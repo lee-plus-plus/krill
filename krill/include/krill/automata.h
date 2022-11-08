@@ -7,9 +7,8 @@
 using std::pair;
 using std::set, std::map, std::multimap, std::vector;
 
-namespace krill::lexical {
+namespace krill::automata {
 
-const int ERROR_STATE = -1; // dfa跳转错误状态, 作为dfa邻接矩阵的占位值
 const int EMPTY_SYMBOL = 0; // 空字符ε, 作为nfa空边
 
 using DFAgraph = map<int, map<int, int>>;      // {from, {symbol, to}}
@@ -44,10 +43,10 @@ DFA getMinimizedDfa(DFA dfa);
 DFA getDFAfromNFA(NFA nfa);
 DFA getDFAintegrated(vector<DFA> dfas);
 
-} // namespace krill::lexical
+} // namespace krill::automata
 
-namespace krill::lexical::utils {
-    using namespace krill::lexical;
+namespace krill::automata::utils {
+    using namespace krill::automata;
 
     NFAgraph toNFAgraph(EdgeTable edgeTable);
     DFAgraph toDFAgraph(EdgeTable edgeTable);
@@ -61,6 +60,6 @@ namespace krill::lexical::utils {
     pair<DFAgraph, map<int, set<int>>> getCoverMapfromNFAgraph(NFAgraph nfaGraph);
     map<int, int> getFinalityFromCoverMap(map<int, int> nfaFinality, map<int, set<int>> coverMap);
     DFA _getDFAintegrated(vector<DFA> dfas);
-} // namespace krill:lexical::utils
+} // namespace krill:automata::utils
 
 #endif

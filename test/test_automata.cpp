@@ -1,11 +1,11 @@
 #include "krill/defs.h"
-#include "krill/FaModels.h"
+#include "krill/automata.h"
 #include "Krill/utils.h"
 #include <iostream>
 using namespace std;
 using namespace krill;
-using namespace krill::lexical;
-using namespace krill::lexical::utils;
+using namespace krill::automata;
+using namespace krill::automata::utils;
 using namespace krill::utils;
 
 // test the transformation from EdgeTable to NFA to DFA

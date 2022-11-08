@@ -1,10 +1,10 @@
-#include "krill/FaModels.h"
+#include "krill/automata.h"
 #include <algorithm>
 #include <queue>
 using std::max, std::min;
 using std::queue;
 
-namespace krill::lexical {
+namespace krill::automata {
 
 bool Edge::operator<(const Edge &e) const {
     return (symbol < e.symbol ||
@@ -47,9 +47,9 @@ DFA getDFAintegrated(vector<DFA> dfas) {
     return getMinimizedDfa(utils::_getDFAintegrated(dfas));
 }
 
-} // namespace krill::lexical
+} // namespace krill::automata
 
-namespace krill::lexical::utils {
+namespace krill::automata::utils {
 
 
 // EdgeTabel => NFAgraph
@@ -229,8 +229,8 @@ DFA getMergedDfa(DFA dfa) {
     // 替换
     EdgeTable edgeTable = toEdgeTable(dfa.graph);
     for (auto it = edgeTable.begin(); it != edgeTable.end(); it++) {
-        it->from = replaceMap[it->from];
-        it->to   = replaceMap[it->to];
+      it->from = replaceMap[it->from];
+      it->to = replaceMap[it->to];
     }
     DFA resDfa;
     resDfa.graph = toDFAgraph(edgeTable);
@@ -313,4 +313,4 @@ DFA _getDFAintegrated(vector<DFA> dfas) {
     return dfa;
 }
 
-} // namespace krill::lexical::utils
+} // namespace krill::automata::utils

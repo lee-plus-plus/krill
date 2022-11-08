@@ -1,8 +1,8 @@
 #include "krill/utils.h"
-#include "krill/FaModels.h"
+#include "krill/automata.h"
 #include <fmt/core.h>
 #include <set>
-using namespace krill::lexical;
+using namespace krill::automata;
 
 namespace krill::utils {
 
