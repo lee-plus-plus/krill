@@ -44,7 +44,6 @@ DFA getMinimizedDfa(DFA dfa);
 DFA getDFAfromNFA(NFA nfa);
 DFA getDFAintegrated(vector<DFA> dfas);
 
-
 } // namespace krill::lexical
 
 namespace krill::lexical::utils {
@@ -61,6 +60,7 @@ namespace krill::lexical::utils {
     map<int, set<int>> getNextCovers(set<int> cover, NFAgraph nfa);
     pair<DFAgraph, map<int, set<int>>> getCoverMapfromNFAgraph(NFAgraph nfaGraph);
     map<int, int> getFinalityFromCoverMap(map<int, int> nfaFinality, map<int, set<int>> coverMap);
+    DFA _getDFAintegrated(vector<DFA> dfas);
 } // namespace krill:lexical::utils
 
 #endif

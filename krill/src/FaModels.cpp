@@ -32,38 +32,19 @@ DFA getDFAfromNFA(NFA nfa) {
 }
 
 // 将若干个DFA整合为1个大DFA
+// 返回的大DFA的finality指示从原先第几个DFA的退出
+// 原先的DFA的finality的含义被抹去
 DFA getDFAintegrated(vector<DFA> dfas) {
-    vector<EdgeTable> edgeTables(dfas.size());
     for (int i = 0; i < dfas.size(); i++) {
-        dfas[i]       = utils::getMinimizedDfa(dfas[i]);
-        edgeTables[i] = utils::toEdgeTable(dfas[i].graph);
-    }
-
-    EdgeTable nfaEdgeTable;
-    map<int, int> nfaFinality;
-
-    // 更新规则很简单，就是把每个状态的重编号，把边集求合
-    // states = {0, dfa0.states, dfa1.states, ...}
-    int numStateAdded = 1;
-    for (int i = 0; i < dfas.size(); i++) {
-        // 更新边集合
-        nfaEdgeTable.push_back({EMPTY_SYMBOL, 0, numStateAdded});
-        for (Edge &edge : edgeTables[i]) {
-            nfaEdgeTable.push_back({edge.symbol, edge.from + numStateAdded,
-                                    edge.to + numStateAdded});
+        dfas[i] = getMinimizedDfa(dfas[i]);
+        for (auto it = dfas[i].finality.begin(); it != dfas[i].finality.end();
+             it++) {
+            if (it->second != 0) {
+                it->second = i + 1;
+            }
         }
-        // 更新终结状态集合
-        for (int state = 0; state < dfas[i].finality.size(); state++) {
-            nfaFinality[state + numStateAdded] = dfas[i].finality[state];
-        }
-
-        numStateAdded += dfas[i].finality.size();
     }
-
-    NFA nfa = {utils::toNFAgraph(nfaEdgeTable), nfaFinality};
-    DFA dfa = getDFAfromNFA(nfa);
-    dfa     = getMinimizedDfa(dfa);
-    return dfa;
+    return getMinimizedDfa(utils::_getDFAintegrated(dfas));
 }
 
 } // namespace krill::lexical
@@ -295,6 +276,41 @@ map<int, set<int>> getNextCovers(set<int> cover, NFAgraph nfaGraph) {
         setCoverExpanded(it->second, nfaGraph);
     }
     return nextCovers;
+}
+
+// 将若干个DFA整合为1个大DFA (for smarter person)
+// 保留原先的DFA的finality的含义
+// 如果你不明白原理，请使用 getDFAintegrated
+DFA _getDFAintegrated(vector<DFA> dfas) {
+    vector<EdgeTable> edgeTables(dfas.size());
+    for (int i = 0; i < dfas.size(); i++) {
+        edgeTables[i] = toEdgeTable(dfas[i].graph);
+    }
+
+    EdgeTable nfaEdgeTable;
+    map<int, int> nfaFinality;
+
+    // 更新规则很简单，就是把每个状态的重编号，把边集求合
+    // states = {0, dfa0.states, dfa1.states, ...}
+    int numStateAdded = 1;
+    for (int i = 0; i < dfas.size(); i++) {
+        // 更新边集合
+        nfaEdgeTable.push_back({EMPTY_SYMBOL, 0, numStateAdded});
+        for (Edge &edge : edgeTables[i]) {
+            nfaEdgeTable.push_back({edge.symbol, edge.from + numStateAdded,
+                                    edge.to + numStateAdded});
+        }
+        // 更新终结状态集合
+        for (int state = 0; state < dfas[i].finality.size(); state++) {
+            nfaFinality[state + numStateAdded] = dfas[i].finality[state];
+        }
+
+        numStateAdded += dfas[i].finality.size();
+    }
+
+    NFA nfa = {toNFAgraph(nfaEdgeTable), nfaFinality};
+    DFA dfa = getDFAfromNFA(nfa);
+    return dfa;
 }
 
 } // namespace krill::lexical::utils
