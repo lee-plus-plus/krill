@@ -3,6 +3,8 @@
 #include "defs.h"
 
 namespace krill::utils {
+	void printDFA(const DFA dfa);
+	void printNFA(const NFA nfa);
 
 } // krill::utils
 #endif
