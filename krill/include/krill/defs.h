@@ -1,16 +1,21 @@
 #ifndef DEFS_H
 #define DEFS_H
+#include <vector>
+#include <map>
 
 namespace krill {
     namespace automata {
-        class DFA;
-        class NFA;
-        class Edge;
+        struct DFA;
+        struct NFA;
+        struct Edge;
+        using EdgeTable = std::vector<Edge>;
     }
     namespace grammar {
-        class Grammar;
-        class Production;
-        class ActionTable;
+        struct Grammar;
+        struct Prod;
+        struct ProdItem;
+        struct Action;
+        using ActionTable = std::map<std::pair<int, int>, Action>;
     }
     namespace utils {}
     namespace runtime {}

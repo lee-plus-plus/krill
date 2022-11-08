@@ -16,18 +16,17 @@ bool Edge::operator==(const Edge &e) const {
     return (symbol == e.symbol && from == e.from && to == e.to);
 }
 
-
 // 最小化DFA
 // 包括了消除不可达状态、合并等价状态
 DFA getMinimizedDfa(DFA dfa) {
-    return utils::getReachableDfa(utils::getMergedDfa(dfa));
+    return core::getReachableDfa(core::getMergedDfa(dfa));
 }
 
 // 将NFA转为DFA
 // 采用默认方式确定覆盖片(DFA节点)的可终结属性
 DFA getDFAfromNFA(NFA nfa) {
-    auto[dfaGraph, coverMap] = utils::getCoverMapfromNFAgraph(nfa.graph);
-    auto finality = utils::getFinalityFromCoverMap(nfa.finality, coverMap);
+    auto[dfaGraph, coverMap] = core::getCoverMapfromNFAgraph(nfa.graph);
+    auto finality = core::getFinalityFromCoverMap(nfa.finality, coverMap);
     return DFA({dfaGraph, finality});
 }
 
@@ -39,18 +38,15 @@ DFA getDFAintegrated(vector<DFA> dfas) {
         dfas[i] = getMinimizedDfa(dfas[i]);
         for (auto it = dfas[i].finality.begin(); it != dfas[i].finality.end();
              it++) {
-            if (it->second != 0) {
-                it->second = i + 1;
-            }
+            if (it->second != 0) { it->second = i + 1; }
         }
     }
-    return getMinimizedDfa(utils::_getDFAintegrated(dfas));
+    return getMinimizedDfa(core::_getDFAintegrated(dfas));
 }
 
 } // namespace krill::automata
 
-namespace krill::automata::utils {
-
+namespace krill::automata::core {
 
 // EdgeTabel => NFAgraph
 NFAgraph toNFAgraph(EdgeTable edgeTable) {
@@ -175,7 +171,6 @@ DFA getReachableDfa(DFA dfa) {
     return resDfa;
 }
 
-
 // 合并DFA等价状态
 // 可终结性相同且跳转等效的节点将会被合并
 // 用不同值标注DFA的节点可终结属性, 可以防止合并
@@ -229,8 +224,8 @@ DFA getMergedDfa(DFA dfa) {
     // 替换
     EdgeTable edgeTable = toEdgeTable(dfa.graph);
     for (auto it = edgeTable.begin(); it != edgeTable.end(); it++) {
-      it->from = replaceMap[it->from];
-      it->to = replaceMap[it->to];
+        it->from = replaceMap[it->from];
+        it->to   = replaceMap[it->to];
     }
     DFA resDfa;
     resDfa.graph = toDFAgraph(edgeTable);
@@ -313,4 +308,4 @@ DFA _getDFAintegrated(vector<DFA> dfas) {
     return dfa;
 }
 
-} // namespace krill::automata::utils
+} // namespace krill::automata::core
