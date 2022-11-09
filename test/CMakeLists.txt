@@ -6,4 +6,9 @@ add_executable(test_grammar test_grammar.cpp)
 add_executable(test_codegen_c test_codegen_c.cpp)
 add_executable(test_codegen_cpp test_codegen_cpp.cpp)
 
-add_custom_target(test_codegen DEPENDS test_codegen_c test_codegen_cpp)
+add_custom_target(test_codegen 
+	DEPENDS test_codegen_c test_codegen_cpp
+	COMMAND ${CMAKE_COMMAND} -E make_directory ../demo
+	COMMAND test_codegen_c   > ../demo/calc.c
+	COMMAND test_codegen_cpp > ../demo/calc.cpp
+	)

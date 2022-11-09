@@ -10,21 +10,23 @@ using namespace krill::grammar;
 using namespace krill::utils;
 using namespace krill::codegen;
 
-// test the transformation from EdgeTable to NFA to DFA
+// test Syntax Parser code generator
 void test1() {
-    fprintf(stderr, "test code generator \n");
-    fprintf(stderr, "------------------- \n");
+    // fprintf(stderr, "test code generator \n");
+    // fprintf(stderr, "------------------- \n");
     auto[grammar, symbolNames] = getGrammarFromStr({
-        "Q -> S",
-        "S -> V = R",
-        "S -> R",
-        "R -> L",
-        "L -> * R",
-        "L -> i",
-        "V -> a",
+        "Q -> P",
+        "P -> T",
+        "T -> ( P )",
+        "T -> T * T",
+        "T -> T / T",
+        "P -> T + T",
+        "P -> T - T",
+        "T -> - T",
+        "T -> d",
     });
-    fprintf(stderr, "> initial grammar: \n");
-    printGrammar(grammar, symbolNames, cerr);
+    // fprintf(stderr, "> initial grammar (calculator): \n");
+    // printGrammar(grammar, symbolNames, cerr);
 
     auto actionTable = getLALR1table(grammar);
     genSyntaxParserInCStyle(grammar, symbolNames, actionTable, cout);
@@ -33,13 +35,6 @@ void test1() {
 
 
 int main() {
-    vector<void (*)()> testFuncs = {
-        test1,
-    };
-    for (int i = 0; i < testFuncs.size(); i++) {
-        cerr << "#test " << (i + 1) << endl;
-        testFuncs[i]();
-        cerr << endl << endl;
-    }
+    test1();
     return 0;
 }
