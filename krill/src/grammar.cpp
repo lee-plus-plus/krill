@@ -45,13 +45,13 @@ ActionTable getLR1table(Grammar grammar) {
 // LALR(1) analyze table
 ActionTable getLALR1table(Grammar grammar) {
     auto[covers0, edgeTable0] = core::getLR1dfa(grammar);
-    auto[covers, edgeTable]   = core::getLALR1fromLR1(grammar, covers0, edgeTable0);
-    auto lalr1table           = core::getLR1table(grammar, covers, edgeTable);
+    auto[covers, edgeTable] =
+        core::getLALR1fromLR1(grammar, covers0, edgeTable0);
+    auto lalr1table = core::getLR1table(grammar, covers, edgeTable);
     return lalr1table;
 }
 
 } // namespace krill::grammar
-
 
 namespace krill::grammar::core {
 // ---
@@ -96,7 +96,7 @@ map<int, set<int>> getFirstSet(Grammar grammar) {
             for (int i = 0; i < prod.right.size(); i++) {
                 // prod: X -> Y0 Y1...Yi γ, epsilon ∈ first(Y0),...,first(Yi)
                 // ==> first(X) += first(γ)
-                int y            = prod.right[i];
+                int      y       = prod.right[i];
                 set<int> tempSet = firstSet[y];
                 tempSet.erase(EMPTY_SYMBOL);
                 for (int elem : tempSet) {
@@ -139,8 +139,8 @@ map<int, set<int>> getFollowSet(Grammar grammar, map<int, set<int>> firstSet) {
                 if (grammar.nonterminalSet.count(prod.right[i])) {
                     if (i != prod.right.size() - 1) {
                         // B -> αAβ ==> follow(A) += {first(β) - epsilon}
-                        int A            = prod.right[i];
-                        int b            = prod.right[i + 1];
+                        int      A       = prod.right[i];
+                        int      b       = prod.right[i + 1];
                         set<int> tempSet = firstSet[b];
                         tempSet.erase(EMPTY_SYMBOL);
                         for (int elem : tempSet) {
@@ -172,12 +172,12 @@ map<int, set<int>> getFollowSet(Grammar grammar, map<int, set<int>> firstSet) {
 // lr(1)分析
 // 输入文法, 返回DFA和DFA节点所表示的lr(1)产生式项目
 pair<vector<LR1Cover>, EdgeTable> getLR1dfa(Grammar grammar) {
-    auto firstSet = getFirstSet(grammar);
+    auto firstSet  = getFirstSet(grammar);
     auto followSet = getFollowSet(grammar, firstSet);
     // generate covers
     vector<LR1Cover> covers;
-    LR1Cover initCover = {{grammar.prods[0].symbol,
-                           grammar.prods[0].right, 0, END_SYMBOL}};
+    LR1Cover         initCover = {
+        {grammar.prods[0].symbol, grammar.prods[0].right, 0, END_SYMBOL}};
     setLR1CoverExpanded(initCover, firstSet, grammar);
     covers.push_back(initCover); // generate inital cover
 
@@ -234,8 +234,7 @@ void setLR1CoverExpanded(LR1Cover &cover, map<int, set<int>> firstSet,
 
                 set<int> nextSet = firstSet[prodItem.right[prodItem.dot + 1]];
                 for (int c : nextSet) {
-                    ProdLR1Item nextProdItem(
-                        {prod.symbol, prod.right, 0, c});
+                    ProdLR1Item nextProdItem({prod.symbol, prod.right, 0, c});
                     if (cover.count(nextProdItem) == 0) {
                         cover.insert(nextProdItem);
                         q.push(nextProdItem);
@@ -261,7 +260,7 @@ void setLR1CoverExpanded(LR1Cover &cover, map<int, set<int>> firstSet,
 ActionTable getLR1table(Grammar grammar, vector<LR1Cover> covers,
                         EdgeTable edgeTable) {
     vector<Prod> &prods = grammar.prods;
-    ActionTable analyzeTable;
+    ActionTable   analyzeTable;
 
     // edges ==> ACTION and GOTO
     for (Edge edge : edgeTable) {
@@ -299,15 +298,15 @@ pair<vector<LR1Cover>, EdgeTable>
 getLALR1fromLR1(Grammar grammar, vector<LR1Cover> covers, EdgeTable edgeTable) {
     // 反向寻找每个覆盖片的对应原始推导式
     map<ProdItem, int> prodIndex;
-    int i = 0;
+    int                i = 0;
     for (auto p : grammar.prods) {
         for (int j = 0; j < p.right.size() + 1; j++, i++) {
             prodIndex[{p.symbol, p.right, j}] = i;
         }
     }
 
-    typedef set<int> ID;      // concentric ID
-    map<int, ID> coverIdx2ID; // <index LR1 covers, concentric ID>
+    typedef set<int> ID;          // concentric ID
+    map<int, ID>     coverIdx2ID; // <index LR1 covers, concentric ID>
     for (int i = 0; i < covers.size(); i++) {
         for (auto p : covers[i]) {
             ProdItem prod = {p.symbol, p.right, p.dot};
@@ -315,14 +314,14 @@ getLALR1fromLR1(Grammar grammar, vector<LR1Cover> covers, EdgeTable edgeTable) {
         }
     }
     map<ID, int> ID2LALRIdx;
-    int numLALR1Covers = 0;
+    int          numLALR1Covers = 0;
     for (auto[coverIdx, ID] : coverIdx2ID) {
         if (ID2LALRIdx.count(ID) == 0) {
             ID2LALRIdx[ID] = numLALR1Covers;
             numLALR1Covers++;
         }
     }
-    map<int, int> coverIdx2LALRIdx;
+    map<int, int>      coverIdx2LALRIdx;
     map<int, set<int>> LALRIdx2coverIdxs;
     for (auto[coverIdx, ID] : coverIdx2ID) {
         int LALRIdx                = ID2LALRIdx[ID];
@@ -332,8 +331,8 @@ getLALR1fromLR1(Grammar grammar, vector<LR1Cover> covers, EdgeTable edgeTable) {
 
     // map
     vector<LR1Cover> resCovers;
-    EdgeTable resEdgeTable;
-    set<Edge> resEdgeTable0;
+    EdgeTable        resEdgeTable;
+    set<Edge>        resEdgeTable0;
     for (const auto[LALR1Idex, coverIdxs] : LALRIdx2coverIdxs) {
         LR1Cover resCover;
         for (int idx : coverIdxs) {
@@ -345,11 +344,9 @@ getLALR1fromLR1(Grammar grammar, vector<LR1Cover> covers, EdgeTable edgeTable) {
         resEdgeTable0.insert({edge.symbol, coverIdx2LALRIdx[edge.from],
                               coverIdx2LALRIdx[edge.to]});
     }
-	for (auto edge : resEdgeTable0) {
-		resEdgeTable.push_back(edge);
-	}
+    for (auto edge : resEdgeTable0) { resEdgeTable.push_back(edge); }
 
-	return make_pair(resCovers, resEdgeTable);
+    return make_pair(resCovers, resEdgeTable);
 }
 
 } // krill::grammar::core

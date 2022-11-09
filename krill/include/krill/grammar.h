@@ -1,13 +1,13 @@
 #ifndef GRAMMAR_H
 #define GRAMMAR_H
-#include "defs.h"
 #include "automata.h"
+#include "defs.h"
 #include <map>
 #include <set>
 #include <vector>
+using krill::automata::EdgeTable;
 using std::pair;
 using std::set, std::map, std::multimap, std::vector;
-using krill::automata::EdgeTable;
 
 namespace krill::grammar {
 

@@ -10,11 +10,11 @@ using std::set, std::map, std::multimap, std::vector;
 namespace krill::automata {
 
 const int EMPTY_SYMBOL = 0; // 空字符ε, 作为NFA/EdgeTable空边
-using DFAgraph = map<int, map<int, int>>;      // {from, {symbol, to}}
-using NFAgraph = map<int, multimap<int, int>>; // {from, {symbol, to}}
+using DFAgraph         = map<int, map<int, int>>;      // {from, {symbol, to}}
+using NFAgraph         = map<int, multimap<int, int>>; // {from, {symbol, to}}
 
 struct DFA {
-    DFAgraph graph;
+    DFAgraph      graph;
     map<int, int> finality;
 };
 
@@ -44,19 +44,19 @@ DFA getDFAintegrated(vector<DFA> dfas);
 namespace krill::automata::core {
 using namespace krill::automata;
 
-NFAgraph toNFAgraph(EdgeTable edgeTable);
-DFAgraph toDFAgraph(EdgeTable edgeTable);
+NFAgraph  toNFAgraph(EdgeTable edgeTable);
+DFAgraph  toDFAgraph(EdgeTable edgeTable);
 EdgeTable toEdgeTable(DFAgraph dfa);
 
 DFA getReachableDfa(DFA dfa);
 DFA getMergedDfa(DFA dfa);
 
-void setCoverExpanded(set<int> &cover, NFAgraph nfa);
+void               setCoverExpanded(set<int> &cover, NFAgraph nfa);
 map<int, set<int>> getNextCovers(set<int> cover, NFAgraph nfa);
 pair<DFAgraph, map<int, set<int>>> getCoverMapfromNFAgraph(NFAgraph nfaGraph);
-map<int, int> getFinalityFromCoverMap(map<int, int> nfaFinality,
+map<int, int> getFinalityFromCoverMap(map<int, int>      nfaFinality,
                                       map<int, set<int>> coverMap);
-DFA _getDFAintegrated(vector<DFA> dfas);
+DFA           _getDFAintegrated(vector<DFA> dfas);
 } // namespace krill::automata::core
 
 #endif

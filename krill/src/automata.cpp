@@ -84,7 +84,7 @@ EdgeTable toEdgeTable(DFAgraph dfa) {
 // 不负责处理转换后的可终结属性
 pair<DFAgraph, map<int, set<int>>> getCoverMapfromNFAgraph(NFAgraph nfaGraph) {
     vector<set<int>> covers; // dfa节点对原nfa节点的映射
-    DFAgraph dfaGraph;
+    DFAgraph         dfaGraph;
 
     // 构造初始覆盖片
     set<int> initCover({0});
@@ -104,13 +104,13 @@ pair<DFAgraph, map<int, set<int>>> getCoverMapfromNFAgraph(NFAgraph nfaGraph) {
         // 对覆盖片步进，产生新覆盖片
         map<int, set<int>> nextCovers = getNextCovers(cover, nfaGraph);
         for (const auto &elem : nextCovers) {
-            int symbol         = elem.first;
+            int      symbol    = elem.first;
             set<int> nextCover = elem.second;
 
             if (symbol == EMPTY_SYMBOL) { continue; }
             // 为覆盖片分配下一个idx，加入
-            auto it          = find(covers.begin(), covers.end(), nextCover);
-            int nextCoverIdx = (int) (it - covers.begin());
+            auto it           = find(covers.begin(), covers.end(), nextCover);
+            int  nextCoverIdx = (int) (it - covers.begin());
             if ((size_t) nextCoverIdx == covers.size()) {
                 covers.push_back(nextCover); // 无重复, 先生成新覆盖片
             }
@@ -134,7 +134,7 @@ pair<DFAgraph, map<int, set<int>>> getCoverMapfromNFAgraph(NFAgraph nfaGraph) {
 // 每个DFA均以0为起始状态，合并得到唯一起始状态
 // 用不同值标注DFA的节点可终结属性, 可以防止合并
 // (得到的DFA未最小化)
-map<int, int> getFinalityFromCoverMap(map<int, int> nfaFinality,
+map<int, int> getFinalityFromCoverMap(map<int, int>      nfaFinality,
                                       map<int, set<int>> coverMap) {
     map<int, int> finality;
     for (const auto &elem : coverMap) {
@@ -147,8 +147,8 @@ map<int, int> getFinalityFromCoverMap(map<int, int> nfaFinality,
 
 // 消除DFA不可达状态, 并整理DFA状态数字至0 ~ numStates-1
 DFA getReachableDfa(DFA dfa) {
-    DFA resDfa;
-    vector<int> idState({0});
+    DFA           resDfa;
+    vector<int>   idState({0});
     map<int, int> stateId({{0, 0}});
     // bfs
     for (int id = 0; id < idState.size(); id++) {
@@ -189,7 +189,7 @@ DFA getMergedDfa(DFA dfa) {
         return node;
     };
 
-    int numSplitedStates = 1;
+    int                    numSplitedStates = 1;
     map<DFAnode, set<int>> partition;
     while (true) {
         // 按后继状态的染色情况是否相同, 进行进一步划分

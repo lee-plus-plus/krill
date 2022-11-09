@@ -96,7 +96,7 @@ int /* DIY */ syntaxParser(const int num_tokens, int *tokens, int *values) {{
 }}
 )";
 
-const char codeSyntaxParserInCppStyle[]   = R"(
+const char codeSyntaxParserInCppStyle[] = R"(
 #include <cassert>
 #include <map>
 #include <stack>
@@ -183,9 +183,8 @@ int /* DIY */ syntaxParser(vector<int> tokens) {{
 
 // generate code of Syntax Parser (C format, standalone)
 void genSyntaxParserInCStyle(const Grammar &grammar,
-                                  map<int, string> symbolNames,
-                                  const ActionTable &actionTable,
-                                  ostream &oss) {
+                             map<int, string> symbolNames,
+                             const ActionTable &actionTable, ostream &oss) {
 
     // num_states, num_symbols, num_action_items
     stringstream def_num_states;

@@ -42,7 +42,7 @@ void test1() {
 // 语法树节点
 struct GrammarNode {
     vector<GrammarNode *> children;
-    int symbol;
+    int                   symbol;
 };
 
 vector<int> simpleLexicalParser(map<int, string> symbolNames, string src) {
@@ -62,7 +62,7 @@ GrammarNode *simpleSyntaxParser(vector<Prod> prods, ActionTable actionTable,
     if (src[src.size() - 1] != END_SYMBOL) { src.push_back(END_SYMBOL); }
 
     // stack of states
-    vector<int> states;
+    vector<int>           states;
     vector<GrammarNode *> stateNodes;
     states.push_back(0);
 
@@ -84,7 +84,7 @@ GrammarNode *simpleSyntaxParser(vector<Prod> prods, ActionTable actionTable,
                 break;
             }
             case Action::REDUCE: {
-                Prod r = prods[action.tgt];
+                Prod                  r = prods[action.tgt];
                 vector<GrammarNode *> temp;
                 for (int j = 0; j < r.right.size(); j++) {
                     temp.push_back(stateNodes.back());
@@ -197,7 +197,7 @@ void test2() {
 
     printf("> use LR(1) Action Table to analyze: \n");
     printf("> input string: \n");
-    string src         = "(d+d*d)*d+(d)";
+    string      src    = "(d+d*d)*d+(d)";
     vector<int> tokens = simpleLexicalParser(symbolNames, src);
     printf("%s\n", src.c_str());
     for (int i : tokens) { printf("%d ", i); }
@@ -236,7 +236,7 @@ void test3() {
 
     printf("> use LR(1) Action Table to analyze: \n");
     printf("> input string: \n");
-    string src         = "(d+d*d)*d+(d)";
+    string      src    = "(d+d*d)*d+(d)";
     vector<int> tokens = simpleLexicalParser(symbolNames, src);
     printf("%s\n", src.c_str());
 
@@ -252,7 +252,7 @@ void test3() {
 
     printf("> use LALR(1) Action Table to analyze: \n");
     printf("> input string: \n");
-    string src2         = "(d+d*d)*d+(d)";
+    string      src2    = "(d+d*d)*d+(d)";
     vector<int> tokens2 = simpleLexicalParser(symbolNames, src2);
     printf("%s\n", src2.c_str());
 

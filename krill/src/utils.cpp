@@ -13,8 +13,8 @@ void rtrim(string &str) { str.erase(str.find_last_not_of("\r\n\0") + 1); }
 
 vector<string> split(string str, const char *delim) {
     vector<string> res;
-    char *strc = &str[0];
-    char *temp = strtok(strc, delim);
+    char *         strc = &str[0];
+    char *         temp = strtok(strc, delim);
     while (temp != NULL) {
         res.push_back(string(temp));
         temp = strtok(NULL, delim);
@@ -143,18 +143,17 @@ void printActionTable(const ActionTable &actionTable,
     }
 }
 
-
 pair<Grammar, map<int, string>> getGrammarFromStr(vector<string> prodStrs) {
-    vector<Prod> prods;
+    vector<Prod>     prods;
     map<string, int> symbolNamesRev;
     map<int, string> symbolNames;
-    int numStates = 0;
+    int              numStates = 0;
 
     for (string prodStr : prodStrs) {
         vector<string> words = split(prodStr, " ");
         // assume words like {"Term", "->", "Term", "add", "D-Term"}
         // do not accept literal character like "'+'"
-        int symbol;
+        int         symbol;
         vector<int> right;
         for (int i = 0; i < words.size(); i++) {
             if (i == 1) { continue; }
