@@ -25,6 +25,37 @@ bool ProdItem::operator==(const ProdItem &p) const {
     return (symbol == p.symbol && right == p.right && dot == p.dot);
 }
 
+Grammar::Grammar(vector<Prod> prods) : prods(prods) {
+    for (const Prod &prod : prods) {
+        nonterminalSet.insert(prod.symbol);
+        for (int c : prod.right) { terminalSet.insert(c); }
+    }
+    for (int c : nonterminalSet) {
+        if (terminalSet.count(c)) { terminalSet.erase(c); }
+    }
+}
+
+// LR(1) analyze table
+ActionTable getLR1table(Grammar grammar) {
+    auto[covers, edgeTable] = core::getLR1dfa(grammar);
+    auto lr1table           = core::getLR1table(grammar, covers, edgeTable);
+    return lr1table;
+}
+
+// LALR(1) analyze table
+ActionTable getLALR1table(Grammar grammar) {
+    auto[covers0, edgeTable0] = core::getLR1dfa(grammar);
+    auto[covers, edgeTable]   = core::getLALR1fromLR1(grammar, covers0, edgeTable0);
+    auto lalr1table           = core::getLR1table(grammar, covers, edgeTable);
+    return lalr1table;
+}
+
+} // namespace krill::grammar
+
+
+namespace krill::grammar::core {
+// ---
+
 bool ProdLR1Item::operator<(const ProdLR1Item &p) const {
     return (symbol < p.symbol ||
             (symbol == p.symbol &&
@@ -37,37 +68,6 @@ bool ProdLR1Item::operator==(const ProdLR1Item &p) const {
     return (symbol == p.symbol && right == p.right && dot == p.dot &&
             search == p.search);
 }
-
-Grammar::Grammar(vector<Prod> prods) : prods(prods) {
-    for (const Prod &prod : prods) {
-        nonterminalSet.insert(prod.symbol);
-        for (int c : prod.right) { terminalSet.insert(c); }
-    }
-    for (int c : nonterminalSet) {
-        if (terminalSet.count(c)) { terminalSet.erase(c); }
-    }
-}
-
-// // LR(1) analyze table
-// ActionTable getLR1table(Grammar grammar) {
-//     auto[covers, edgeTable] = core::getLR1dfa(grammar);
-//     auto lr1table           = core::getLR1table(grammar, covers, edgeTable);
-//     return lr1table;
-// }
-
-// // LALR(1) analyze table
-// ActionTable getLALR1table(Grammar grammar) {
-//     auto[covers0, edgeTable0] = core::getLR1dfa(grammar);
-//     auto[covers, edgeTable]   = core::getLALR1fromLR1(grammar, covers0, edgeTable0);
-//     auto lalr1table           = core::getLR1table(grammar, covers, edgeTable);
-//     return lalr1table;
-// }
-
-} // namespace krill::grammar
-
-
-namespace krill::grammar::core {
-// ---
 
 // 求首符集
 map<int, set<int>> getFirstSet(Grammar grammar) {

@@ -126,7 +126,7 @@ void printFirstset(const map<int, set<int>> &firstSet, ostream &oss) {
 }
 
 void printActionTable(const ActionTable &actionTable, map<int, string> symbolNames, ostream &oss) {
-    oss << "Analysis Table: \n";
+    oss << fmt::format("Analysis Table (size={}): \n", actionTable.size());
     string typeName[] = {"ACTION", "REDUCE", "GOTO  ", "ACCEPT"};
     for (auto[key, action] : actionTable) {
         oss << fmt::format("s{:<2d} --> {:s} --> {:<6s} ", key.first, key.second != END_SYMBOL ? symbolNames[key.second] : "[end]",

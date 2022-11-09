@@ -11,6 +11,8 @@ using krill::automata::EdgeTable;
 
 namespace krill::grammar {
 
+const int END_SYMBOL = -1; // 作为语法分析终结标志
+
 // 产生式 (P -> Ab)
 struct Prod {
     int symbol;        // left, nonterminal symbol
@@ -40,20 +42,6 @@ struct ProdItem : Prod {
     bool operator==(const ProdItem &p) const;
 };
 
-const int END_SYMBOL = -1; // 作为语法分析终结标志
-// LR1产生式项目 (P -> A·b, a)
-struct ProdLR1Item : ProdItem {
-    int search; // search symbol (terminal)
-    ProdLR1Item(int symbol, vector<int> right, int dot, int search)
-        : ProdItem(symbol, right, dot), search(search){};
-    // to make std::set happy
-    bool operator<(const ProdLR1Item &p) const;
-    bool operator==(const ProdLR1Item &p) const;
-};
-
-// LR1覆盖片
-using LR1Cover = set<ProdLR1Item>;
-
 // lr(1) 分析表动作
 struct Action {
     enum TYPE { ACTION = 0, REDUCE = 1, GOTO = 2, ACCEPT = 3 };
@@ -70,6 +58,20 @@ ActionTable getLALR1table(Grammar grammar);
 
 namespace krill::grammar::core {
 using namespace krill::grammar;
+
+// LR1产生式项目 (P -> A·b, a)
+struct ProdLR1Item : ProdItem {
+    int search; // search symbol (terminal)
+    ProdLR1Item(int symbol, vector<int> right, int dot, int search)
+        : ProdItem(symbol, right, dot), search(search){};
+    // to make std::set happy
+    bool operator<(const ProdLR1Item &p) const;
+    bool operator==(const ProdLR1Item &p) const;
+};
+
+// LR1覆盖片
+using LR1Cover = set<ProdLR1Item>;
+
 
 // 求非终结符的首符集
 // 输入非终结符集合和CFG文法, 返回首符集
