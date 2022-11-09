@@ -240,7 +240,8 @@ void test3() {
     vector<int> tokens = simpleLexicalParser(symbolNames, src);
     printf("%s\n", src.c_str());
 
-    GrammarNode *root = simpleSyntaxParser(grammar.prods, actionTable, tokens, false);
+    GrammarNode *root =
+        simpleSyntaxParser(grammar.prods, actionTable, tokens, false);
     printf("> grammar tree: \n");
     printGrammarTreeNode(root, symbolNames, cout);
 
@@ -255,7 +256,8 @@ void test3() {
     vector<int> tokens2 = simpleLexicalParser(symbolNames, src2);
     printf("%s\n", src2.c_str());
 
-    GrammarNode *root2 = simpleSyntaxParser(grammar.prods, actionTable2, tokens2, false);
+    GrammarNode *root2 =
+        simpleSyntaxParser(grammar.prods, actionTable2, tokens2, false);
     printf("> grammar tree: \n");
     printGrammarTreeNode(root2, symbolNames, cout);
 
@@ -265,7 +267,7 @@ void test3() {
 int main() {
     vector<void (*)()> testFuncs = {test1, test2, test3};
     for (int i = 0; i < testFuncs.size(); i++) {
-        cout << "#test " << (i+1) << endl;
+        cout << "#test " << (i + 1) << endl;
         testFuncs[i]();
         cout << endl << endl;
     }

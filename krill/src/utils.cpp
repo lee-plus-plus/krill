@@ -25,8 +25,8 @@ vector<string> split(string str, const char *delim) {
 void printEdgeTable(EdgeTable edgeTable, ostream &oss) {
     oss << "EdgeTable: \n";
     for (const Edge &edge : edgeTable) {
-        oss << fmt::format("s{:<2d} --> {:2d} --> s{:<2d}\n", 
-                           edge.from, edge.symbol, edge.to);
+        oss << fmt::format("s{:<2d} --> {:2d} --> s{:<2d}\n", edge.from,
+                           edge.symbol, edge.to);
     }
 }
 
@@ -125,11 +125,14 @@ void printFirstset(const map<int, set<int>> &firstSet, ostream &oss) {
     }
 }
 
-void printActionTable(const ActionTable &actionTable, map<int, string> symbolNames, ostream &oss) {
+void printActionTable(const ActionTable &actionTable,
+                      map<int, string> symbolNames, ostream &oss) {
     oss << fmt::format("Analysis Table (size={}): \n", actionTable.size());
     string typeName[] = {"ACTION", "REDUCE", "GOTO  ", "ACCEPT"};
     for (auto[key, action] : actionTable) {
-        oss << fmt::format("s{:<2d} --> {:s} --> {:<6s} ", key.first, key.second != END_SYMBOL ? symbolNames[key.second] : "[end]",
+        oss << fmt::format("s{:<2d} --> {:s} --> {:<6s} ", key.first,
+                           key.second != END_SYMBOL ? symbolNames[key.second]
+                                                    : "[end]",
                            typeName[action.type]);
         if (action.type == Action::ACTION || action.type == Action::GOTO) {
             oss << fmt::format("s{:<2d}", action.tgt);
