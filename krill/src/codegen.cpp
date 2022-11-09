@@ -12,11 +12,12 @@ const char codeSyntaxParserInCStyle[] = R"(
 #include <assert.h>
 #include <stdio.h>
 
-int /* DIY */ syntaxParser(const int num_tokens, int *tokens, int *values) {{
+typedef struct {{ int value; }} GrammarNode; // DIY
+
+GrammarNode syntaxParser(const int num_tokens, int *tokens, int *values) {{
   typedef struct {{ int symbol; int len_right; int *right; }} Prod;
   enum TYPE {{ACTION=0, REDUCE=1, GOTO=2, ACCEPT=3}};
-  typedef struct {{ int value; }} GrammarNode; // DIY
-
+  
   #define num_states /* FILL-0 */ {}
   #define num_symbols /* FILL-1 */ {}
   #define num_action_items /* FILL-2 */ {}
@@ -92,7 +93,7 @@ int /* DIY */ syntaxParser(const int num_tokens, int *tokens, int *values) {{
     }}       
   }}
   assert(len_state_nodes == 1);
-  return state_nodes[0].value; // DIY
+  return state_nodes[0];
 }}
 )";
 
@@ -103,13 +104,14 @@ const char codeSyntaxParserInCppStyle[] = R"(
 #include <vector>
 using std::pair, std::vector, std::map, std::stack;
 
-int /* DIY */ syntaxParser(vector<int> tokens) {{
+struct GrammarNode {{ int value; }}; // DIY
+
+GrammarNode syntaxParser(vector<int> tokens) {{
   // declaration of struct
   struct Prod {{ int symbol; vector<int> right; }};
   enum TYPE {{ACTION, REDUCE, GOTO, ACCEPT}};
   struct Action {{ TYPE type; int tgt; }};
   typedef map<pair<int, int>, Action> ActionTable;
-  struct GrammarNode {{ int value; }}; // DIY
 
   // prods
   vector<Prod> prods = {{
@@ -177,7 +179,7 @@ int /* DIY */ syntaxParser(vector<int> tokens) {{
     }}       
   }}
   assert(stateNodes.size() == 1);
-  return stateNodes.top().value; // DIY
+  return stateNodes.top();
 }} 
 )";
 

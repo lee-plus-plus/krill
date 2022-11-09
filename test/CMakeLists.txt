@@ -11,4 +11,5 @@ add_custom_target(test_codegen
 	COMMAND ${CMAKE_COMMAND} -E make_directory ../demo
 	COMMAND test_codegen_c   > ../demo/calc.c
 	COMMAND test_codegen_cpp > ../demo/calc.cpp
+	COMMENT "generated as demo/calc.c, demo/calc.cpp"
 	)
