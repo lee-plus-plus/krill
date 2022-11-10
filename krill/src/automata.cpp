@@ -23,8 +23,8 @@ DFA getMinimizedDfa(DFA dfa) {
 // 将NFA转为DFA
 // 采用默认方式确定覆盖片(DFA节点)的可终结属性
 DFA getDFAfromNFA(NFA nfa) {
-    auto[dfaGraph, coverMap] = core::getCoverMapfromNFAgraph(nfa.graph);
-    auto finality = core::getFinalityFromCoverMap(nfa.finality, coverMap);
+    auto[dfaGraph, closureMap] = core::getClosureMapfromNFAgraph(nfa.graph);
+    auto finality = core::getFinalityFromClosureMap(nfa.finality, closureMap);
     return DFA({dfaGraph, finality});
 }
 
@@ -80,51 +80,51 @@ EdgeTable toEdgeTable(DFAgraph dfa) {
 // 由于覆盖片中各节点可能拥有不同可终结属性, 覆盖片(DFA节点)的可终结属性无法确定
 // 返回DFA和覆盖片，其中覆盖片记录了DFA-NFA节点映射关系
 // 不负责处理转换后的可终结属性
-pair<DFAgraph, map<int, set<int>>> getCoverMapfromNFAgraph(NFAgraph nfaGraph) {
-    vector<set<int>> covers; // dfa节点对原nfa节点的映射
+pair<DFAgraph, ClosureMap> getClosureMapfromNFAgraph(NFAgraph nfaGraph) {
+    vector<set<int>> closures; // dfa节点对原nfa节点的映射
     DFAgraph         dfaGraph;
 
     // 构造初始覆盖片
-    set<int> initCover({0});
-    setCoverExpanded(initCover, nfaGraph);
-    covers.push_back(initCover);
+    set<int> initClosure({0});
+    setClosureExpanded(initClosure, nfaGraph);
+    closures.push_back(initClosure);
 
     // bfs, 产生新覆盖片
-    for (int coverIdx = 0; (size_t) coverIdx < covers.size(); coverIdx++) {
-        set<int> cover = covers[coverIdx];
+    for (int closureIdx = 0; (size_t) closureIdx < closures.size(); closureIdx++) {
+        set<int> closure = closures[closureIdx];
 
         set<int> nextSymbols;
-        for (int state : cover) {
+        for (int state : closure) {
             for (const auto &node : nfaGraph[state]) {
                 nextSymbols.insert(node.first);
             }
         }
         // 对覆盖片步进，产生新覆盖片
-        map<int, set<int>> nextCovers = getNextCovers(cover, nfaGraph);
-        for (const auto &elem : nextCovers) {
+        map<int, set<int>> nextClosures = getNextClosures(closure, nfaGraph);
+        for (const auto &elem : nextClosures) {
             int      symbol    = elem.first;
-            set<int> nextCover = elem.second;
+            set<int> nextClosure = elem.second;
 
             if (symbol == EMPTY_SYMBOL) { continue; }
             // 为覆盖片分配下一个idx，加入
-            auto it           = find(covers.begin(), covers.end(), nextCover);
-            int  nextCoverIdx = (int) (it - covers.begin());
-            if ((size_t) nextCoverIdx == covers.size()) {
-                covers.push_back(nextCover); // 无重复, 先生成新覆盖片
+            auto it           = find(closures.begin(), closures.end(), nextClosure);
+            int  nextClosureIdx = (int) (it - closures.begin());
+            if ((size_t) nextClosureIdx == closures.size()) {
+                closures.push_back(nextClosure); // 无重复, 先生成新覆盖片
             }
-            dfaGraph[coverIdx][symbol] = nextCoverIdx;
+            dfaGraph[closureIdx][symbol] = nextClosureIdx;
         }
     }
 
-    // 格式转换, covers -> coverMap
-    map<int, set<int>> coverMap;
-    for (int coverIdx = 0; (size_t) coverIdx < covers.size(); coverIdx++) {
-        for (int nfaState : covers[coverIdx]) {
-            coverMap[coverIdx].insert(nfaState);
+    // 格式转换, closures -> closureMap
+    map<int, set<int>> closureMap;
+    for (int closureIdx = 0; (size_t) closureIdx < closures.size(); closureIdx++) {
+        for (int nfaState : closures[closureIdx]) {
+            closureMap[closureIdx].insert(nfaState);
         }
     }
 
-    return make_pair(dfaGraph, coverMap);
+    return make_pair(dfaGraph, closureMap);
 }
 
 // 默认确定finality方式: 假定finality无冲突，若有多个则取最大值
@@ -132,10 +132,10 @@ pair<DFAgraph, map<int, set<int>>> getCoverMapfromNFAgraph(NFAgraph nfaGraph) {
 // 每个DFA均以0为起始状态，合并得到唯一起始状态
 // 用不同值标注DFA的节点可终结属性, 可以防止合并
 // (得到的DFA未最小化)
-map<int, int> getFinalityFromCoverMap(map<int, int>      nfaFinality,
-                                      map<int, set<int>> coverMap) {
+map<int, int> getFinalityFromClosureMap(map<int, int> nfaFinality,
+                                      ClosureMap      closureMap) {
     map<int, int> finality;
-    for (const auto &elem : coverMap) {
+    for (const auto &elem : closureMap) {
         for (int i : elem.second) {
             finality[elem.first] = max(finality[elem.first], nfaFinality[i]);
         }
@@ -237,18 +237,18 @@ DFA getMergedDfa(DFA dfa) {
 }
 
 // // 扩张覆盖片选择（epsilon-闭包法）
-void setCoverExpanded(set<int> &cover, NFAgraph nfaGraph) {
+void setClosureExpanded(Closure &closure, NFAgraph nfaGraph) {
     // bfs扩大搜索
     std::queue<int> q;
-    for (int state : cover) { q.push(state); }
+    for (int state : closure) { q.push(state); }
     while (q.size()) {
         int current = q.front();
         q.pop();
         for (const auto &elem : nfaGraph[current]) {
             int symbol = elem.first;
             int next   = elem.second;
-            if (symbol == EMPTY_SYMBOL && cover.count(next) == 0) {
-                cover.insert(next);
+            if (symbol == EMPTY_SYMBOL && closure.count(next) == 0) {
+                closure.insert(next);
                 q.push(next);
             }
         }
@@ -256,19 +256,19 @@ void setCoverExpanded(set<int> &cover, NFAgraph nfaGraph) {
 }
 
 // 求后继覆盖片
-map<int, set<int>> getNextCovers(set<int> cover, NFAgraph nfaGraph) {
-    map<int, set<int>> nextCovers;
-    for (int current : cover) {
+ClosureMap getNextClosures(Closure closure, NFAgraph nfaGraph) {
+    map<int, set<int>> nextClosures;
+    for (int current : closure) {
         for (const auto &edge : nfaGraph[current]) {
             if (edge.first != EMPTY_SYMBOL) {
-                nextCovers[edge.first].insert(edge.second);
+                nextClosures[edge.first].insert(edge.second);
             }
         }
     }
-    for (auto it = nextCovers.begin(); it != nextCovers.end(); it++) {
-        setCoverExpanded(it->second, nfaGraph);
+    for (auto it = nextClosures.begin(); it != nextClosures.end(); it++) {
+        setClosureExpanded(it->second, nfaGraph);
     }
-    return nextCovers;
+    return nextClosures;
 }
 
 // 将若干个DFA整合为1个大DFA (for smarter person)

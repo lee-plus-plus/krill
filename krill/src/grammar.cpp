@@ -14,16 +14,8 @@ bool Prod::operator==(const Prod &p) const {
     return std::tie(symbol, right) == std::tie(p.symbol, p.right);
 }
 
-bool ProdItem::operator<(const ProdItem &p) const {
-    return std::tie(symbol, right, dot) < std::tie(p.symbol, p.right, p.dot);
-}
-
-bool ProdItem::operator==(const ProdItem &p) const {
-    return std::tie(symbol, right, dot) == std::tie(p.symbol, p.right, p.dot);
-}
-
 Grammar::Grammar(vector<Prod> prods) : prods(prods) {
-    for (const Prod &prod : prods) {
+    for (const Prod &prod : prods) { 
         nonterminalSet.insert(prod.symbol);
         for (int c : prod.right) { terminalSet.insert(c); }
     }
@@ -32,26 +24,32 @@ Grammar::Grammar(vector<Prod> prods) : prods(prods) {
     }
 }
 
-// LR(1) analyze table
+// LR(1) action table
 ActionTable getLR1table(Grammar grammar) {
-    auto[covers, edgeTable] = core::getLR1dfa(grammar);
-    auto lr1table           = core::getLR1table(grammar, covers, edgeTable);
+    auto lr1Automata = core::getLR1Automata(grammar);
+    auto lr1table    = core::getLR1table(grammar, lr1Automata);
     return lr1table;
 }
 
-// LALR(1) analyze table
+// LALR(1) action table
 ActionTable getLALR1table(Grammar grammar) {
-    auto[covers0, edgeTable0] = core::getLR1dfa(grammar);
-    auto[covers, edgeTable] =
-        core::getLALR1fromLR1(grammar, covers0, edgeTable0);
-    auto lalr1table = core::getLR1table(grammar, covers, edgeTable);
+    auto lr1Automata   = core::getLR1Automata(grammar);
+    auto lalr1Automata = core::getLALR1fromLR1(grammar, lr1Automata);
+    auto lalr1table    = core::getLR1table(grammar, lalr1Automata);
     return lalr1table;
 }
 
 } // namespace krill::grammar
 
 namespace krill::grammar::core {
-// ---
+
+bool ProdItem::operator<(const ProdItem &p) const {
+    return std::tie(symbol, right, dot) < std::tie(p.symbol, p.right, p.dot);
+}
+
+bool ProdItem::operator==(const ProdItem &p) const {
+    return std::tie(symbol, right, dot) == std::tie(p.symbol, p.right, p.dot);
+}
 
 bool ProdLR1Item::operator<(const ProdLR1Item &p) const {
     return std::tie(symbol, right, dot, search) <
@@ -63,7 +61,6 @@ bool ProdLR1Item::operator==(const ProdLR1Item &p) const {
            std::tie(p.symbol, p.right, p.dot, p.search);
 }
 
-// 求首符集
 map<int, set<int>> getFirstSet(Grammar grammar) {
     map<int, set<int>> firstSet;
     // first(a) = {a}
@@ -120,7 +117,6 @@ map<int, set<int>> getFirstSet(Grammar grammar) {
     return firstSet;
 }
 
-// 求随符集
 map<int, set<int>> getFollowSet(Grammar grammar, map<int, set<int>> firstSet) {
     map<int, set<int>> followSet;
     followSet[grammar.prods[0].symbol].insert(END_SYMBOL);
@@ -163,53 +159,51 @@ map<int, set<int>> getFollowSet(Grammar grammar, map<int, set<int>> firstSet) {
     return followSet;
 }
 
-// lr(1)分析
-// 输入文法, 返回DFA和DFA节点所表示的lr(1)产生式项目
-pair<vector<LR1Cover>, EdgeTable> getLR1dfa(Grammar grammar) {
+LR1Automata getLR1Automata(Grammar grammar) {
     auto firstSet  = getFirstSet(grammar);
     auto followSet = getFollowSet(grammar, firstSet);
-    // generate covers
-    vector<LR1Cover> covers;
-    LR1Cover         initCover = {
+    // generate states
+    vector<LR1State> states;
+    LR1State         initStates = {
         {grammar.prods[0].symbol, grammar.prods[0].right, 0, END_SYMBOL}};
-    setLR1CoverExpanded(initCover, firstSet, grammar);
-    covers.push_back(initCover); // generate inital cover
+    setLR1StateExpanded(initStates, firstSet, grammar);
+    states.push_back(initStates); // generate inital state
 
-    // bfs, generate follow covers
+    // bfs, generate follow states
     EdgeTable edgeTable;
-    for (int i = 0; i < covers.size(); i++) {
-        map<int, LR1Cover> nextCovers;
-        for (ProdLR1Item prodItem : covers[i]) {
-            // current cover: (A -> α·Bβ, s)
-            // B => next cover: (A -> αB·β, s)
+    for (int i = 0; i < states.size(); i++) {
+        map<int, LR1State> nextStatess;
+        for (ProdLR1Item prodItem : states[i]) {
+            // current state: (A -> α·Bβ, s)
+            // B => next state: (A -> αB·β, s)
             if (prodItem.dot < prodItem.right.size()) {
                 int c = prodItem.right[prodItem.dot];
-                if (nextCovers.count(c) == 0) { nextCovers[c] = {}; }
-                nextCovers[c].insert({prodItem.symbol, prodItem.right,
-                                      prodItem.dot + 1, prodItem.search});
+                if (nextStatess.count(c) == 0) { nextStatess[c] = {}; }
+                nextStatess[c].insert({prodItem.symbol, prodItem.right,
+                                       prodItem.dot + 1, prodItem.search});
             }
         }
 
-        for (auto[symbol, nextCover] : nextCovers) {
-            setLR1CoverExpanded(nextCover, firstSet, grammar);
+        for (auto[symbol, nextStates] : nextStatess) {
+            setLR1StateExpanded(nextStates, firstSet, grammar);
             int tgtIdx;
-            for (tgtIdx = 0; tgtIdx < covers.size(); tgtIdx++) {
-                if (nextCover == covers[tgtIdx]) { break; }
+            for (tgtIdx = 0; tgtIdx < states.size(); tgtIdx++) {
+                if (nextStates == states[tgtIdx]) { break; }
             }
-            if (tgtIdx == covers.size()) { covers.push_back(nextCover); }
+            if (tgtIdx == states.size()) { states.push_back(nextStates); }
             // printf("[%d,%d,%d]", symbol, i, tgtIdx);
             edgeTable.push_back({symbol, i, tgtIdx});
         }
     }
 
-    return make_pair(covers, edgeTable);
+    return LR1Automata({states, edgeTable});
 }
 
-// 扩张LR(1)覆盖片选择（epsilon-闭包法）
-void setLR1CoverExpanded(LR1Cover &cover, map<int, set<int>> firstSet,
+// expand the LR(1) state (epsilon-closure method)
+void setLR1StateExpanded(LR1State &state, map<int, set<int>> firstSet,
                          Grammar grammar) {
     std::queue<ProdLR1Item> q;
-    for (ProdLR1Item prodItem : cover) { q.push(prodItem); }
+    for (ProdLR1Item prodItem : state) { q.push(prodItem); }
     while (q.size()) { // bfs
         ProdLR1Item prodItem = q.front();
         q.pop();
@@ -222,27 +216,27 @@ void setLR1CoverExpanded(LR1Cover &cover, map<int, set<int>> firstSet,
 
         // (A -> α·B..., s), check prods with right started by B
         if (prodItem.dot + 1 < prodItem.right.size()) {
-            // (A -> α·Bβ, s) => cover += (B -> ·..., first(β))
+            // (A -> α·Bβ, s) => state += (B -> ·..., first(β))
             for (Prod prod : grammar.prods) {
                 if (prod.symbol != prodItem.right[prodItem.dot]) { continue; }
 
                 set<int> nextSet = firstSet[prodItem.right[prodItem.dot + 1]];
                 for (int c : nextSet) {
                     ProdLR1Item nextProdItem({prod.symbol, prod.right, 0, c});
-                    if (cover.count(nextProdItem) == 0) {
-                        cover.insert(nextProdItem);
+                    if (state.count(nextProdItem) == 0) {
+                        state.insert(nextProdItem);
                         q.push(nextProdItem);
                     }
                 }
             }
         } else {
-            // (A -> α·B, s) => cover += (B -> ·..., s)
+            // (A -> α·B, s) => state += (B -> ·..., s)
             for (Prod prod : grammar.prods) {
                 if (prod.symbol != prodItem.right[prodItem.dot]) { continue; }
                 ProdLR1Item nextProdItem(
                     {prod.symbol, prod.right, 0, prodItem.search});
-                if (cover.count(nextProdItem) == 0) {
-                    cover.insert(nextProdItem);
+                if (state.count(nextProdItem) == 0) {
+                    state.insert(nextProdItem);
                     q.push(nextProdItem);
                 }
             }
@@ -250,46 +244,49 @@ void setLR1CoverExpanded(LR1Cover &cover, map<int, set<int>> firstSet,
     }
 }
 
-// LR(1) analyze table
-ActionTable getLR1table(Grammar grammar, vector<LR1Cover> covers,
-                        EdgeTable edgeTable) {
+ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
+    vector<LR1State> &states    = lr1Automata.states;
+    EdgeTable &       edgeTable = lr1Automata.edgeTable;
+
     vector<Prod> &prods = grammar.prods;
-    ActionTable   analyzeTable;
+    ActionTable   actionTable;
 
     // edges ==> ACTION and GOTO
     for (Edge edge : edgeTable) {
         if (grammar.terminalSet.count(edge.symbol)) {
             // s1 ——a-> s2 ==> action[s1, a] = s2
-            analyzeTable[{edge.from, edge.symbol}] = {Action::ACTION, edge.to};
+            actionTable[{edge.from, edge.symbol}] = {Action::ACTION, edge.to};
         } else {
             // s1 ——A-> s2 ==> goto[s1, A] = s2
-            analyzeTable[{edge.from, edge.symbol}] = {Action::GOTO, edge.to};
+            actionTable[{edge.from, edge.symbol}] = {Action::GOTO, edge.to};
         }
     }
     // node ==> REDUCE and ACCEPT
-    for (int i = 0; i < covers.size(); i++) {
-        for (ProdLR1Item item : covers[i]) {
+    for (int i = 0; i < states.size(); i++) {
+        for (ProdLR1Item item : states[i]) {
             if (item.symbol == prods[0].symbol &&
                 item.dot == item.right.size()) {
                 // s1: (S -> ...·, #) ==> accept[s1, #]
-                analyzeTable[{i, item.search}] = {Action::ACCEPT, 0};
+                actionTable[{i, item.search}] = {Action::ACCEPT, 0};
             } else if (item.dot == item.right.size()) {
                 // s1: (A -> ...·, s), r2: A -> ... ==> reduce[s1, s] = r2
                 for (int j = 0; j < prods.size(); j++) {
                     if (prods[j].symbol == item.symbol &&
                         prods[j].right == item.right) {
-                        analyzeTable[{i, item.search}] = {Action::REDUCE, j};
+                        actionTable[{i, item.search}] = {Action::REDUCE, j};
                         break;
                     }
                 }
             }
         }
     }
-    return analyzeTable;
+    return actionTable;
 }
 
-pair<vector<LR1Cover>, EdgeTable>
-getLALR1fromLR1(Grammar grammar, vector<LR1Cover> covers, EdgeTable edgeTable) {
+LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata) {
+    vector<LR1State> &states    = lr1Automata.states;
+    EdgeTable &       edgeTable = lr1Automata.edgeTable;
+
     // 反向寻找每个覆盖片的对应原始推导式
     map<ProdItem, int> prodIndex;
     int                i = 0;
@@ -300,47 +297,47 @@ getLALR1fromLR1(Grammar grammar, vector<LR1Cover> covers, EdgeTable edgeTable) {
     }
 
     typedef set<int> ID;          // concentric ID
-    map<int, ID>     coverIdx2ID; // <index LR1 covers, concentric ID>
-    for (int i = 0; i < covers.size(); i++) {
-        for (auto p : covers[i]) {
+    map<int, ID>     stateIdx2ID; // <index LR1 states, concentric ID>
+    for (int i = 0; i < states.size(); i++) {
+        for (auto p : states[i]) {
             ProdItem prod = {p.symbol, p.right, p.dot};
-            coverIdx2ID[i].insert(prodIndex[prod]);
+            stateIdx2ID[i].insert(prodIndex[prod]);
         }
     }
     map<ID, int> ID2LALRIdx;
-    int          numLALR1Covers = 0;
-    for (auto[coverIdx, ID] : coverIdx2ID) {
+    int          numLALR1States = 0;
+    for (auto[stateIdx, ID] : stateIdx2ID) {
         if (ID2LALRIdx.count(ID) == 0) {
-            ID2LALRIdx[ID] = numLALR1Covers;
-            numLALR1Covers++;
+            ID2LALRIdx[ID] = numLALR1States;
+            numLALR1States++;
         }
     }
-    map<int, int>      coverIdx2LALRIdx;
-    map<int, set<int>> LALRIdx2coverIdxs;
-    for (auto[coverIdx, ID] : coverIdx2ID) {
+    map<int, int>      stateIdx2LALRIdx;
+    map<int, set<int>> LALRIdx2stateIdxs;
+    for (auto[stateIdx, ID] : stateIdx2ID) {
         int LALRIdx                = ID2LALRIdx[ID];
-        coverIdx2LALRIdx[coverIdx] = LALRIdx;
-        LALRIdx2coverIdxs[LALRIdx].insert(coverIdx);
+        stateIdx2LALRIdx[stateIdx] = LALRIdx;
+        LALRIdx2stateIdxs[LALRIdx].insert(stateIdx);
     }
 
     // map
-    vector<LR1Cover> resCovers;
+    vector<LR1State> resStates;
     EdgeTable        resEdgeTable;
     set<Edge>        resEdgeTable0;
-    for (const auto[LALR1Idex, coverIdxs] : LALRIdx2coverIdxs) {
-        LR1Cover resCover;
-        for (int idx : coverIdxs) {
-            for (auto item : covers[idx]) { resCover.insert(item); }
+    for (const auto[LALR1Idex, stateIdxs] : LALRIdx2stateIdxs) {
+        LR1State resState;
+        for (int idx : stateIdxs) {
+            for (auto item : states[idx]) { resState.insert(item); }
         }
-        resCovers.push_back(resCover);
+        resStates.push_back(resState);
     }
     for (const Edge &edge : edgeTable) {
-        resEdgeTable0.insert({edge.symbol, coverIdx2LALRIdx[edge.from],
-                              coverIdx2LALRIdx[edge.to]});
+        resEdgeTable0.insert({edge.symbol, stateIdx2LALRIdx[edge.from],
+                              stateIdx2LALRIdx[edge.to]});
     }
     for (auto edge : resEdgeTable0) { resEdgeTable.push_back(edge); }
 
-    return make_pair(resCovers, resEdgeTable);
+    return LR1Automata({resStates, resEdgeTable});
 }
 
 } // krill::grammar::core

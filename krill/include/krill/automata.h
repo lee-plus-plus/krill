@@ -9,20 +9,19 @@ using std::set, std::map, std::multimap, std::vector;
 
 namespace krill::automata {
 
-const int EMPTY_SYMBOL = 0; // 空字符ε, 作为NFA/EdgeTable空边
-using DFAgraph         = map<int, map<int, int>>;      // {from, {symbol, to}}
-using NFAgraph         = map<int, multimap<int, int>>; // {from, {symbol, to}}
+const int EMPTY_SYMBOL = 0; // empty edge for NFA / EdgeTable
+
+using DFAgraph = map<int, map<int, int>>;      // {from, {symbol, to}}
+using NFAgraph = map<int, multimap<int, int>>; // {from, {symbol, to}}
 
 struct DFA {
-    DFAgraph      graph;
-    map<int, int> finality;
+    DFAgraph      graph;    // always assume start state = 0
+    map<int, int> finality; // multiple final states can be binded differently
 };
 
 struct NFA {
-    // always assume start state = 0
-    NFAgraph graph;
-    // multiple final states can be binded with different action
-    map<int, int> finality;
+    NFAgraph      graph;    // always assume start state = 0
+    map<int, int> finality; // multiple final states can be binded differently
 };
 
 struct Edge {
@@ -51,12 +50,15 @@ EdgeTable toEdgeTable(DFAgraph dfa);
 DFA getReachableDfa(DFA dfa);
 DFA getMergedDfa(DFA dfa);
 
-void               setCoverExpanded(set<int> &cover, NFAgraph nfa);
-map<int, set<int>> getNextCovers(set<int> cover, NFAgraph nfa);
-pair<DFAgraph, map<int, set<int>>> getCoverMapfromNFAgraph(NFAgraph nfaGraph);
-map<int, int> getFinalityFromCoverMap(map<int, int>      nfaFinality,
-                                      map<int, set<int>> coverMap);
-DFA           _getDFAintegrated(vector<DFA> dfas);
+using Closure    = set<int>;
+using ClosureMap = map<int, Closure>; // {symbol, closure}
+
+void                       setClosureExpanded(Closure &closure, NFAgraph nfa);
+ClosureMap                 getNextClosures(Closure closure, NFAgraph nfa);
+pair<DFAgraph, ClosureMap> getClosureMapfromNFAgraph(NFAgraph nfaGraph);
+map<int, int>              getFinalityFromClosureMap(map<int, int>     nfaFinality,
+                                                     map<int, Closure> closureMap);
+DFA                        _getDFAintegrated(vector<DFA> dfas);
 } // namespace krill::automata::core
 
 #endif

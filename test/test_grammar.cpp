@@ -31,10 +31,10 @@ void test1() {
     auto followSet = getFollowSet(grammar, firstSet);
 
     printf("> first-set: \n");
-    printFirstset(firstSet, cout);
+    printFirstSet(firstSet, cout);
 
     printf("> follow-set: \n");
-    printFirstset(followSet, cout);
+    printFirstSet(followSet, cout);
 
     printf("\n");
 }
@@ -175,23 +175,12 @@ void test2() {
     auto followSet = getFollowSet(grammar, firstSet);
 
     printf("> first-set: \n");
-    printFirstset(firstSet, cout);
+    printFirstSet(firstSet, cout);
     printf("> follow-set: \n");
-    printFirstset(followSet, cout);
+    printFirstSet(followSet, cout);
 
-    auto[covers, edgeTable] = getLR1dfa(grammar);
-    // auto [covers, edgeTable]   = getLALR1fromLR1(grammar, covers0,
-    // edgeTable0); printf("> covers of LR(1): \n"); for (int i = 0; i <
-    // covers.size(); i++) {
-    //     printf("c%d: \n", i);
-    //     for (ProdLR1Item prod : covers[i]) { printProdLR1Item(prod); }
-    // }
-
-    // print edge table
-    // printf("> edge table of LR(1) dfa: \n");
-    // printEdgeTable(edgeTable);
-
-    auto actionTable = getLR1table(grammar, covers, edgeTable);
+    auto lr1Automata = getLR1Automata(grammar);
+    auto actionTable = getLR1table(grammar, lr1Automata);
     printf("> Action Table of LR(1) dfa: \n");
     printActionTable(actionTable, symbolNames, cout);
 

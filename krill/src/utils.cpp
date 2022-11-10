@@ -109,7 +109,7 @@ void printGrammar(const Grammar &grammar, map<int, string> symbolNames,
     }
 }
 
-void printFirstset(const map<int, set<int>> &firstSet, ostream &oss) {
+void printFirstSet(const map<int, set<int>> &firstSet, ostream &oss) {
     for (auto[symbol, nextSymbols] : firstSet) {
         oss << symbol;
         oss << ": {";

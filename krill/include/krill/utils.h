@@ -24,7 +24,7 @@ void printProd(const Prod &prod, map<int, string> symbolNames, ostream &oss);
 // void printProdLR1Item(const ProdLR1Item &prodItem, ostream &oss);
 void printGrammar(const Grammar &grammar, map<int, string> symbolNames,
                   ostream &oss);
-void printFirstset(const map<int, set<int>> &firstSet, ostream &oss);
+void printFirstSet(const map<int, set<int>> &firstSet, ostream &oss);
 
 void printActionTable(const ActionTable &actionTable,
                       map<int, string> symbolNames, ostream &oss);
