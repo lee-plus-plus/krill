@@ -1,28 +1,25 @@
 #include "krill/grammar.h"
 #include "krill/automata.h"
 #include <queue>
+#include <tuple>
 using namespace krill::automata;
-using std::queue;
-// using namespace krill::grammar;
 
 namespace krill::grammar {
 
 bool Prod::operator<(const Prod &p) const {
-    return (symbol < p.symbol || (symbol == p.symbol && (right < p.right)));
+    return std::tie(symbol, right) < std::tie(p.symbol, p.right);
 }
 
 bool Prod::operator==(const Prod &p) const {
-    return (symbol == p.symbol && right == p.right);
+    return std::tie(symbol, right) == std::tie(p.symbol, p.right);
 }
 
 bool ProdItem::operator<(const ProdItem &p) const {
-    return (symbol < p.symbol ||
-            (symbol == p.symbol &&
-             (right < p.right || (right == p.right && (dot < p.dot)))));
+    return std::tie(symbol, right, dot) < std::tie(p.symbol, p.right, p.dot);
 }
 
 bool ProdItem::operator==(const ProdItem &p) const {
-    return (symbol == p.symbol && right == p.right && dot == p.dot);
+    return std::tie(symbol, right, dot) == std::tie(p.symbol, p.right, p.dot);
 }
 
 Grammar::Grammar(vector<Prod> prods) : prods(prods) {
@@ -57,16 +54,13 @@ namespace krill::grammar::core {
 // ---
 
 bool ProdLR1Item::operator<(const ProdLR1Item &p) const {
-    return (symbol < p.symbol ||
-            (symbol == p.symbol &&
-             (right < p.right ||
-              (right == p.right &&
-               (dot < p.dot || (dot == p.dot && (search < p.search)))))));
+    return std::tie(symbol, right, dot, search) <
+           std::tie(p.symbol, p.right, p.dot, p.search);
 }
 
 bool ProdLR1Item::operator==(const ProdLR1Item &p) const {
-    return (symbol == p.symbol && right == p.right && dot == p.dot &&
-            search == p.search);
+    return std::tie(symbol, right, dot, search) ==
+           std::tie(p.symbol, p.right, p.dot, p.search);
 }
 
 // 求首符集
@@ -214,7 +208,7 @@ pair<vector<LR1Cover>, EdgeTable> getLR1dfa(Grammar grammar) {
 // 扩张LR(1)覆盖片选择（epsilon-闭包法）
 void setLR1CoverExpanded(LR1Cover &cover, map<int, set<int>> firstSet,
                          Grammar grammar) {
-    queue<ProdLR1Item> q;
+    std::queue<ProdLR1Item> q;
     for (ProdLR1Item prodItem : cover) { q.push(prodItem); }
     while (q.size()) { // bfs
         ProdLR1Item prodItem = q.front();

@@ -1,19 +1,17 @@
 #include "krill/automata.h"
 #include <algorithm>
 #include <queue>
+#include <tuple>
 using std::max, std::min;
-using std::queue;
 
 namespace krill::automata {
 
 bool Edge::operator<(const Edge &e) const {
-    return (symbol < e.symbol ||
-            (symbol == e.symbol &&
-             (from < e.from || (from == e.from && (to < e.to)))));
+    return std::tie(symbol, from, to) < std::tie(e.symbol, e.from, e.to);
 }
 
 bool Edge::operator==(const Edge &e) const {
-    return (symbol == e.symbol && from == e.from && to == e.to);
+    return std::tie(symbol, from, to) == std::tie(e.symbol, e.from, e.to);
 }
 
 // 最小化DFA
@@ -241,7 +239,7 @@ DFA getMergedDfa(DFA dfa) {
 // // 扩张覆盖片选择（epsilon-闭包法）
 void setCoverExpanded(set<int> &cover, NFAgraph nfaGraph) {
     // bfs扩大搜索
-    queue<int> q;
+    std::queue<int> q;
     for (int state : cover) { q.push(state); }
     while (q.size()) {
         int current = q.front();
