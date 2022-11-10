@@ -26,7 +26,7 @@ GrammarNode syntaxParser(vector<int> tokens, vector<char> lexValues) {
     typedef map<pair<int, int>, Action> ActionTable;
 
     // prods
-    vector<Prod> prods = {
+    static const vector<Prod> prods = {
         /* FILL-0 */
         /* 0: Q -> P */ {0, {1}},
         /* 1: P -> T */ {1, {2}},
@@ -40,7 +40,7 @@ GrammarNode syntaxParser(vector<int> tokens, vector<char> lexValues) {
     };
 
     // Action Table
-    ActionTable actionTable = {
+    static const ActionTable actionTable = {
         /* FILL-1 */
         {{0, 1}, {GOTO, 1}},     {{0, 2}, {GOTO, 2}},
         {{0, 3}, {ACTION, 3}},   {{0, 8}, {ACTION, 4}},

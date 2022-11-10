@@ -23,7 +23,7 @@ struct Prod {
     bool operator==(const Prod &p) const;
 };
 
-// Grammar (literal) {(P -> Ab), (A -> Ab), (A -> b), ...}
+// Grammar {(P -> Ab), (A -> Abc), (A -> b), ...}
 struct Grammar {
     set<int>     terminalSet;
     set<int>     nonterminalSet;

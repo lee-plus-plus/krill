@@ -79,10 +79,11 @@ void printNFA(NFA nfa, ostream &oss) {
             if (nfa.graph[state].count(symbol)) {
                 auto it     = nfa.graph[state].lower_bound(symbol);
                 auto it_end = nfa.graph[state].upper_bound(symbol);
-                oss << fmt::format("s{}\t", it->second);
+                oss << fmt::format("s{}", it->second);
                 for (it++; it != it_end; it++) {
-                    oss << fmt::format(",s{}\t", it->second);
+                    oss << fmt::format(",s{}", it->second);
                 }
+                oss << "\t";
             } else {
                 oss << "\t";
             }
@@ -152,7 +153,7 @@ pair<Grammar, map<int, string>> getGrammarFromStr(vector<string> prodStrs) {
     for (string prodStr : prodStrs) {
         vector<string> words = split(prodStr, " ");
         // assume words like {"Term", "->", "Term", "add", "D-Term"}
-        // do not accept literal character like "'+'"
+        // throw away the second element "->"
         int         symbol;
         vector<int> right;
         for (int i = 0; i < words.size(); i++) {
