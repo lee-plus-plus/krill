@@ -11,3 +11,6 @@ file (GLOB_RECURSE KRILL_SRC    src/*.cpp)
 
 add_library(krill ${KRILL_SRC} ${KRILL_HEADER})
 target_link_libraries(krill PUBLIC fmt)
+
+set(CMAKE_CXX_FLAGS   "-g")
+# set(CMAKE_CXX_FLAGS   "-Wall")

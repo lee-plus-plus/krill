@@ -12,13 +12,14 @@ namespace krill {
 		using EdgeTable = std::vector<Edge>;
 	} // namespace automata
 	namespace grammar {
-		struct Grammar;
 		struct Prod;
-		struct ProdItem;
+		struct Grammar;
 		struct Action;
 		using ActionTable = std::map<std::pair<int, int>, Action>;
+		struct Token;
 	} // namespace grammar
 	namespace utils {}
+	namespace codegen {}
 	namespace runtime {}
 
 } // namespace krill

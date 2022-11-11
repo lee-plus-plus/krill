@@ -178,7 +178,7 @@ DFA getMergedDfa(DFA dfa) {
     map<int, int> stateColor = dfa.finality;
     // 获取充分染色后DFA节点, 作为区分特征
     // 对于状态i和状态j,若{stateColor[i], dfa}
-    typedef pair<int, map<int, int>> DFAnode;
+    using DFAnode = pair<int, map<int, int>>;
     auto getColoredDFAnode = [&stateColor](DFAnode node) -> DFAnode {
         node.first = stateColor[node.first];
         for (auto it = node.second.begin(); it != node.second.end(); it++) {

@@ -1,11 +1,16 @@
 #include "krill/regex.h"
 #include "krill/automata.h"
 #include "krill/defs.h"
+#include "krill/grammar.h"
 #include "krill/utils.h"
 #include <cassert>
 #include <map>
 #include <stack>
 #include <vector>
+// #include "fmt/format.h"
+
+
+using krill::grammar::Token;
 using std::pair, std::vector, std::map, std::stack;
 using namespace krill::automata;
 using namespace krill::utils;
@@ -13,22 +18,22 @@ using namespace krill::utils;
 namespace krill::regex {
 
 DFA getDFAfromRegex(string src) {
-    auto[tokens, lexValues] = core::lexicalParser(src);
-    NFA nfa                 = core::syntaxParser(tokens, lexValues);
-    DFA dfa                 = getDFAfromNFA(nfa);
+    vector<Token> tokens = core::lexicalParser(src);
+    NFA           nfa    = core::syntaxParser(tokens);
+    DFA           dfa    = getMinimizedDfa(getDFAfromNFA(nfa));
     return dfa;
 }
 
 NFA getNFAfromRegex(string src) {
-    auto[tokens, lexValues] = core::lexicalParser(src);
-    NFA nfa                 = core::syntaxParser(tokens, lexValues);
+    vector<Token> tokens = core::lexicalParser(src);
+    NFA           nfa    = core::syntaxParser(tokens);
     return nfa;
 }
 } // namespace krill::regex
 
 namespace krill::regex::core {
-// RegEx tokens, lexValues => RegEx NFA
-NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
+// RegEx tokens => RegEx NFA
+NFA syntaxParser(vector<Token> tokens) {
     // declaration of struct
     struct Prod {
         int         symbol;
@@ -39,7 +44,7 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
         TYPE type;
         int  tgt;
     };
-    typedef map<pair<int, int>, Action> ActionTable;
+    using ActionTable = map<pair<int, int>, Action>;
     struct Node {
         int    tokenId;
         string lexValue;
@@ -49,9 +54,9 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
 
     // Symbol Names
     static const map<int, string> symbolNames = {
-        {0, "RegEx"},   {1, "Parallel"}, {2, "'|'"},   {3, "Seq"}, {4, "Item"},
-        {5, "Closure"}, {6, "Atom"},     {7, "'+'"},   {8, "'*'"}, {9, "'?'"},
-        {10, "'('"},    {11, "')'"},     {12, "Char"},
+        {-1, "END_"}, {0, "RegEx"},   {1, "Parallel"}, {2, "'|'"},   {3, "Seq"},
+        {4, "Item"},  {5, "Closure"}, {6, "Atom"},     {7, "'+'"},   {8, "'*'"},
+        {9, "'?'"},   {10, "'('"},    {11, "')'"},     {12, "Char"},
     };
     // Productions
     static const vector<Prod> prods = {
@@ -119,7 +124,8 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
         {{15, 11}, {REDUCE, 10}}, {{15, 12}, {REDUCE, 10}},
     };
 
-    if (tokens[tokens.size() - 1] != -1) { tokens.push_back(-1); }
+    assert(tokens.size() > 0);
+    if (tokens[tokens.size() - 1].id != -1) { tokens.push_back({-1, ""}); }
 
     stack<int>  states;
     stack<Node> stateNodes;
@@ -129,18 +135,23 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
     int       numNfaNodes = 2; // leave 0 for global start, 1 for global end
 
     for (int i = 0, accpeted = false; !accpeted;) {
-        // look tokens[i], state => next_state, action
-        assert(actionTable.count({states.top(), tokens[i]}) != 0);
+        // look tokens[i].id, state => next_state, action
+        assert(actionTable.count({states.top(), tokens[i].id}) != 0);
 
-        Action action = actionTable.at({states.top(), tokens[i]});
+        Action action = actionTable.at({states.top(), tokens[i].id});
         switch (action.type) {
             case ACTION: {
                 states.push(action.tgt);
                 // just pass the tokenId and lexValue into node
-                stateNodes.push(Node({.tokenId  = tokens[i],
-                                      .lexValue = lexValues[i],
+                Node nextNode = Node({.tokenId  = tokens[i].id,
+                                      .lexValue = tokens[i].lexValue,
                                       .nfaSt    = -1,
-                                      .nfaEd    = -1}));
+                                      .nfaEd    = -1});
+                stateNodes.push(nextNode);
+
+                // fmt::print("[{} \"{}\"]", symbolNames.at(nextNode.tokenId),
+                //            nextNode.lexValue);
+
                 i++;
                 break;
             }
@@ -161,59 +172,70 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
                 Node nextNode;
                 switch (action.tgt) {
                     case 0: { // RegEx -> Parallel
-                        nextNode = Node({.tokenId  = action.tgt,
+                        nextNode = Node({.tokenId = prods.at(action.tgt).symbol,
                                          .lexValue = child[0].lexValue,
                                          .nfaSt    = child[0].nfaSt,
                                          .nfaEd    = child[0].nfaEd});
                         break;
                     }
                     case 1: { // Parallel -> Parallel '|' Seq
+                        // promise to be safe
+                        int from = numNfaNodes++;
+                        int to = numNfaNodes++;
                         nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
-                                            .from   = child[0].nfaSt,
+                                            .from   = from,
+                                            .to     = child[0].nfaSt});
+                        nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
+                                            .from   = from,
                                             .to     = child[2].nfaSt});
                         nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
+                                            .from   = child[0].nfaEd,
+                                            .to     = to});
+                        nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
                                             .from   = child[2].nfaEd,
-                                            .to     = child[0].nfaEd});
-                        nextNode = Node({.tokenId  = action.tgt,
+                                            .to     = to});
+                        nextNode = Node({.tokenId = prods.at(action.tgt).symbol,
                                          .lexValue = child[0].lexValue + "|" +
-                                                     child[0].lexValue,
-                                         .nfaSt = child[0].nfaSt,
-                                         .nfaEd = child[0].nfaEd});
+                                                     child[2].lexValue,
+                                         .nfaSt = from,
+                                         .nfaEd = to});
                         break;
                     }
                     case 2: { // Parallel -> Seq
-                        nextNode = Node({.tokenId  = action.tgt,
+                        nextNode = Node({.tokenId = prods.at(action.tgt).symbol,
                                          .lexValue = child[0].lexValue,
                                          .nfaSt    = child[0].nfaSt,
                                          .nfaEd    = child[0].nfaEd});
                         break;
                     }
                     case 3: { // Seq -> Seq Item
+                        // promise to be safe
                         nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
                                             .from   = child[0].nfaEd,
                                             .to     = child[1].nfaSt});
-                        nextNode = Node({.tokenId  = action.tgt,
-                                         .lexValue = child[0].lexValue,
-                                         .nfaSt    = child[0].nfaSt,
-                                         .nfaEd    = child[1].nfaEd});
+                        nextNode = Node(
+                            {.tokenId  = prods.at(action.tgt).symbol,
+                             .lexValue = child[0].lexValue + child[1].lexValue,
+                             .nfaSt    = child[0].nfaSt,
+                             .nfaEd    = child[1].nfaEd});
                         break;
                     }
                     case 4: { // Seq -> Item
-                        nextNode = Node({.tokenId  = action.tgt,
+                        nextNode = Node({.tokenId = prods.at(action.tgt).symbol,
                                          .lexValue = child[0].lexValue,
                                          .nfaSt    = child[0].nfaSt,
                                          .nfaEd    = child[0].nfaEd});
                         break;
                     }
                     case 5: { // Item -> Closure
-                        nextNode = Node({.tokenId  = action.tgt,
+                        nextNode = Node({.tokenId = prods.at(action.tgt).symbol,
                                          .lexValue = child[0].lexValue,
                                          .nfaSt    = child[0].nfaSt,
                                          .nfaEd    = child[0].nfaEd});
                         break;
                     }
                     case 6: { // Item -> Atom
-                        nextNode = Node({.tokenId  = action.tgt,
+                        nextNode = Node({.tokenId = prods.at(action.tgt).symbol,
                                          .lexValue = child[0].lexValue,
                                          .nfaSt    = child[0].nfaSt,
                                          .nfaEd    = child[0].nfaEd});
@@ -223,7 +245,7 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
                         nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
                                             .from   = child[0].nfaEd,
                                             .to     = child[0].nfaSt});
-                        nextNode = Node({.tokenId  = action.tgt,
+                        nextNode = Node({.tokenId = prods.at(action.tgt).symbol,
                                          .lexValue = child[0].lexValue + "+",
                                          .nfaSt    = child[0].nfaSt,
                                          .nfaEd    = child[0].nfaEd});
@@ -236,7 +258,7 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
                         nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
                                             .from   = child[0].nfaEd,
                                             .to     = child[0].nfaSt});
-                        nextNode = Node({.tokenId  = action.tgt,
+                        nextNode = Node({.tokenId = prods.at(action.tgt).symbol,
                                          .lexValue = child[0].lexValue + "*",
                                          .nfaSt    = child[0].nfaSt,
                                          .nfaEd    = child[0].nfaEd});
@@ -246,7 +268,7 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
                         nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
                                             .from   = child[0].nfaSt,
                                             .to     = child[0].nfaEd});
-                        nextNode = Node({.tokenId  = action.tgt,
+                        nextNode = Node({.tokenId = prods.at(action.tgt).symbol,
                                          .lexValue = child[0].lexValue + "?",
                                          .nfaSt    = child[0].nfaSt,
                                          .nfaEd    = child[0].nfaEd});
@@ -254,7 +276,7 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
                     }
                     case 10: { // Atom -> '(' Parallel ')'
                         nextNode =
-                            Node({.tokenId  = action.tgt,
+                            Node({.tokenId  = prods.at(action.tgt).symbol,
                                   .lexValue = "(" + child[1].lexValue + ")",
                                   .nfaSt    = child[1].nfaSt,
                                   .nfaEd    = child[1].nfaEd});
@@ -265,7 +287,7 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
                         int  from   = numNfaNodes++;
                         int  to     = numNfaNodes++;
                         nfaEdges.push_back({symbol, from, to});
-                        nextNode = Node({.tokenId  = action.tgt,
+                        nextNode = Node({.tokenId = prods.at(action.tgt).symbol,
                                          .lexValue = child[0].lexValue,
                                          .nfaSt    = from,
                                          .nfaEd    = to});
@@ -276,6 +298,10 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
                         break;
                     }
                 }
+
+                // fmt::print("[{} \"{}\"]", symbolNames.at(nextNode.tokenId),
+                //            nextNode.lexValue);
+
                 stateNodes.push(nextNode);
                 break;
             }
@@ -301,28 +327,26 @@ NFA syntaxParser(vector<int> tokens, vector<string> lexValues) {
     for (int i = 0; i < numNfaNodes; i++) { finality[i] = 0; }
     finality[1] = 1;
 
+    // fmt::print("\n");
     return NFA({nfaGraph, finality});
 }
 
-// RegEx String => tokens, lexValues
-pair<vector<int>, vector<string>> lexicalParser(string src) {
+// RegEx String => tokens
+vector<Token> lexicalParser(string src) {
     // { {RegEx, "0"}, {Parallel, "1"}, {'|', "2"}, {Seq, "3"}, {Item, "4"},
     //   {Closure, "5"}, {Atom, "6"}, {'+', "7"}, {'*', "8"}, {'?', "9"}, {'(',
     //   "10"}, {')', "11"}, {Char, "12"},}
-    vector<int>          tokens;
-    vector<string>       lexValues;
+    vector<Token>        tokens;
     const map<char, int> lexMap = {
         {'|', 2}, {'+', 7}, {'*', 8}, {'?', 9}, {'(', 10}, {')', 11},
     };
 
     bool isEscape = false;
     for (char c : src) {
-        int  token;
-        char lexValue;
+        int id;
 
         if (isEscape) {
-            tokens.push_back(token);
-            lexValues.push_back(string(1, c));
+            tokens.push_back({.id = 12, .lexValue = string(1, c)});
             continue;
         }
 
@@ -330,17 +354,16 @@ pair<vector<int>, vector<string>> lexicalParser(string src) {
             isEscape = true;
             continue;
         } else if (lexMap.count(c) != 0) {
-            token = lexMap.at(c);
+            id = lexMap.at(c);
         } else {
-            token = 12;
+            id = 12;
         }
 
-        tokens.push_back(token);
-        lexValues.push_back(string(1, c));
+        tokens.push_back({.id = id, .lexValue = string(1, c)});
     }
 
     assert(isEscape == false);
-    return make_pair(tokens, lexValues);
+    return tokens;
 }
 
 } // namespace krill::regex::core

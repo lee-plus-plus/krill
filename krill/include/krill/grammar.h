@@ -1,13 +1,13 @@
 #ifndef GRAMMAR_H
 #define GRAMMAR_H
-#include "automata.h"
 #include "defs.h"
 #include <map>
 #include <set>
+#include <string>
 #include <vector>
 using krill::automata::EdgeTable;
-using std::pair;
-using std::set, std::map, std::multimap, std::vector;
+using std::string;
+using std::pair, std::set, std::map, std::multimap, std::vector;
 
 namespace krill::grammar {
 
@@ -28,7 +28,7 @@ struct Grammar {
     set<int>     terminalSet;
     set<int>     nonterminalSet;
     vector<Prod> prods;
-    Grammar(){};
+    Grammar() = default;
     Grammar(vector<Prod> prods);
 };
 
@@ -39,7 +39,18 @@ struct Action {
     int  tgt;  // ACTION or GOTO: tgt=next_state; REDUCE: tgt=prod_idx
 };
 // {current_state, look_over_symbol, action}
-typedef map<pair<int, int>, Action> ActionTable;
+using ActionTable = map<pair<int, int>, Action>;
+
+// Token for parsing input (can be derived)
+struct Token {
+    int    id;
+    string lexValue;
+    // to make std::set happy
+    bool operator<(const Token &t) const;
+    bool operator==(const Token &t) const;
+    bool operator!=(const Token &t) const;
+};
+const Token END_TOKEN = Token({.id = END_SYMBOL, .lexValue = ""});
 
 // Grammar => LR1 Automata (LR1 states, EdgeTable) => Action Table
 ActionTable getLR1table(Grammar grammar);

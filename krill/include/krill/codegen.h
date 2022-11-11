@@ -4,10 +4,10 @@
 #include <map>
 #include <ostream>
 #include <string>
-
-namespace krill::codegen {
 using krill::grammar::Grammar, krill::grammar::ActionTable;
 using std::map, std::string, std::ostream;
+
+namespace krill::codegen {
 // generate code of Syntax Parser (C format, standalone)
 void genSyntaxParserInCStyle(const Grammar &    grammar,
                              map<int, string>   symbolNames,

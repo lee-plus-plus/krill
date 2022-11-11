@@ -81,7 +81,7 @@ void printNFA(NFA nfa, ostream &oss) {
                 auto it_end = nfa.graph[state].upper_bound(symbol);
                 oss << fmt::format("s{}", it->second);
                 for (it++; it != it_end; it++) {
-                    oss << fmt::format(",s{}", it->second);
+                    oss << fmt::format(",{}", it->second);
                 }
                 oss << "\t";
             } else {
@@ -143,6 +143,11 @@ void printActionTable(const ActionTable &actionTable,
         oss << "\n";
     }
 }
+
+void printToken(Token token, ostream &oss) {
+    oss << fmt::format("[{} \"{}\"", token.id, token.lexValue);
+}
+
 
 pair<Grammar, map<int, string>> getGrammarFromStr(vector<string> prodStrs) {
     vector<Prod>     prods;

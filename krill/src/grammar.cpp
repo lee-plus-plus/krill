@@ -24,6 +24,18 @@ Grammar::Grammar(vector<Prod> prods) : prods(prods) {
     }
 }
 
+bool Token::operator<(const Token &t) const {
+    return std::tie(id, lexValue) < std::tie(t.id, t.lexValue);
+}
+
+bool Token::operator==(const Token &t) const {
+    return std::tie(id, lexValue) == std::tie(t.id, t.lexValue);
+}
+
+bool Token::operator!=(const Token &t) const {
+    return std::tie(id, lexValue) != std::tie(t.id, t.lexValue);
+}
+
 // LR(1) action table
 ActionTable getLR1table(Grammar grammar) {
     auto lr1Automata = core::getLR1Automata(grammar);
@@ -296,7 +308,7 @@ LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata) {
         }
     }
 
-    typedef set<int> ID;          // concentric ID
+    using ID = set<int>;          // concentric ID
     map<int, ID>     stateIdx2ID; // <index LR1 states, concentric ID>
     for (int i = 0; i < states.size(); i++) {
         for (auto p : states[i]) {

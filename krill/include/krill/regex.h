@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 using krill::automata::DFA, krill::automata::NFA;
+using krill::grammar::Token;
 using std::string, std::pair, std::vector;
 
 namespace krill::regex {
@@ -15,8 +16,10 @@ NFA getNFAfromRegex(string src);
 
 namespace krill::regex::core {
 
-NFA syntaxParser(vector<int> tokens, vector<string> lexValues);
-pair<vector<int>, vector<string>> lexicalParser(string src);
+// parse at once
+NFA syntaxParser(vector<Token> tokens);
+// parse at once
+vector<Token> lexicalParser(string src);
 
 } // namespace krill::regex::core
 #endif
