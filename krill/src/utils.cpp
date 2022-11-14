@@ -2,10 +2,13 @@
 #include "krill/automata.h"
 #include "krill/grammar.h"
 #include <cstring>
+#include <map>
+#include <string>
 #include <fmt/core.h>
 #include <set>
 using namespace krill::automata;
 using namespace krill::grammar;
+using namespace std;
 
 namespace krill::utils {
 
@@ -22,15 +25,25 @@ vector<string> split(string str, const char *delim) {
     return res;
 }
 
-void printEdgeTable(EdgeTable edgeTable, ostream &oss) {
+// template <typename T1, typename T2>
+// map<T2, T1> reverse(map<T1, T2> m) {
+//     map<T2, T1> m_reversed;
+//     for (auto [key, value] : m) {
+//         m_reversed[value] = key;
+//     }
+//     return m_reversed;
+// }
+
+void printEdgeTable(EdgeTable edgeTable, ostream &oss, bool isAscii) {
     oss << "EdgeTable: \n";
     for (const Edge &edge : edgeTable) {
-        oss << fmt::format("s{:<2d} --> {:2d} --> s{:<2d}\n", edge.from,
-                           edge.symbol, edge.to);
+        oss << fmt::format(isAscii ? "s{:<2d} --> {:2c} --> s{:<2d}\n"
+                                   : "s{:<2d} --> {:2d} --> s{:<2d}\n",
+                           edge.from, edge.symbol, edge.to);
     }
 }
 
-void printDFA(DFA dfa, ostream &oss) {
+void printDFA(DFA dfa, ostream &oss, bool isAscii) {
     set<int> symbolset;
     for (const auto &node : dfa.graph) {
         for (const auto &edge : node.second) { symbolset.insert(edge.first); }
@@ -38,7 +51,7 @@ void printDFA(DFA dfa, ostream &oss) {
 
     oss << "DFA: \n";
     oss << "\t";
-    for (int symbol : symbolset) { oss << "_" << symbol << "\t"; }
+    for (int symbol : symbolset) { oss << fmt::format(isAscii ? "'{:c}'\t":"_{:d}\t", symbol); }
     oss << "\n";
     for (const auto &elem : dfa.finality) {
         const int &state = elem.first;
@@ -58,7 +71,7 @@ void printDFA(DFA dfa, ostream &oss) {
     }
 }
 
-void printNFA(NFA nfa, ostream &oss) {
+void printNFA(NFA nfa, ostream &oss, bool isAscii) {
     set<int> symbolset;
     for (const auto &node : nfa.graph) {
         for (const auto &edge : node.second) { symbolset.insert(edge.first); }
@@ -66,7 +79,7 @@ void printNFA(NFA nfa, ostream &oss) {
 
     oss << "NFA: \n";
     oss << "\t";
-    for (int symbol : symbolset) { oss << "_" << symbol << "\t"; }
+    for (int symbol : symbolset) { oss << fmt::format(isAscii ? "'{:c}'\t":"_{:d}\t", symbol); }
     oss << "\n";
     for (const auto &elem : nfa.finality) {
         const int &state = elem.first;
@@ -176,6 +189,8 @@ pair<Grammar, map<int, string>> getGrammarFromStr(vector<string> prodStrs) {
         }
         prods.push_back({symbol, right});
     }
+
+    symbolNames[END_SYMBOL] = "END_";
     return {Grammar(prods), symbolNames};
 }
 

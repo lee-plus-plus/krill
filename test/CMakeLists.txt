@@ -7,6 +7,8 @@ add_executable(test_codegen_c test_codegen_c.cpp)
 add_executable(test_codegen_cpp test_codegen_cpp.cpp)
 add_executable(test_codegen_regex test_codegen_regex.cpp)
 add_executable(test_regex test_regex.cpp)
+add_executable(test_lexical test_lexical.cpp)
+add_executable(test_syntax test_syntax.cpp)
 
 add_custom_target(test_codegen 
 	DEPENDS test_codegen_c test_codegen_cpp test_codegen_regex

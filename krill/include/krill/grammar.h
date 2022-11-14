@@ -1,15 +1,17 @@
 #ifndef GRAMMAR_H
 #define GRAMMAR_H
+#include "automata.h"
 #include "defs.h"
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 using krill::automata::EdgeTable;
-using std::string;
 using std::pair, std::set, std::map, std::multimap, std::vector;
+using std::string;
 
 namespace krill::grammar {
+
 
 const int END_SYMBOL = -1; // end of input in syntax parsing
 
@@ -25,11 +27,13 @@ struct Prod {
 
 // Grammar {(P -> Ab), (A -> Abc), (A -> b), ...}
 struct Grammar {
-    set<int>     terminalSet;
-    set<int>     nonterminalSet;
-    vector<Prod> prods;
+    set<int>         terminalSet;
+    set<int>         nonterminalSet;
+    vector<Prod>     prods;
+    map<int, string> symbolNames;
     Grammar() = default;
     Grammar(vector<Prod> prods);
+    Grammar(vector<string> prodStrs);
 };
 
 // Action of LR1 parse (ACTION | GOTO | REDUCE | ACCEPT, tgt)

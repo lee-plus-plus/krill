@@ -1,10 +1,54 @@
 #include "krill/grammar.h"
 #include "krill/automata.h"
+#include "fmt/format.h"
 #include <queue>
 #include <tuple>
 using namespace krill::automata;
 
 namespace krill::grammar {
+
+vector<string> split(string str, const char *delim) {
+    vector<string> res;
+    char *         strc = &str[0];
+    char *         temp = strtok(strc, delim);
+    while (temp != NULL) {
+        res.push_back(string(temp));
+        temp = strtok(NULL, delim);
+    }
+    return res;
+}
+
+pair<vector<Prod>, map<int, string>> getProdsFromStr(vector<string> prodStrs) {
+    vector<Prod>     prods;
+    map<string, int> symbolNamesRev;
+    map<int, string> symbolNames;
+    int              numStates = 0;
+
+    for (string prodStr : prodStrs) {
+        vector<string> words = split(prodStr, " ");
+        // assume words like {"Term", "->", "Term", "add", "D-Term"}
+        // throw away the second element "->"
+        int         symbol;
+        vector<int> right;
+        for (int i = 0; i < words.size(); i++) {
+            if (i == 1) { continue; }
+            if (symbolNamesRev.count(words[i]) == 0) {
+                symbolNamesRev[words[i]] = numStates;
+                symbolNames[numStates]   = words[i];
+                numStates++;
+            }
+            if (i == 0) {
+                symbol = symbolNamesRev[words[i]];
+            } else {
+                right.push_back(symbolNamesRev[words[i]]);
+            }
+        }
+        prods.push_back({symbol, right});
+    }
+
+    symbolNames[END_SYMBOL] = "END_";
+    return {prods, symbolNames};
+}
 
 bool Prod::operator<(const Prod &p) const {
     return std::tie(symbol, right) < std::tie(p.symbol, p.right);
@@ -15,6 +59,25 @@ bool Prod::operator==(const Prod &p) const {
 }
 
 Grammar::Grammar(vector<Prod> prods) : prods(prods) {
+    for (const Prod &prod : prods) { 
+        nonterminalSet.insert(prod.symbol);
+        for (int c : prod.right) { terminalSet.insert(c); }
+    }
+    for (int c : nonterminalSet) {
+        if (terminalSet.count(c)) { terminalSet.erase(c); }
+    }
+    for (int c : terminalSet) { 
+        symbolNames[c] = fmt::format("_{:d}", c);
+    }
+    for (int c : nonterminalSet) { 
+        symbolNames[c] = fmt::format("_{:d}", c);
+    }
+}
+
+Grammar::Grammar(vector<string> prodStrs) {
+    auto [prods_, symbolNames_] = getProdsFromStr(prodStrs);
+    prods = prods_;
+    symbolNames = symbolNames_;
     for (const Prod &prod : prods) { 
         nonterminalSet.insert(prod.symbol);
         for (int c : prod.right) { terminalSet.insert(c); }

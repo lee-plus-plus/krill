@@ -347,6 +347,7 @@ vector<Token> lexicalParser(string src) {
 
         if (isEscape) {
             tokens.push_back({.id = 12, .lexValue = string(1, c)});
+            isEscape = false;
             continue;
         }
 
