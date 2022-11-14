@@ -28,6 +28,14 @@ void test1() {
         "Closure -> Atom '?'", 
         "Atom -> '(' Parallel ')'", 
         "Atom -> Char", 
+        "Atom -> Range", 
+        "Range -> '[' RangeSeq ']'", 
+        "Range -> '[' '^' RangeSeq ']'", 
+        "RangeSeq -> RangeSeq RangeItem", 
+        "RangeSeq -> RangeItem", 
+        "RangeItem -> Char '-' Char", 
+        "RangeItem -> Char", 
+        "Atom -> '.'", 
     });
     // fprintf(stderr, "> initial grammar (calculator): \n");
     // printGrammar(grammar, symbolNames, cerr);
@@ -35,7 +43,7 @@ void test1() {
     // generate symbol name table
     cout << "// {\n//   ";
     for (auto [idx, symbolName] : symbolNames) {
-        cout << fmt::format("{{{}, \"{}\"}}, ", symbolName, idx);
+        cout << fmt::format("{{{}, \"{}\"}}, ", idx, symbolName);
     }
     cout << "\n// }";
 

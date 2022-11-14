@@ -13,26 +13,27 @@ using std::pair, std::map, std::vector, std::string, std::istream;
 
 namespace krill::runtime {
 
-class BaseLexicalParser {
+class LexicalParser {
   protected:
     DFA dfa_;
     int state_;
 
   public:
-    BaseLexicalParser() = default;
-    BaseLexicalParser(vector<DFA> dfas);
+    LexicalParser() = default;
+    LexicalParser(vector<DFA> dfas);
+    LexicalParser(vector<string> regexs);
 
     Token         parseStep(istream &input);
     vector<Token> parseAll(istream &input);
 };
 
-class LexicalParser : public BaseLexicalParser {
+class SimpleLexicalParser : public LexicalParser {
   private:
     map<int, int>    toSyntaxId_; // {x, syntaxId}
     map<int, string> tokenNames_; // {syntaxId,  name}
 
   public:
-    LexicalParser(Grammar grammar, map<string, string> nameToRegex);
+    SimpleLexicalParser(Grammar grammar, map<string, string> nameToRegex);
     Token         parseStep(istream &input);
     vector<Token> parseAll(istream &input);
 };

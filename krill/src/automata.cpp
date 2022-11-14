@@ -90,7 +90,8 @@ pair<DFAgraph, ClosureMap> getClosureMapfromNFAgraph(NFAgraph nfaGraph) {
     closures.push_back(initClosure);
 
     // bfs, 产生新覆盖片
-    for (int closureIdx = 0; (size_t) closureIdx < closures.size(); closureIdx++) {
+    for (int closureIdx = 0; (size_t) closureIdx < closures.size();
+         closureIdx++) {
         set<int> closure = closures[closureIdx];
 
         set<int> nextSymbols;
@@ -102,12 +103,12 @@ pair<DFAgraph, ClosureMap> getClosureMapfromNFAgraph(NFAgraph nfaGraph) {
         // 对覆盖片步进，产生新覆盖片
         map<int, set<int>> nextClosures = getNextClosures(closure, nfaGraph);
         for (const auto &elem : nextClosures) {
-            int      symbol    = elem.first;
+            int      symbol      = elem.first;
             set<int> nextClosure = elem.second;
 
             if (symbol == EMPTY_SYMBOL) { continue; }
             // 为覆盖片分配下一个idx，加入
-            auto it           = find(closures.begin(), closures.end(), nextClosure);
+            auto it = find(closures.begin(), closures.end(), nextClosure);
             int  nextClosureIdx = (int) (it - closures.begin());
             if ((size_t) nextClosureIdx == closures.size()) {
                 closures.push_back(nextClosure); // 无重复, 先生成新覆盖片
@@ -118,7 +119,8 @@ pair<DFAgraph, ClosureMap> getClosureMapfromNFAgraph(NFAgraph nfaGraph) {
 
     // 格式转换, closures -> closureMap
     map<int, set<int>> closureMap;
-    for (int closureIdx = 0; (size_t) closureIdx < closures.size(); closureIdx++) {
+    for (int closureIdx = 0; (size_t) closureIdx < closures.size();
+         closureIdx++) {
         for (int nfaState : closures[closureIdx]) {
             closureMap[closureIdx].insert(nfaState);
         }
@@ -127,17 +129,20 @@ pair<DFAgraph, ClosureMap> getClosureMapfromNFAgraph(NFAgraph nfaGraph) {
     return make_pair(dfaGraph, closureMap);
 }
 
-// 默认确定finality方式: 假定finality无冲突，若有多个则取最大值
-// 将若干个DFA整合为1个大DFA
+// 默认确定finality方式: 假定finality无冲突，若有多个则取最小值
+// (finality越小越优先) 将若干个DFA整合为1个大DFA
 // 每个DFA均以0为起始状态，合并得到唯一起始状态
 // 用不同值标注DFA的节点可终结属性, 可以防止合并
 // (得到的DFA未最小化)
 map<int, int> getFinalityFromClosureMap(map<int, int> nfaFinality,
-                                      ClosureMap      closureMap) {
+                                        ClosureMap    closureMap) {
     map<int, int> finality;
     for (const auto &elem : closureMap) {
         for (int i : elem.second) {
-            finality[elem.first] = max(finality[elem.first], nfaFinality[i]);
+            finality[elem.first] =
+                min(finality[elem.first], nfaFinality[i]) == 0
+                    ? max(finality[elem.first], nfaFinality[i])
+                    : min(finality[elem.first], nfaFinality[i]);
         }
     }
     return finality;
@@ -178,7 +183,7 @@ DFA getMergedDfa(DFA dfa) {
     map<int, int> stateColor = dfa.finality;
     // 获取充分染色后DFA节点, 作为区分特征
     // 对于状态i和状态j,若{stateColor[i], dfa}
-    using DFAnode = pair<int, map<int, int>>;
+    using DFAnode          = pair<int, map<int, int>>;
     auto getColoredDFAnode = [&stateColor](DFAnode node) -> DFAnode {
         node.first = stateColor[node.first];
         for (auto it = node.second.begin(); it != node.second.end(); it++) {

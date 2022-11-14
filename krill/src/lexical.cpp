@@ -14,12 +14,22 @@ using namespace std;
 
 namespace krill::runtime {
 
-BaseLexicalParser::BaseLexicalParser(vector<DFA> dfas)
+LexicalParser::LexicalParser(vector<DFA> dfas)
     : state_(0), dfa_(getDFAintegrated(dfas)) {}
+
+LexicalParser::LexicalParser(vector<string> regexs) {
+    state_ = 0;
+    vector<DFA> dfas;
+    for (string regex : regexs) {
+        dfas.push_back(getDFAfromRegex(regex));
+    }
+    dfa_ = getDFAintegrated(dfas);
+}
+
 
 // read, until one token is generated
 // return token with lexical id
-Token BaseLexicalParser::parseStep(istream &input) {
+Token LexicalParser::parseStep(istream &input) {
     // return end_token when input end
     if (!(input.good() && !input.eof() && !input.fail())) { return END_TOKEN; }
 
@@ -49,7 +59,7 @@ Token BaseLexicalParser::parseStep(istream &input) {
 
 // read, until the end of input (END_TOKEN is generated)
 // return tokens with lexical id
-vector<Token> BaseLexicalParser::parseAll(istream &input) {
+vector<Token> LexicalParser::parseAll(istream &input) {
     vector<Token> tokens;
     do {
         Token token = parseStep(input);
@@ -69,7 +79,7 @@ map<T2, T1> reverse(map<T1, T2> m) {
 
 // to align the lexicalId and syntaxId
 // nameToRegex: {terminalName, regex}
-LexicalParser::LexicalParser(Grammar grammar, map<string, string> nameToRegex) {
+SimpleLexicalParser::SimpleLexicalParser(Grammar grammar, map<string, string> nameToRegex) {
     state_      = 0;
     tokenNames_ = grammar.symbolNames;
     map<int, string> lexicalNames;
@@ -99,9 +109,9 @@ LexicalParser::LexicalParser(Grammar grammar, map<string, string> nameToRegex) {
 // read, until one "syntax" token is generated
 // lexical token which cannot map to syntax token will be dropped
 // return tokens with syntax id
-Token LexicalParser::parseStep(istream &input) {
+Token SimpleLexicalParser::parseStep(istream &input) {
     while (true) {
-        Token token = BaseLexicalParser::parseStep(input);
+        Token token = LexicalParser::parseStep(input);
         if (toSyntaxId_.count(token.id) != 0) {
             token.id    = toSyntaxId_.at(token.id); // lexical id => syntax id
             return token;
@@ -113,7 +123,7 @@ Token LexicalParser::parseStep(istream &input) {
 
 // read, until the end of input (END_TOKEN is generated)
 // return tokens with syntax id
-vector<Token> LexicalParser::parseAll(istream &input) {
+vector<Token> SimpleLexicalParser::parseAll(istream &input) {
     vector<Token> tokens;
     do {
         Token token = parseStep(input);

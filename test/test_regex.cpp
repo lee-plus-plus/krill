@@ -13,14 +13,6 @@ using namespace krill::regex;
 using namespace krill::regex::core;
 using namespace krill::utils;
 
-static const map<int, string> symbolNames = {
-    {-1, "END_"}, 
-    {0, "RegEx"},   {1, "Parallel"}, {2, "'|'"},   {3, "Seq"}, {4, "Item"},
-    {5, "Closure"}, {6, "Atom"},     {7, "'+'"},   {8, "'*'"}, {9, "'?'"},
-    {10, "'('"},    {11, "')'"},     {12, "Char"},
-};
-
-// test the transformation from EdgeTable to NFA to DFA
 void test1() {
     vector<string> srcs = {
         "abc",
@@ -36,7 +28,7 @@ void test1() {
 
         vector<Token> tokens = lexicalParser(src);
         for (Token token : tokens) {
-            cout << fmt::format("[{} '{}']", symbolNames.at(token.id),
+            cout << fmt::format("[{} '{}']", regexNames.at(token.id),
                                 token.lexValue);
         }
         cout << "\n";
@@ -47,9 +39,27 @@ void test1() {
     }
 }
 
+void test2() {
+    vector<string> regexs = {
+        "abc",
+        "a?b+c*d",
+        "b(ac?a|b)+d",
+        "(1|2)(0|1|2)*|0",
+        "[0-2]",
+        "[^a-y]",
+        "[^a-zA-Z0-9]",
+        "\\n",
+    };
+    for (auto regex : regexs) {
+        cout << fmt::format("regex: \"{}\"\n", regex);
+        DFA dfa = getDFAfromRegex(regex);
+        printDFA(dfa, cout, false);
+    }
+}
+
 
 int main() {
-    vector<void (*)()> testFuncs = {test1};
+    vector<void (*)()> testFuncs = {test1, test2};
     for (int i = 0; i < testFuncs.size(); i++) {
         cout << "#test " << (i + 1) << endl;
         testFuncs[i]();

@@ -98,11 +98,13 @@ APTnode *SyntaxParser::getAnnotatedParsingTree() {
 }
 
 void printAPT_(APTnode *node, ostream &oss, map<int, string> symbolNames,
-               bool forShort = false, vector<bool> isLast = {}) {
+               bool forShort, vector<bool> isLast = {}) {
     if (node == nullptr) { return; }
-    if (node->child.size() == 1) {
-        printAPT_(node->child[0], oss, symbolNames, forShort, isLast);
-        return;
+    if (forShort) {
+        if (node->child.size() == 1) {
+            printAPT_(node->child[0], oss, symbolNames, forShort, isLast);
+            return;
+        }
     }
     if (isLast.size() == 0) { oss << fmt::format(" "); }
 
@@ -129,7 +131,7 @@ void printAPT_(APTnode *node, ostream &oss, map<int, string> symbolNames,
 void SyntaxParser::printAnnotatedParsingTree(ostream &oss) {
     if (!isAccepted_) { return; }
     APTnode *root     = getAnnotatedParsingTree();
-    bool     forShort = false;
+    bool     forShort = true;
     printAPT_(root, oss, grammar_.symbolNames, forShort);
 }
 
