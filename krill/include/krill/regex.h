@@ -1,22 +1,17 @@
 #ifndef REGEX_H
 #define REGEX_H
+#include "automata.h"
 #include "defs.h"
 #include <map>
+#include <stack>
 #include <string>
 #include <vector>
-using krill::automata::DFA, krill::automata::NFA;
-using krill::grammar::Token;
-using std::string, std::pair, std::vector, std::map;
+using krill::automata::DFA, krill::automata::NFA, krill::automata::EdgeTable;
+using krill::grammar::Token, krill::grammar::Grammar,
+    krill::grammar::ActionTable;
+using std::string, std::pair, std::vector, std::map, std::stack;
 
 namespace krill::regex {
-
-const map<int, string> regexNames = {
-    {-1, "END_"},     {0, "RegEx"}, {1, "Parallel"}, {2, "'|'"},
-    {3, "Seq"},       {4, "Item"},  {5, "Closure"},  {6, "Atom"},
-    {7, "'+'"},       {8, "'*'"},   {9, "'?'"},      {10, "'('"},
-    {11, "')'"},      {12, "Char"}, {13, "Range"},   {14, "'['"},
-    {15, "RangeSeq"}, {16, "']'"},  {17, "'^'"},     {18, "RangeItem"},
-    {19, "'-'"}};
 
 DFA getDFAfromRegex(string src);
 NFA getNFAfromRegex(string src);
@@ -25,12 +20,50 @@ NFA getNFAfromRegex(string src);
 
 namespace krill::regex::core {
 
-// char lexValueToChar(string lexValue);
+struct Token {
+    int    id;
+    string lexValue;
+    char   realValue;
+    int    st;
+    int    ed;
+};
 
-// parse at once
-NFA syntaxParser(vector<Token> tokens);
-// parse at once
-vector<Token> lexicalParser(string src);
+struct Node {
+    int       id;
+    string    lexValue;
+    char      realValue;
+    int       nfaSt, nfaEd;
+    set<char> rangeChars;
+    Node *    child;
+    int       st, ed;
+};
+
+class RegexParser {
+  protected:
+    static const Grammar     grammar_;
+    static const ActionTable actionTable_;
+
+    string        regex_;
+    stack<int>    states_;
+    vector<Token> tokens_;
+    stack<Node>   nodes_;
+
+    EdgeTable nfaEdges;    // {{symbol, from, to}}
+    int       numNfaNodes; // leave 0 for global start, 1 for global end
+
+    int  posTokens_;
+    bool isAccepted_;
+
+    void lexicalParse();
+    void syntaxParse();
+
+  public:
+    RegexParser(string regex);
+
+    // bool match(string src);
+    NFA nfa();
+    DFA dfa();
+};
 
 } // namespace krill::regex::core
 #endif

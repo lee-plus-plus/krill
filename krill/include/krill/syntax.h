@@ -22,7 +22,7 @@ struct APTnode {
 };
 
 class SyntaxParser {
-  private:
+  protected:
     Grammar     grammar_;
     ActionTable actionTable_;
 

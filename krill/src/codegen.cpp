@@ -220,7 +220,7 @@ void genGrammarInCppStyle(const Grammar &grammar, ostream &oss) {
     stringstream def_symbolnames;
     def_symbolnames << "{\n";
     for (auto[id, name] : grammar.symbolNames) {
-        def_symbolnames << fmt::format("  {{{}, \"{}\"}}\n", id, name);
+        def_symbolnames << fmt::format("  {{{}, \"{}\"}}, \n", id, name);
     }
     def_symbolnames << "}";
 
@@ -259,12 +259,12 @@ void genGrammarInCppStyle(const Grammar &grammar, ostream &oss) {
     oss << fmt::format("set<int> nonterminalSet = {};\n\n",
                        def_nonterminals.str());
     oss << fmt::format("vector<Prod> prods = {};\n\n", def_prods.str());
-    oss << "Grammar grammar({"
-           "  .terminalSet=terminalSet, "
-           "  .nonterminalSet=nonterminalSet, "
-           "  .prods=prods, "
-           "  .symbolNames=symbolNames, "
-           "});";
+    oss << "Grammar grammar({\n"
+           "  .terminalSet=terminalSet,\n"
+           "  .nonterminalSet=nonterminalSet,\n"
+           "  .prods=prods,\n"
+           "  .symbolNames=symbolNames,\n"
+           "});\n";
 
 }
 

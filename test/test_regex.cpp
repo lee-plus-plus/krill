@@ -14,32 +14,6 @@ using namespace krill::regex::core;
 using namespace krill::utils;
 
 void test1() {
-    vector<string> srcs = {
-        "abc",
-        "a?b+c*d",
-        "b(ac?a|b)+d",
-        "(1|2)(0|1|2)*|0",
-        "((1|2)(0|1|2)*|0).?(0|1|2)+",
-        "(a|b|c)(a|b|c|0|1|2)*",
-        " +",
-    };
-    for (auto src : srcs) {
-        cout << fmt::format("regex: \"{}\"\n", src);
-
-        vector<Token> tokens = lexicalParser(src);
-        for (Token token : tokens) {
-            cout << fmt::format("[{} '{}']", regexNames.at(token.id),
-                                token.lexValue);
-        }
-        cout << "\n";
-
-        NFA nfa = syntaxParser(tokens);
-        DFA dfa = getMinimizedDfa(getDFAfromNFA(nfa));
-        printDFA(dfa, cout);
-    }
-}
-
-void test2() {
     vector<string> regexs = {
         "abc",
         "a?b+c*d",
@@ -59,7 +33,7 @@ void test2() {
 
 
 int main() {
-    vector<void (*)()> testFuncs = {test1, test2};
+    vector<void (*)()> testFuncs = {test1};
     for (int i = 0; i < testFuncs.size(); i++) {
         cout << "#test " << (i + 1) << endl;
         testFuncs[i]();

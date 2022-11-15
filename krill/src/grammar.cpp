@@ -72,6 +72,11 @@ bool Prod::operator==(const Prod &p) const {
     return std::tie(symbol, right) == std::tie(p.symbol, p.right);
 }
 
+Grammar::Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
+        map<int, string> symbolNames)
+    : terminalSet(terminalSet), nonterminalSet(nonterminalSet), prods(prods),
+      symbolNames(symbolNames) {}
+
 Grammar::Grammar(vector<Prod> prods) : prods(prods) {
     for (const Prod &prod : prods) {
         nonterminalSet.insert(prod.symbol);

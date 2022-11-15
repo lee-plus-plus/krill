@@ -32,6 +32,7 @@ struct Grammar {
     vector<Prod>     prods;
     map<int, string> symbolNames;
     Grammar() = default;
+    Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods, map<int, string> symbolNames);
     Grammar(vector<Prod> prods);
     Grammar(vector<string> prodStrs);
 };

@@ -36,7 +36,7 @@ void printActionTable(const ActionTable &actionTable,
 void printToken(Token token, ostream &oss);
 
 // grammar string => Grammar, Symbol Names
-pair<Grammar, map<int, string>> getGrammarFromStr(vector<string> prodStrs);
+// pair<Grammar, map<int, string>> getGrammarFromStr(vector<string> prodStrs);
 
 } // namespace krill::utils
 #endif
