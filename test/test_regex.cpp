@@ -7,6 +7,7 @@
 #include <iostream>
 #include <vector>
 using namespace std;
+using namespace krill::type;
 using namespace krill::automata;
 using namespace krill::grammar;
 using namespace krill::regex;

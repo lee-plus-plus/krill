@@ -9,8 +9,8 @@
 #include <deque>
 #include <string>
 #include <vector>
-using krill::grammar::Grammar, krill::grammar::ActionTable;
-using krill::grammar::Token;
+using krill::type::Grammar, krill::type::ActionTable;
+using krill::type::Token;
 using krill::utils::AttrDict;
 using std::vector, std::deque, std::stack;
 using std::string, std::ostream;

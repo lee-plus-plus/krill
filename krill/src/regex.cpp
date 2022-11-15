@@ -567,7 +567,7 @@ NFA RegexParser::nfa() {
     // RegEx NFA: start at 0, terminate at 1
     nfaEdges.push_back({.symbol = EMPTY_SYMBOL, .from = 0, .to = root.nfaSt});
     nfaEdges.push_back({.symbol = EMPTY_SYMBOL, .from = root.nfaEd, .to = 1});
-    NFAgraph nfaGraph = krill::automata::core::toNFAgraph(nfaEdges);
+    NFAgraph nfaGraph = krill::automata::toNFAgraph(nfaEdges);
 
     map<int, int> finality;
     for (int i = 0; i < numNfaNodes; i++) { finality[i] = 0; }

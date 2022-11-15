@@ -1,5 +1,5 @@
-#ifndef FAMODELS_H
-#define FAMODELS_H
+#ifndef AUTOMATA_H
+#define AUTOMATA_H
 #include "defs.h"
 #include <map>
 #include <set>
@@ -7,7 +7,7 @@
 using std::pair;
 using std::set, std::map, std::multimap, std::vector;
 
-namespace krill::automata {
+namespace krill::type {
 
 const int EMPTY_SYMBOL = 0; // empty edge for NFA / EdgeTable
 
@@ -34,14 +34,16 @@ struct Edge {
 };
 using EdgeTable = vector<Edge>;
 
+} // namespace krill::type
+
+
+
+namespace krill::automata {
+using namespace krill::type;
+
 DFA getMinimizedDfa(DFA dfa);
 DFA getDFAfromNFA(NFA nfa);
 DFA getDFAintegrated(vector<DFA> dfas);
-
-} // namespace krill::automata
-
-namespace krill::automata::core {
-using namespace krill::automata;
 
 NFAgraph  toNFAgraph(EdgeTable edgeTable);
 DFAgraph  toDFAgraph(EdgeTable edgeTable);
@@ -59,6 +61,6 @@ pair<DFAgraph, ClosureMap> getClosureMapfromNFAgraph(NFAgraph nfaGraph);
 map<int, int>              getFinalityFromClosureMap(map<int, int>     nfaFinality,
                                                      map<int, Closure> closureMap);
 DFA                        _getDFAintegrated(vector<DFA> dfas);
-} // namespace krill::automata::core
+} // namespace krill::automata
 
 #endif

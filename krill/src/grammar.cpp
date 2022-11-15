@@ -7,8 +7,7 @@
 using namespace krill::automata;
 using namespace krill::utils;
 
-namespace krill::grammar {
-
+namespace krill::type {
 
 // {"Term -> Term '+' Term D-Term", ... } =>
 //   (Prod) {{256 -> 256 43 256 257}, ...},
@@ -58,8 +57,8 @@ bool Prod::operator==(const Prod &p) const {
     return std::tie(symbol, right) == std::tie(p.symbol, p.right);
 }
 
-Grammar::Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
-        map<int, string> symbolNames)
+Grammar::Grammar(set<int> terminalSet, set<int> nonterminalSet,
+                 vector<Prod> prods, map<int, string> symbolNames)
     : terminalSet(terminalSet), nonterminalSet(nonterminalSet), prods(prods),
       symbolNames(symbolNames) {}
 
@@ -100,24 +99,26 @@ bool Token::operator!=(const Token &t) const {
     return std::tie(id, lval) != std::tie(t.id, t.lval);
 }
 
+} // namespace krill::type
+
+
+
+namespace krill::grammar {
+
 // LR(1) action table
 ActionTable getLR1table(Grammar grammar) {
-    auto lr1Automata = core::getLR1Automata(grammar);
-    auto lr1table    = core::getLR1table(grammar, lr1Automata);
+    auto lr1Automata = getLR1Automata(grammar);
+    auto lr1table    = getLR1table(grammar, lr1Automata);
     return lr1table;
 }
 
 // LALR(1) action table
 ActionTable getLALR1table(Grammar grammar) {
-    auto lr1Automata   = core::getLR1Automata(grammar);
-    auto lalr1Automata = core::getLALR1fromLR1(grammar, lr1Automata);
-    auto lalr1table    = core::getLR1table(grammar, lalr1Automata);
+    auto lr1Automata   = getLR1Automata(grammar);
+    auto lalr1Automata = getLALR1fromLR1(grammar, lr1Automata);
+    auto lalr1table    = getLR1table(grammar, lalr1Automata);
     return lalr1table;
 }
-
-} // namespace krill::grammar
-
-namespace krill::grammar::core {
 
 bool ProdItem::operator<(const ProdItem &p) const {
     return std::tie(symbol, right, dot) < std::tie(p.symbol, p.right, p.dot);

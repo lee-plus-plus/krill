@@ -7,8 +7,8 @@
 #include <string>
 #include <map>
 #include <vector>
-using krill::automata::DFA;
-using krill::grammar::Grammar, krill::grammar::Token;
+using krill::type::DFA;
+using krill::type::Grammar, krill::type::Token;
 using std::pair, std::map, std::vector, std::string, std::istream;
 
 namespace krill::runtime {

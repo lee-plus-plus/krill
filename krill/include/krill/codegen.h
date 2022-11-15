@@ -4,15 +4,15 @@
 #include <map>
 #include <ostream>
 #include <string>
-using krill::grammar::Grammar, krill::grammar::ActionTable;
-using krill::automata::DFA;
+using krill::type::Grammar, krill::type::ActionTable;
+using krill::type::DFA;
 using std::map, std::string, std::ostream;
 
 namespace krill::codegen {
 
-void genActionTableInCppStyle(const ActionTable &actionTable, ostream &oss);
-void genGrammarInCppStyle(const Grammar& grammar, ostream &oss);
-void genDFAInCppStyle(const DFA &dfa, ostream &oss);
+void genActionTable(const ActionTable &actionTable, ostream &oss);
+void genGrammar(const Grammar& grammar, ostream &oss);
+void genDFA(const DFA &dfa, ostream &oss);
 
 // generate code of Syntax Parser (C format, standalone)
 void genSyntaxParserInCStyle(const Grammar &    grammar,

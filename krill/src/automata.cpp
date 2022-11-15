@@ -4,7 +4,7 @@
 #include <tuple>
 using std::max, std::min;
 
-namespace krill::automata {
+namespace krill::type {
 
 bool Edge::operator<(const Edge &e) const {
     return std::tie(symbol, from, to) < std::tie(e.symbol, e.from, e.to);
@@ -14,17 +14,23 @@ bool Edge::operator==(const Edge &e) const {
     return std::tie(symbol, from, to) == std::tie(e.symbol, e.from, e.to);
 }
 
+} // namespace krill::type
+
+
+
+namespace krill::automata {
+
 // 最小化DFA
 // 包括了消除不可达状态、合并等价状态
 DFA getMinimizedDfa(DFA dfa) {
-    return core::getReachableDfa(core::getMergedDfa(dfa));
+    return getReachableDfa(getMergedDfa(dfa));
 }
 
 // 将NFA转为DFA
 // 采用默认方式确定覆盖片(DFA节点)的可终结属性
 DFA getDFAfromNFA(NFA nfa) {
-    auto[dfaGraph, closureMap] = core::getClosureMapfromNFAgraph(nfa.graph);
-    auto finality = core::getFinalityFromClosureMap(nfa.finality, closureMap);
+    auto[dfaGraph, closureMap] = getClosureMapfromNFAgraph(nfa.graph);
+    auto finality = getFinalityFromClosureMap(nfa.finality, closureMap);
     return DFA({dfaGraph, finality});
 }
 
@@ -39,12 +45,9 @@ DFA getDFAintegrated(vector<DFA> dfas) {
             if (it->second != 0) { it->second = i + 1; }
         }
     }
-    return getMinimizedDfa(core::_getDFAintegrated(dfas));
+    return getMinimizedDfa(_getDFAintegrated(dfas));
 }
 
-} // namespace krill::automata
-
-namespace krill::automata::core {
 
 // EdgeTabel => NFAgraph
 NFAgraph toNFAgraph(EdgeTable edgeTable) {
@@ -311,4 +314,4 @@ DFA _getDFAintegrated(vector<DFA> dfas) {
     return dfa;
 }
 
-} // namespace krill::automata::core
+} // namespace krill::automata

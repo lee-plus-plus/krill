@@ -192,7 +192,7 @@ template <typename T> vector<T> to_vector(set<T> s) {
 template <typename T1, typename T2> void genMap(map<T1, T2> m, ostream &oss) {}
 
 
-void genActionTableInCppStyle(const ActionTable &actionTable, ostream &oss) {
+void genActionTable(const ActionTable &actionTable, ostream &oss) {
     stringstream def_actionTable;
     def_actionTable << "{\n";
     for (auto[key, action] : actionTable) {
@@ -211,7 +211,7 @@ void genActionTableInCppStyle(const ActionTable &actionTable, ostream &oss) {
     oss << fmt::format("ActionTable actionTable = {};\n", def_actionTable.str());
 }
 
-void genGrammarInCppStyle(const Grammar &grammar, ostream &oss) {
+void genGrammar(const Grammar &grammar, ostream &oss) {
     // define of symbols
     stringstream def_symbols;
     for (auto[id, name] : grammar.symbolNames) {
@@ -271,7 +271,7 @@ void genGrammarInCppStyle(const Grammar &grammar, ostream &oss) {
 
 }
 
-void genDFAInCppStyle(const DFA &dfa, ostream &oss) {
+void genDFA(const DFA &dfa, ostream &oss) {
     stringstream def_dfa_graph;
     def_dfa_graph << "{\n";
     for (auto[from, map] : dfa.graph) {

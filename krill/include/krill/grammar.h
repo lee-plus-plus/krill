@@ -6,16 +6,15 @@
 #include <set>
 #include <string>
 #include <vector>
-using krill::automata::EdgeTable;
 using std::pair, std::set, std::map, std::multimap, std::vector;
 using std::string;
 
-namespace krill::grammar {
+namespace krill::type {
 
 const int END_SYMBOL = -1; // end of input in syntax parsing
 
-// Production (P -> Ab)
 struct Prod {
+    // Production (P -> Ab)
     int         symbol; // left, nonterminal symbol
     vector<int> right;  // mixed with nonterminals and terminals
     Prod(int symbol, vector<int> right) : symbol(symbol), right(right){};
@@ -24,29 +23,30 @@ struct Prod {
     bool operator==(const Prod &p) const;
 };
 
-// Grammar {(P -> Ab), (A -> Abc), (A -> b), ...}
 struct Grammar {
+    // Grammar {(P -> Ab), (A -> Abc), (A -> b), ...}
     set<int>         terminalSet;
     set<int>         nonterminalSet;
     vector<Prod>     prods;
     map<int, string> symbolNames;
     Grammar() = default;
-    Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods, map<int, string> symbolNames);
+    Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
+            map<int, string> symbolNames);
     Grammar(vector<Prod> prods);
     Grammar(vector<string> prodStrs);
 };
 
-// Action of LR1 parse (ACTION | GOTO | REDUCE | ACCEPT, tgt)
 enum ActionType { ACTION = 0, REDUCE = 1, GOTO = 2, ACCEPT = 3 };
 struct Action {
+    // Action of LR1 parse (ACTION | GOTO | REDUCE | ACCEPT, tgt)
     ActionType type; // action type
     int        tgt;  // ACTION or GOTO: tgt=next_state; REDUCE: tgt=prod_idx
 };
 // {current_state, look_over_symbol, action}
 using ActionTable = map<pair<int, int>, Action>;
 
-// Token for parsing input (can be derived)
 struct Token {
+    // lexical token
     int    id;
     string lval;
     // to make std::set happy
@@ -56,14 +56,16 @@ struct Token {
 };
 const Token END_TOKEN = Token({.id = END_SYMBOL, .lval = ""});
 
+}; // namespace krill::type
+
+
+
+namespace krill::grammar {
+using namespace krill::type;
+
 // Grammar => LR1 Automata (LR1 states, EdgeTable) => Action Table
 ActionTable getLR1table(Grammar grammar);
 ActionTable getLALR1table(Grammar grammar);
-
-}; // namespace krill::grammar
-
-namespace krill::grammar::core {
-using namespace krill::grammar;
 
 // Production Item (P -> A·b)
 struct ProdItem : Prod {
@@ -104,6 +106,6 @@ LR1Automata getLR1Automata(Grammar grammar);
 ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata);
 LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata);
 
-} // namespace krill::grammar::core
+} // namespace krill::grammar
 
 #endif

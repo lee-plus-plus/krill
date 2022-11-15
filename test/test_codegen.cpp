@@ -1,13 +1,20 @@
-#include "Krill/utils.h"
-#include "krill/codegen.h"
-#include "krill/defs.h"
-#include "krill/grammar.h"
 #include "fmt/format.h"
+#include "krill/defs.h"
+#include "krill/automata.h"
+#include "krill/grammar.h"
+#include "krill/regex.h"
+#include "krill/codegen.h"
 #include <iostream>
+#include <sstream>
+#include <map>
+#include <vector>
 using namespace std;
-using krill::automata::DFA;
-using krill::grammar::Grammar;
+using namespace krill::automata;
+using namespace krill::grammar;
+using namespace krill::regex;
+using namespace krill::utils;
 using namespace krill::codegen;
+using namespace krill::runtime;
 
 Grammar grammar = Grammar({
     "RegEx -> Parallel", 
@@ -57,10 +64,10 @@ void test() {
     auto actionTable = getLALR1table(grammar);
 
     cout << "\n// Action Table\n";
-    genActionTableInCppStyle(actionTable, cout);
+    genActionTable(actionTable, cout);
 
     cout << "\n// Grammar\n";
-    genGrammarInCppStyle(grammar, cout);
+    genGrammar(grammar, cout);
 }
 
 

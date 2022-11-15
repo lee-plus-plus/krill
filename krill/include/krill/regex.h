@@ -6,9 +6,8 @@
 #include <stack>
 #include <string>
 #include <vector>
-using krill::automata::DFA, krill::automata::NFA, krill::automata::EdgeTable;
-using krill::grammar::Token, krill::grammar::Grammar,
-    krill::grammar::ActionTable;
+using krill::type::DFA, krill::type::NFA, krill::type::EdgeTable;
+using krill::type::Token, krill::type::Grammar, krill::type::ActionTable;
 using std::string, std::pair, std::vector, std::map, std::stack;
 
 namespace krill::regex {

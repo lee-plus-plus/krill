@@ -130,6 +130,6 @@ template <typename T> void AttrDict::Set(string attr_name, T attr_value) {
 
 inline void AttrDict::Clear() { attr_dict_.clear(); }
 
-} // namespace sly::core::type
+} // namespace krill::utils
 
-#endif // SEULEXYACC_ATTRDICT_H
+#endif

@@ -6,8 +6,8 @@
 #include <iostream>
 #include <vector>
 using namespace std;
+using namespace krill::type;
 using namespace krill::grammar;
-using namespace krill::grammar::core;
 using namespace krill::utils;
 
 

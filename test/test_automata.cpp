@@ -4,9 +4,8 @@
 #include "fmt/format.h"
 #include <iostream>
 using namespace std;
-using namespace krill;
+using namespace krill::type;
 using namespace krill::automata;
-using namespace krill::automata::core;
 using namespace krill::utils;
 
 void printEdgeTable(EdgeTable edgeTable, ostream &oss, bool isAscii = false) {
