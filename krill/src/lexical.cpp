@@ -14,6 +14,9 @@ using namespace std;
 
 namespace krill::runtime {
 
+LexicalParser::LexicalParser(DFA dfai)
+    : state_(0), dfa_(dfai) {}
+
 LexicalParser::LexicalParser(vector<DFA> dfas)
     : state_(0), dfa_(getDFAintegrated(dfas)) {}
 

@@ -20,6 +20,7 @@ class LexicalParser {
 
   public:
     LexicalParser() = default;
+    LexicalParser(DFA dfai);
     LexicalParser(vector<DFA> dfas);
     LexicalParser(vector<string> regexs);
 

@@ -44,6 +44,8 @@ char lexValueToChar(string lexValue) {
         return '\t';
     } else if (lexValue == "\v") {
         return '\v';
+    } else if (lexValue == "\f") {
+        return '\f';
     } else {
         assert(lexValue.size() == 1);
         return lexValue[0];
@@ -227,10 +229,6 @@ NFA syntaxParser(vector<Token> tokens) {
                                       .nfaSt    = -1,
                                       .nfaEd    = -1});
                 stateNodes.push(nextNode);
-
-                // fmt::print("[{} \"{}\"]", symbolNames.at(nextNode.tokenId),
-                //            nextNode.lexValue);
-
                 i++;
                 break;
             }
@@ -242,6 +240,7 @@ NFA syntaxParser(vector<Token> tokens) {
                     child.insert(child.begin(), stateNodes.top());
                     stateNodes.pop();
                 }
+
 
                 assert(actionTable.count({states.top(), r.symbol}) != 0);
                 Action action2 = actionTable.at({states.top(), r.symbol});
@@ -528,7 +527,7 @@ vector<Token> lexicalParser(string src) {
         int id;
 
         if (isEscape) {
-            if (c == 'n' || c == 'r' || c == 't' || c == 'v') {
+            if (c == 'n' || c == 'r' || c == 't' || c == 'v' || c == 'f') {
                 string s = "\\" + c;
                 tokens.push_back({.id = 12, .lexValue = s});
             } else {

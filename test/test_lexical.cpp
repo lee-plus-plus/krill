@@ -30,7 +30,7 @@ void test1() {
         regexDFAs.push_back(getDFAfromRegex(regex));
         printDFA(regexDFAs.back(), cout, true);
     }
-    BaseLexicalParser parser(regexDFAs);
+    LexicalParser parser(regexDFAs);
 
     vector<string> srcs = {
         "121  abc  a21 a",
@@ -71,13 +71,13 @@ void test2() {
         {"int", "(1|2)(0|1|2)*|0"},
         {"float", "((1|2)(0|1|2)*|0)?.?(0|1|2)+"},
         {"varname", "(a|b|c)(a|b|c|0|1|2)*"},
-        {"oprt", "\\+|-|\\*|/"},
+        {"oprt", "\\+|\\-|\\*|/"},
         {"'='", "="},
         {"';'", ";"},
         {"delim", " +"},
     };
 
-    LexicalParser parser(grammar, nameToRegex);
+    SimpleLexicalParser parser(grammar, nameToRegex);
 
     vector<string> srcs = {"a =1 + 21; b=2*0/1; 1/1-1; "};
 

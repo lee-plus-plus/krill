@@ -25,6 +25,8 @@ NFA getNFAfromRegex(string src);
 
 namespace krill::regex::core {
 
+// char lexValueToChar(string lexValue);
+
 // parse at once
 NFA syntaxParser(vector<Token> tokens);
 // parse at once

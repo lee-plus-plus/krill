@@ -1,7 +1,7 @@
 #include "krill/codegen.h"
 #include "krill/grammar.h"
 #include "krill/utils.h"
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <sstream>
 using namespace krill::grammar;
 using namespace std;
@@ -183,9 +183,120 @@ GrammarNode syntaxParser(vector<int> tokens) {{
 }} 
 )";
 
+template <typename T> vector<T> to_vector(set<T> s) {
+    vector<T> v;
+    v.assign(s.begin(), s.end());
+    return v;
+}
+
+template <typename T1, typename T2> void genMap(map<T1, T2> m, ostream &oss) {}
+
+
+void genActionTableInCppStyle(const ActionTable &actionTable, ostream &oss) {
+    stringstream def_actionTable;
+    const string typeName[] = {"ACTION", "REDUCE", "GOTO", "ACCEPT"};
+    def_actionTable << "{\n";
+    for (auto[key, action] : actionTable) {
+        def_actionTable << "  {{" << key.first << "," << key.second << "},{"
+                        << typeName[action.type] << "," << action.tgt
+                        << "}},\n";
+    }
+    def_actionTable << "}";
+
+    oss << "struct Action { TYPE type; int tgt; };\n";
+    oss << "using ActionTable = map<pair<int, int>, Action>;\n";
+    oss << fmt::format("ActionTable actionTable = {};\n", def_actionTable.str());
+}
+
+void genGrammarInCppStyle(const Grammar &grammar, ostream &oss) {
+    // define of symbols
+    stringstream def_symbols;
+    for (auto[id, name] : grammar.symbolNames) {
+        if (0 <= id && id < 256) { continue; }
+        def_symbols << fmt::format("#define {} {}\n", name, id);
+    }
+
+    // symbol names
+    stringstream def_symbolnames;
+    def_symbolnames << "{\n";
+    for (auto[id, name] : grammar.symbolNames) {
+        def_symbolnames << fmt::format("  {{{}, \"{}\"}}\n", id, name);
+    }
+    def_symbolnames << "}";
+
+    // terminals & nonterminals
+    stringstream def_terminals;
+    stringstream def_nonterminals;
+    def_terminals << fmt::format(
+        "{{\n  {}\n}}", fmt::join(to_vector(grammar.terminalSet), ", "));
+    def_nonterminals << fmt::format(
+        "{{\n  {}\n}}", fmt::join(to_vector(grammar.nonterminalSet), ", "));
+
+    // prods
+    stringstream def_prods;
+    const auto &symbolNames = grammar.symbolNames;
+    def_prods << "{\n";
+    for (int i = 0; i < grammar.prods.size(); i++) {
+        def_prods << "  /* " << i << ": ";
+        const auto &prod = grammar.prods[i];
+        def_prods << symbolNames.at(prod.symbol) << " -> ";
+        for (int r : prod.right) { def_prods << symbolNames.at(r) << " "; }
+        def_prods << "*/ {\n    " << symbolNames.at(prod.symbol) << ", {";
+        for (int j = 0; j < prod.right.size(); j++) {
+            def_prods << symbolNames.at(prod.right[j])
+                     << ((j + 1 < prod.right.size()) ? ", " : "");
+        }
+        def_prods << "}}, \n";
+    }
+    def_prods << "}";
+
+    oss << fmt::format("{}\n", def_symbols.str());
+    oss << "struct Prod { int symbol; vector<int> right; };\n";
+    oss << "struct Grammar { set<int> terminalSet; set<int> nonterminalSet; "
+           "vector<Prod> prods; map<int, string> symbolNames; };\n";
+    oss << fmt::format("map<int, string> symbolNames = {};\n\n", def_symbolnames.str());
+    oss << fmt::format("set<int> terminalSet = {};\n\n", def_terminals.str());
+    oss << fmt::format("set<int> nonterminalSet = {};\n\n",
+                       def_nonterminals.str());
+    oss << fmt::format("vector<Prod> prods = {};\n\n", def_prods.str());
+    oss << "Grammar grammar({"
+           "  .terminalSet=terminalSet, "
+           "  .nonterminalSet=nonterminalSet, "
+           "  .prods=prods, "
+           "  .symbolNames=symbolNames, "
+           "});";
+
+}
+
+void genDFAInCppStyle(const DFA &dfa, ostream &oss) {
+    stringstream def_dfa_graph;
+    def_dfa_graph << "{\n";
+    for (auto[from, map] : dfa.graph) {
+        def_dfa_graph << "{" << from << ", {";
+        for (auto[symbol, to] : map) {
+            def_dfa_graph << "{" << symbol << "," << to << "},";
+        }
+        def_dfa_graph << "}\n";
+    }
+    def_dfa_graph << "}";
+
+    stringstream def_finality;
+    def_finality << "{\n";
+    for (auto[state, f] : dfa.finality) {
+        def_finality << "{" << state << "," << f << "},";
+    }
+    def_finality << "}";
+
+    oss << "const int EMPTY_SYMBOL = 0;\n"
+        << "using DFAgraph = map<int, map<int, int>>;\n"
+        << "struct DFA { DFAgraph graph; map<int, int> finality; };\n\n"
+        << fmt::format("DFAgraph graph = {};\n\n", def_dfa_graph.str());
+    oss << fmt::format("map<int, int> finality = {};\n", def_finality.str());
+}
+
 // generate code of Syntax Parser (C format, standalone)
-void genSyntaxParserInCStyle(const Grammar &grammar,
-                             map<int, string> symbolNames,
+void genSyntaxParserInCStyle(const Grammar &    grammar,
+                             map<int, string>   symbolNames,
                              const ActionTable &actionTable, ostream &oss) {
 
     // num_states, num_symbols, num_action_items
@@ -229,7 +340,7 @@ void genSyntaxParserInCStyle(const Grammar &grammar,
     // action_table => dfa_table, actions_type, actions_tgt
     // (compressed storage)
     const string typeName[] = {"ACTION", "REDUCE", "GOTO", "ACCEPT"};
-    int **dfa_table         = new int *[num_states];
+    int **       dfa_table  = new int *[num_states];
     for (int i = 0; i < num_states; i++) {
         dfa_table[i] = new int[num_symbols];
         for (int j = 0; j < num_symbols; j++) { dfa_table[i][j] = -1; }
@@ -312,24 +423,24 @@ void genSyntaxParserInCStyle(const Grammar &grammar,
 }
 
 // generate code of Syntax Parser (C++ format, standalone)
-void genSyntaxParserInCppStyle(const Grammar &grammar,
-                               map<int, string> symbolNames,
+void genSyntaxParserInCppStyle(const Grammar &    grammar,
+                               map<int, string>   symbolNames,
                                const ActionTable &actionTable, ostream &oss) {
 
     // prods
-    stringstream defProds;
-    defProds << endl;
+    stringstream def_prods;
+    def_prods << endl;
     for (int i = 0; i < grammar.prods.size(); i++) {
         const auto &prod = grammar.prods[i];
-        defProds << "    /* " << i << ": ";
-        defProds << symbolNames[prod.symbol] << " -> ";
-        for (int r : prod.right) { defProds << symbolNames[r] << " "; }
-        defProds << "*/ {" << prod.symbol << ", {";
+        def_prods << "    /* " << i << ": ";
+        def_prods << symbolNames[prod.symbol] << " -> ";
+        for (int r : prod.right) { def_prods << symbolNames[r] << " "; }
+        def_prods << "*/ {" << prod.symbol << ", {";
         for (int j = 0; j < prod.right.size(); j++) {
-            defProds << prod.right[j]
+            def_prods << prod.right[j]
                      << ((j + 1 < prod.right.size()) ? ", " : "");
         }
-        defProds << "}}"
+        def_prods << "}}"
                  << ", " << endl;
     }
 
@@ -365,9 +476,25 @@ void genSyntaxParserInCppStyle(const Grammar &grammar,
                       << "break;" << endl;
     }
 
-    oss << fmt::format(codeSyntaxParserInCppStyle, defProds.str(),
+    oss << fmt::format(codeSyntaxParserInCppStyle, def_prods.str(),
                        defActionTable.str(), defReductions.str());
 }
 
+struct Parms {
+    Grammar        grammar;      // syntax parser
+    vector<string> regexs;       // lexical parser
+    int            startTokenId; // for augmented grammar
+
+    // code insert
+    vector<string> prodActions;
+    vector<string> lexActions;
+    string         headCodeblock;
+    string         tailCodeblock;
+};
+
+// assume grammar is augmented
+// void genSyntaxParserInCppStyle(Grammar grammar, vector<string> regexs) {
+
+// }
 
 } // namespace krill::codegen

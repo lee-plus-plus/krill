@@ -1,6 +1,6 @@
 #include "krill/grammar.h"
-#include "krill/automata.h"
 #include "fmt/format.h"
+#include "krill/automata.h"
 #include <queue>
 #include <tuple>
 using namespace krill::automata;
@@ -18,35 +18,49 @@ vector<string> split(string str, const char *delim) {
     return res;
 }
 
+template <typename T1, typename T2> map<T2, T1> reverse(map<T1, T2> m) {
+    map<T2, T1> m_reversed;
+    for (auto[key, value] : m) { m_reversed[value] = key; }
+    return m_reversed;
+}
+
+// {"Term -> Term '+' Term D-Term", ... } =>
+//   (Prod) {{256 -> 256 43 256 257}, ...},
+//   (symbolNames) {{256, "Term"}, {43, "'+'"}, ...}
+// assign id for symbols, in the order of occurrence
 pair<vector<Prod>, map<int, string>> getProdsFromStr(vector<string> prodStrs) {
     vector<Prod>     prods;
-    map<string, int> symbolNamesRev;
-    map<int, string> symbolNames;
-    int              numStates = 0;
+    map<string, int> symbolId;
+    int              numSymbols = 0;
 
     for (string prodStr : prodStrs) {
         vector<string> words = split(prodStr, " ");
-        // assume words like {"Term", "->", "Term", "add", "D-Term"}
-        // throw away the second element "->"
+        // assume words like {"Term", "->", "Term", "'+'", "D-Term"}
         int         symbol;
         vector<int> right;
         for (int i = 0; i < words.size(); i++) {
-            if (i == 1) { continue; }
-            if (symbolNamesRev.count(words[i]) == 0) {
-                symbolNamesRev[words[i]] = numStates;
-                symbolNames[numStates]   = words[i];
-                numStates++;
+            if (i == 1) { continue; } // throw away the 2nd element "->"
+            const string &word = words[i];
+            if (symbolId.count(word) == 0) { // single char like "'+'"
+                if (word.size() == 3 && word[0] == '\'' && word[2] == '\'') {
+                    symbolId[word] = (int) word[1];
+                } else { // long symbol like "Term"
+                    symbolId[word] = 256 + numSymbols;
+                    numSymbols++;
+                }
             }
             if (i == 0) {
-                symbol = symbolNamesRev[words[i]];
+                symbol = symbolId[word];
             } else {
-                right.push_back(symbolNamesRev[words[i]]);
+                right.push_back(symbolId[word]);
             }
         }
         prods.push_back({symbol, right});
     }
 
-    symbolNames[END_SYMBOL] = "END_";
+    symbolId["END_"] = END_SYMBOL;
+
+    map<int, string> symbolNames = reverse(symbolId);
     return {prods, symbolNames};
 }
 
@@ -59,26 +73,22 @@ bool Prod::operator==(const Prod &p) const {
 }
 
 Grammar::Grammar(vector<Prod> prods) : prods(prods) {
-    for (const Prod &prod : prods) { 
+    for (const Prod &prod : prods) {
         nonterminalSet.insert(prod.symbol);
         for (int c : prod.right) { terminalSet.insert(c); }
     }
     for (int c : nonterminalSet) {
         if (terminalSet.count(c)) { terminalSet.erase(c); }
     }
-    for (int c : terminalSet) { 
-        symbolNames[c] = fmt::format("_{:d}", c);
-    }
-    for (int c : nonterminalSet) { 
-        symbolNames[c] = fmt::format("_{:d}", c);
-    }
+    for (int c : terminalSet) { symbolNames[c] = fmt::format("_{:d}", c); }
+    for (int c : nonterminalSet) { symbolNames[c] = fmt::format("_{:d}", c); }
 }
 
 Grammar::Grammar(vector<string> prodStrs) {
-    auto [prods_, symbolNames_] = getProdsFromStr(prodStrs);
-    prods = prods_;
-    symbolNames = symbolNames_;
-    for (const Prod &prod : prods) { 
+    auto[prods_, symbolNames_] = getProdsFromStr(prodStrs);
+    prods                      = prods_;
+    symbolNames                = symbolNames_;
+    for (const Prod &prod : prods) {
         nonterminalSet.insert(prod.symbol);
         for (int c : prod.right) { terminalSet.insert(c); }
     }
@@ -371,8 +381,8 @@ LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata) {
         }
     }
 
-    using ID = set<int>;          // concentric ID
-    map<int, ID>     stateIdx2ID; // <index LR1 states, concentric ID>
+    using ID = set<int>;      // concentric ID
+    map<int, ID> stateIdx2ID; // <index LR1 states, concentric ID>
     for (int i = 0; i < states.size(); i++) {
         for (auto p : states[i]) {
             ProdItem prod = {p.symbol, p.right, p.dot};
