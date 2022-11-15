@@ -22,16 +22,16 @@ namespace krill::regex::core {
 
 struct Token {
     int    id;
-    string lexValue;
-    char   realValue;
+    string lval;
+    char   rval;
     int    st;
     int    ed;
 };
 
 struct Node {
     int       id;
-    string    lexValue;
-    char      realValue;
+    string    lval;
+    char      rval;
     int       nfaSt, nfaEd;
     set<char> rangeChars;
     Node *    child;

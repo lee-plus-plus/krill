@@ -12,7 +12,6 @@ using std::string;
 
 namespace krill::grammar {
 
-
 const int END_SYMBOL = -1; // end of input in syntax parsing
 
 // Production (P -> Ab)
@@ -38,10 +37,10 @@ struct Grammar {
 };
 
 // Action of LR1 parse (ACTION | GOTO | REDUCE | ACCEPT, tgt)
+enum ActionType { ACTION = 0, REDUCE = 1, GOTO = 2, ACCEPT = 3 };
 struct Action {
-    enum TYPE { ACTION = 0, REDUCE = 1, GOTO = 2, ACCEPT = 3 };
-    TYPE type; // action type
-    int  tgt;  // ACTION or GOTO: tgt=next_state; REDUCE: tgt=prod_idx
+    ActionType type; // action type
+    int        tgt;  // ACTION or GOTO: tgt=next_state; REDUCE: tgt=prod_idx
 };
 // {current_state, look_over_symbol, action}
 using ActionTable = map<pair<int, int>, Action>;
@@ -49,13 +48,13 @@ using ActionTable = map<pair<int, int>, Action>;
 // Token for parsing input (can be derived)
 struct Token {
     int    id;
-    string lexValue;
+    string lval;
     // to make std::set happy
     bool operator<(const Token &t) const;
     bool operator==(const Token &t) const;
     bool operator!=(const Token &t) const;
 };
-const Token END_TOKEN = Token({.id = END_SYMBOL, .lexValue = ""});
+const Token END_TOKEN = Token({.id = END_SYMBOL, .lval = ""});
 
 // Grammar => LR1 Automata (LR1 states, EdgeTable) => Action Table
 ActionTable getLR1table(Grammar grammar);

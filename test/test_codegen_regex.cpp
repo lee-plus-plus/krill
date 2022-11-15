@@ -9,27 +9,22 @@ using krill::automata::DFA;
 using krill::grammar::Grammar;
 using namespace krill::codegen;
 
+
 Grammar grammar = Grammar({
-    "RegEx -> Parallel", 
-    "Parallel -> Parallel '|' Seq", 
-    "Parallel -> Seq", 
-    "Seq -> Seq Item", 
-    "Seq -> Item ", 
-    "Item -> Closure", 
-    "Item -> Atom", 
-    "Closure -> Atom '+'", 
-    "Closure -> Atom '*'", 
-    "Closure -> Atom '?'", 
-    "Atom -> '(' Parallel ')'", 
-    "Atom -> Char", 
-    "Atom -> Range", 
-    "Range -> '[' RangeSeq ']'", 
-    "Range -> '[' '^' RangeSeq ']'", 
-    "RangeSeq -> RangeSeq RangeItem", 
-    "RangeSeq -> RangeItem", 
-    "RangeItem -> Char '-' Char", 
-    "RangeItem -> Char", 
-    "Atom -> '.'", 
+    "LexFile <- Defs delim Rules delim Sub eof", 
+    "Defs <- DefsLine Defs", 
+    "Defs <- lbrace Codes rbrace", 
+    "Defs <- ", 
+    "Codes <- CodesLine Codes", 
+    "Codes <-", 
+    "CodesLine <- line", 
+    "DefsLine <- line", 
+    "Rules <- RulesLine Rules ", 
+    "Rules <-", 
+    "RulesLine <- line ", 
+    "Sub <- SubLine Sub", 
+    "Sub <- ", 
+    "SubLine <- line", 
 });
 
 // test Syntax Parser code generator
@@ -61,6 +56,7 @@ void test2() {
     cout << "\n// Grammar\n";
     genGrammarInCppStyle(grammar, cout);
 }
+
 
 
 int main() {

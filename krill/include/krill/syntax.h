@@ -2,49 +2,62 @@
 #define SYNTAX_H
 #include "defs.h"
 #include "grammar.h"
-#include <map>
+#include "attrdict.h"
+#include <memory>
 #include <ostream>
-#include <set>
+#include <stack>
+#include <deque>
 #include <string>
 #include <vector>
-using krill::grammar::Grammar, krill::grammar::ActionTable,
-    krill::grammar::Token;
-using std::map, std::vector;
+using krill::grammar::Grammar, krill::grammar::ActionTable;
+using krill::grammar::Token;
+using krill::utils::AttrDict;
+using std::vector, std::deque, std::stack;
 using std::string, std::ostream;
+using std::shared_ptr;
 
 namespace krill::runtime {
 
 // Annotated Parsing Tree Node
 struct APTnode {
-    int               syntaxId;
-    string            lexValue;
-    vector<APTnode *> child;
+    int                        id;
+    AttrDict                   attr;
+    deque<shared_ptr<APTnode>> child;
 };
 
+using Rfunc = std::function<void(AttrDict &next, deque<AttrDict> &child)>;
+using Afunc = std::function<void(AttrDict &next, const Token &token)>;
+
 class SyntaxParser {
-  protected:
-    Grammar     grammar_;
-    ActionTable actionTable_;
-
-    vector<Token>     tokens_;
-    vector<int>       states_;
-    vector<APTnode *> nodes_;
-
-    int  posTokens_;
-    bool isAccepted_;
-
-    void parse();
-
   public:
+    vector<Rfunc> reduceFunc_; // binded with default function
+    Afunc         actionFunc_; // // binded with default function
+
     SyntaxParser() = default;
     SyntaxParser(Grammar grammar, ActionTable actionTable);
 
-    void reset();
+    void clear();
     void parseStep(Token token);
     void parseAll(vector<Token> tokens);
 
     APTnode *getAnnotatedParsingTree();
-    void     printAnnotatedParsingTree(ostream &oss);
+    // void lrdVisit(APTnode *node, std::function<void(APTnode *)>);
+    void printAnnotatedParsingTree(ostream &oss);
+
+  private:
+    Grammar       grammar_;
+    ActionTable   actionTable_;
+    
+
+    vector<Token>    tokens_;
+    stack<int>       states_;
+    stack<shared_ptr<APTnode>> nodes_;
+
+    int  offset_;
+    bool isAccepted_;
+    string history_;
+
+    void parse();
 };
 
 } // namespace krill::runtime

@@ -194,16 +194,19 @@ template <typename T1, typename T2> void genMap(map<T1, T2> m, ostream &oss) {}
 
 void genActionTableInCppStyle(const ActionTable &actionTable, ostream &oss) {
     stringstream def_actionTable;
-    const string typeName[] = {"ACTION", "REDUCE", "GOTO", "ACCEPT"};
     def_actionTable << "{\n";
     for (auto[key, action] : actionTable) {
         def_actionTable << "  {{" << key.first << "," << key.second << "},{"
-                        << typeName[action.type] << "," << action.tgt
+                        << (int)action.type << "," << action.tgt
                         << "}},\n";
     }
     def_actionTable << "}";
 
-    oss << "struct Action { TYPE type; int tgt; };\n";
+    oss << "\n";
+    oss << "struct Action {"
+           "  enum TYPE { ACTION = 0, REDUCE = 1, GOTO = 2, ACCEPT = 3 };\n"
+           "  TYPE type; int tgt;\n"
+           "};\n";
     oss << "using ActionTable = map<pair<int, int>, Action>;\n";
     oss << fmt::format("ActionTable actionTable = {};\n", def_actionTable.str());
 }

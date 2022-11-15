@@ -2,10 +2,12 @@
 #include "krill/automata.h"
 #include "krill/grammar.h"
 #include "krill/regex.h"
-// #include "krill/utils.h"
 #include <cassert>
 #include <sstream>
+#include <iostream>
 #include <string>
+#include <stdexcept>
+#include "fmt/format.h"
 using krill::automata::DFA, krill::automata::getDFAintegrated;
 using krill::grammar::Token, krill::grammar::END_SYMBOL, krill::grammar::END_TOKEN;
 using krill::regex::getDFAfromRegex;
@@ -45,18 +47,29 @@ Token LexicalParser::parseStep(istream &input) {
             dfa_.graph.at(state_).count(c) == 0) {
             input.putback(c);
 
-            assert(dfa_.finality.at(state_) != 0); // failed
+            // assert(dfa_.finality.at(state_) != 0); // failed
+            if (dfa_.finality.at(state_) == 0) {
+                throw runtime_error(fmt::format(
+                    "Lexical Error: unmatched \"{}\" in \"{}\"\n", 
+                    buffer.str() + c, history_ + c));
+            }
             int    tokenId       = dfa_.finality.at(state_) - 1;
             string tokenLexValue = buffer.str();
 
             state_ = 0;
             buffer.clear();
 
+            assert(tokenLexValue.size() > 0);
             return Token({tokenId, tokenLexValue});
         }
+
         // continue
         state_ = dfa_.graph.at(state_).at(c);
         buffer << c;
+        history_.push_back(c);
+        if (history_.size() > 20) {
+            history_ = history_.substr(10);
+        }
     }
 }
 

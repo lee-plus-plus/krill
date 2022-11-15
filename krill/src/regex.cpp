@@ -14,15 +14,15 @@
 
 #define ERR_LOG(...)                                                           \
     {                                                                          \
-        std::cerr << fmt::format("{}:line {}: ", __FILE__, __LINE__);        \
+        std::cerr << fmt::format("{}:line {}: ", __FILE__, __LINE__);          \
         std::cerr << fmt::format(__VA_ARGS__);                                 \
         std::cerr << "\n";                                                     \
         assert(false);                                                         \
     }
 
-using krill::grammar::Token;
 using namespace std;
 using namespace krill::automata;
+using namespace krill::grammar;
 using namespace krill::utils;
 
 namespace krill::regex::core {
@@ -41,12 +41,6 @@ namespace krill::regex::core {
 #define RangeItem 265
 
 // Action Table
-enum TYPE { ACTION = 0, REDUCE = 1, GOTO = 2, ACCEPT = 3 };
-struct Action {
-    TYPE type;
-    int  tgt;
-};
-using ActionTable             = map<pair<int, int>, Action>;
 const ActionTable actionTable = {
     {{0, 40}, {ACTION, 1}},    {{0, 46}, {ACTION, 2}},
     {{0, 91}, {ACTION, 3}},    {{0, 257}, {GOTO, 4}},
@@ -184,7 +178,7 @@ const Grammar RegexParser::grammar_ =
 // RegEx String => tokens
 void RegexParser::lexicalParse() {
     static const map<char, int> lexMap = {
-        {'|', '|'},  {'+', '+'},  {'*', '*'},  {'?', '?'},  {'(', '('}, {')', ')'},
+        {'|', '|'}, {'+', '+'}, {'*', '*'}, {'?', '?'}, {'(', '('}, {')', ')'},
         {'[', '['}, {']', ']'}, {'^', '^'}, {'-', '-'}, {'.', '.'},
     };
     static const map<char, string> escapeLexMap = {
@@ -198,17 +192,17 @@ void RegexParser::lexicalParse() {
     for (char c : regex_) {
         if (isEscape) {
             if (escapeLexMap.count(c) != 0) {
-                tokens_.push_back({.id        = Char,
-                                   .lexValue  = escapeLexMap.at(c),
-                                   .realValue = escapeRealMap.at(c),
-                                   .st        = pos - 1,
-                                   .ed        = pos});
+                tokens_.push_back({.id   = Char,
+                                   .lval = escapeLexMap.at(c),
+                                   .rval = escapeRealMap.at(c),
+                                   .st   = pos - 1,
+                                   .ed   = pos});
             } else {
-                tokens_.push_back({.id        = Char,
-                                   .lexValue  = string("\\") + c,
-                                   .realValue = c,
-                                   .st        = pos - 1,
-                                   .ed        = pos});
+                tokens_.push_back({.id   = Char,
+                                   .lval = string("\\") + c,
+                                   .rval = c,
+                                   .st   = pos - 1,
+                                   .ed   = pos});
             }
             isEscape = false;
             continue;
@@ -216,11 +210,11 @@ void RegexParser::lexicalParse() {
             isEscape = true;
         } else {
             int id_ = (lexMap.count(c) != 0) ? lexMap.at(c) : Char;
-            tokens_.push_back({.id        = id_,
-                               .lexValue  = string(1, c),
-                               .realValue = c,
-                               .st        = pos,
-                               .ed        = pos});
+            tokens_.push_back({.id   = id_,
+                               .lval = string(1, c),
+                               .rval = c,
+                               .st   = pos,
+                               .ed   = pos});
         }
         pos++;
     }
@@ -250,16 +244,17 @@ void RegexParser::syntaxParse() {
         if (actionTable.count({states_.top(), tokens_[i].id}) == 0) {
             if (nodes_.size() == 0) {
                 ERR_LOG("Regex Parsing Error: unmatched symbol \"{}\"\n"
-                    "\"{}\"\n {}", tokens_[i].lexValue, regex_, 
-                    string(tokens_[i].ed - tokens_[i].st + 1, '^'));
+                        "\"{}\"\n {}",
+                        tokens_[i].lval, regex_,
+                        string(tokens_[i].ed - tokens_[i].st + 1, '^'));
             } else {
                 ERR_LOG("Regex Parsing Error: unmatched symbol \"{}\"\n"
-                    "\"{}\"\n {}",
-                    tokens_[i].lexValue, regex_,
-                    string(' ', nodes_.top().st) +
+                        "\"{}\"\n {}",
+                        tokens_[i].lval, regex_,
                         string(nodes_.top().st, ' ') +
-                        string(nodes_.top().ed - nodes_.top().st + 1, '~') +
-                        string(tokens_[i].ed - tokens_[i].st + 1, '^'));
+                            string(nodes_.top().st, ' ') +
+                            string(nodes_.top().ed - nodes_.top().st + 1, '~') +
+                            string(tokens_[i].ed - tokens_[i].st + 1, '^'));
             }
         }
 
@@ -267,16 +262,16 @@ void RegexParser::syntaxParse() {
         switch (action.type) {
             case ACTION: {
                 states_.push(action.tgt);
-                // just pass the id and lexValue into node
+                // just pass the id and lval into node
                 Node nextNode;
                 nextNode = Node({
-                    .id       = tokens_[i].id,
-                    .lexValue = tokens_[i].lexValue,
-                    .realValue = tokens_[i].realValue,
-                    .nfaSt    = -1,
-                    .nfaEd    = -1,
-                    .st       = tokens_[i].st,
-                    .ed       = tokens_[i].ed,
+                    .id    = tokens_[i].id,
+                    .lval  = tokens_[i].lval,
+                    .rval  = tokens_[i].rval,
+                    .nfaSt = -1,
+                    .nfaEd = -1,
+                    .st    = tokens_[i].st,
+                    .ed    = tokens_[i].ed,
                 });
                 nodes_.push(nextNode);
                 i++;
@@ -294,13 +289,14 @@ void RegexParser::syntaxParse() {
 
                 // assert(actionTable.count({states_.top(), r.symbol}) != 0);
                 if (actionTable.count({states_.top(), r.symbol}) == 0) {
-                    ERR_LOG("Regex Parsing Error: unmatched symbol \"{}\"\n"
-                            "\"{}\"\n{}",
-                            tokens_[i].lexValue, regex_,
+                    ERR_LOG(
+                        "Regex Parsing Error: unmatched symbol \"{}\"\n"
+                        "\"{}\"\n{}",
+                        tokens_[i].lval, regex_,
+                        string(' ', nodes_.top().st) +
                             string(' ', nodes_.top().st) +
-                                string(' ', nodes_.top().st) +
-                                string('~', nodes_.top().ed - nodes_.top().st + 1) +
-                                string('^', tokens_[i].ed - tokens_[i].st + 1));
+                            string('~', nodes_.top().ed - nodes_.top().st + 1) +
+                            string('^', tokens_[i].ed - tokens_[i].st + 1));
                 }
                 Action action2 = actionTable.at({states_.top(), r.symbol});
                 assert(action2.type == GOTO);
@@ -313,12 +309,12 @@ void RegexParser::syntaxParse() {
                     case 4:   // Seq -> Item
                     case 5:   // Item -> Closure
                     case 6: { // Item -> Atom
-                        nextNode = Node({.id = prods.at(action.tgt).symbol,
-                                         .lexValue = child[0].lexValue,
-                                         .nfaSt    = child[0].nfaSt,
-                                         .nfaEd    = child[0].nfaEd,
-                                         .st       = child[0].st,
-                                         .ed       = child[0].ed});
+                        nextNode = Node({.id    = prods.at(action.tgt).symbol,
+                                         .lval  = child[0].lval,
+                                         .nfaSt = child[0].nfaSt,
+                                         .nfaEd = child[0].nfaEd,
+                                         .st    = child[0].st,
+                                         .ed    = child[0].ed});
                         break;
                     }
                     case 1: { // Parallel -> Parallel '|' Seq
@@ -337,13 +333,13 @@ void RegexParser::syntaxParse() {
                         nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
                                             .from   = child[2].nfaEd,
                                             .to     = to});
-                        nextNode = Node({.id = prods.at(action.tgt).symbol,
-                                         .lexValue = child[0].lexValue + "|" +
-                                                     child[2].lexValue,
-                                         .nfaSt = from,
-                                         .nfaEd = to,
-                                         .st    = child[0].st,
-                                         .ed    = child[2].ed});
+                        nextNode =
+                            Node({.id    = prods.at(action.tgt).symbol,
+                                  .lval  = child[0].lval + "|" + child[2].lval,
+                                  .nfaSt = from,
+                                  .nfaEd = to,
+                                  .st    = child[0].st,
+                                  .ed    = child[2].ed});
                         break;
                     }
                     case 3: { // Seq -> Seq Item
@@ -351,25 +347,24 @@ void RegexParser::syntaxParse() {
                         nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
                                             .from   = child[0].nfaEd,
                                             .to     = child[1].nfaSt});
-                        nextNode = Node(
-                            {.id       = prods.at(action.tgt).symbol,
-                             .lexValue = child[0].lexValue + child[1].lexValue,
-                             .nfaSt    = child[0].nfaSt,
-                             .nfaEd    = child[1].nfaEd,
-                             .st       = child[0].st,
-                             .ed       = child[1].ed});
+                        nextNode = Node({.id    = prods.at(action.tgt).symbol,
+                                         .lval  = child[0].lval + child[1].lval,
+                                         .nfaSt = child[0].nfaSt,
+                                         .nfaEd = child[1].nfaEd,
+                                         .st    = child[0].st,
+                                         .ed    = child[1].ed});
                         break;
                     }
                     case 7: { // Closure -> Atom '+'
                         nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
                                             .from   = child[0].nfaEd,
                                             .to     = child[0].nfaSt});
-                        nextNode = Node({.id = prods.at(action.tgt).symbol,
-                                         .lexValue = child[0].lexValue + "+",
-                                         .nfaSt    = child[0].nfaSt,
-                                         .nfaEd    = child[0].nfaEd,
-                                         .st       = child[0].st,
-                                         .ed       = child[1].ed});
+                        nextNode = Node({.id    = prods.at(action.tgt).symbol,
+                                         .lval  = child[0].lval + "+",
+                                         .nfaSt = child[0].nfaSt,
+                                         .nfaEd = child[0].nfaEd,
+                                         .st    = child[0].st,
+                                         .ed    = child[1].ed});
                         break;
                     }
                     case 8: { // Closure -> Atom '*'
@@ -379,56 +374,55 @@ void RegexParser::syntaxParse() {
                         nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
                                             .from   = child[0].nfaEd,
                                             .to     = child[0].nfaSt});
-                        nextNode = Node({.id = prods.at(action.tgt).symbol,
-                                         .lexValue = child[0].lexValue + "*",
-                                         .nfaSt    = child[0].nfaSt,
-                                         .nfaEd    = child[0].nfaEd,
-                                         .st       = child[0].st,
-                                         .ed       = child[1].ed});
+                        nextNode = Node({.id    = prods.at(action.tgt).symbol,
+                                         .lval  = child[0].lval + "*",
+                                         .nfaSt = child[0].nfaSt,
+                                         .nfaEd = child[0].nfaEd,
+                                         .st    = child[0].st,
+                                         .ed    = child[1].ed});
                         break;
                     }
                     case 9: { // Closure -> Atom '?'
                         nfaEdges.push_back({.symbol = EMPTY_SYMBOL,
                                             .from   = child[0].nfaSt,
                                             .to     = child[0].nfaEd});
-                        nextNode = Node({.id = prods.at(action.tgt).symbol,
-                                         .lexValue = child[0].lexValue + "?",
-                                         .nfaSt    = child[0].nfaSt,
-                                         .nfaEd    = child[0].nfaEd,
-                                         .st       = child[0].st,
-                                         .ed       = child[1].ed});
+                        nextNode = Node({.id    = prods.at(action.tgt).symbol,
+                                         .lval  = child[0].lval + "?",
+                                         .nfaSt = child[0].nfaSt,
+                                         .nfaEd = child[0].nfaEd,
+                                         .st    = child[0].st,
+                                         .ed    = child[1].ed});
                         break;
                     }
                     case 10: { // Atom -> '(' Parallel ')'
-                        nextNode =
-                            Node({.id       = prods.at(action.tgt).symbol,
-                                  .lexValue = "(" + child[1].lexValue + ")",
-                                  .nfaSt    = child[1].nfaSt,
-                                  .nfaEd    = child[1].nfaEd,
-                                  .st       = child[0].st,
-                                  .ed       = child[2].ed});
+                        nextNode = Node({.id    = prods.at(action.tgt).symbol,
+                                         .lval  = "(" + child[1].lval + ")",
+                                         .nfaSt = child[1].nfaSt,
+                                         .nfaEd = child[1].nfaEd,
+                                         .st    = child[0].st,
+                                         .ed    = child[2].ed});
                         break;
                     }
                     case 11: { // Atom -> Char
-                        char symbol = child[0].lexValue[0];
+                        char symbol = child[0].rval;
                         int  from   = numNfaNodes++;
                         int  to     = numNfaNodes++;
                         nfaEdges.push_back({symbol, from, to});
-                        nextNode = Node({.id = prods.at(action.tgt).symbol,
-                                         .lexValue = child[0].lexValue,
-                                         .nfaSt    = from,
-                                         .nfaEd    = to,
-                                         .st       = child[0].st,
-                                         .ed       = child[0].ed});
+                        nextNode = Node({.id    = prods.at(action.tgt).symbol,
+                                         .lval  = child[0].lval,
+                                         .nfaSt = from,
+                                         .nfaEd = to,
+                                         .st    = child[0].st,
+                                         .ed    = child[0].ed});
                         break;
                     }
                     case 12: { // Atom -> Range
-                        nextNode = Node({.id = prods.at(action.tgt).symbol,
-                                         .lexValue = child[0].lexValue,
-                                         .nfaSt    = child[0].nfaSt,
-                                         .nfaEd    = child[0].nfaEd,
-                                         .st       = child[0].st,
-                                         .ed       = child[0].ed});
+                        nextNode = Node({.id    = prods.at(action.tgt).symbol,
+                                         .lval  = child[0].lval,
+                                         .nfaSt = child[0].nfaSt,
+                                         .nfaEd = child[0].nfaEd,
+                                         .st    = child[0].st,
+                                         .ed    = child[0].ed});
                         break;
                     }
                     case 13: { // Range -> '[' RangeSeq ']'
@@ -442,13 +436,12 @@ void RegexParser::syntaxParse() {
                         int to2   = numNfaNodes++;
                         nfaEdges.push_back({EMPTY_SYMBOL, from2, from});
                         nfaEdges.push_back({EMPTY_SYMBOL, to, to2});
-                        nextNode =
-                            Node({.id       = prods.at(action.tgt).symbol,
-                                  .lexValue = "[" + child[1].lexValue + "]",
-                                  .nfaSt    = from2,
-                                  .nfaEd    = to2,
-                                  .st       = child[0].st,
-                                  .ed       = child[2].ed});
+                        nextNode = Node({.id    = prods.at(action.tgt).symbol,
+                                         .lval  = "[" + child[1].lval + "]",
+                                         .nfaSt = from2,
+                                         .nfaEd = to2,
+                                         .st    = child[0].st,
+                                         .ed    = child[2].ed});
                         break;
                     }
                     case 14: { // Range -> '[' '^' RangeSeq ']'
@@ -464,56 +457,54 @@ void RegexParser::syntaxParse() {
                         int to2   = numNfaNodes++;
                         nfaEdges.push_back({EMPTY_SYMBOL, from2, from});
                         nfaEdges.push_back({EMPTY_SYMBOL, to, to2});
-                        nextNode =
-                            Node({.id       = prods.at(action.tgt).symbol,
-                                  .lexValue = "[^" + child[2].lexValue + "]",
-                                  .nfaSt    = from2,
-                                  .nfaEd    = to2,
-                                  .st       = child[0].st,
-                                  .ed       = child[3].ed});
+                        nextNode = Node({.id    = prods.at(action.tgt).symbol,
+                                         .lval  = "[^" + child[2].lval + "]",
+                                         .nfaSt = from2,
+                                         .nfaEd = to2,
+                                         .st    = child[0].st,
+                                         .ed    = child[3].ed});
                         break;
                     }
                     case 15: { // RangeSeq -> RangeSeq RangeItem
                         set<char> rangeChars = child[0].rangeChars;
                         rangeChars.insert(child[1].rangeChars.begin(),
                                           child[1].rangeChars.end());
-                        nextNode = Node(
-                            {.id       = prods.at(action.tgt).symbol,
-                             .lexValue = child[0].lexValue + child[1].lexValue,
-                             .rangeChars = rangeChars,
-                             .st         = child[0].st,
-                             .ed         = child[1].ed});
+                        nextNode = Node({.id   = prods.at(action.tgt).symbol,
+                                         .lval = child[0].lval + child[1].lval,
+                                         .rangeChars = rangeChars,
+                                         .st         = child[0].st,
+                                         .ed         = child[1].ed});
                         break;
                     }
                     case 16: { // RangeSeq -> RangeItem
-                        nextNode = Node({.id = prods.at(action.tgt).symbol,
-                                         .lexValue   = child[0].lexValue,
+                        nextNode = Node({.id   = prods.at(action.tgt).symbol,
+                                         .lval = child[0].lval,
                                          .rangeChars = child[0].rangeChars,
                                          .st         = child[0].st,
                                          .ed         = child[0].ed});
                         break;
                     }
                     case 17: { // RangeItem -> Char '-' Char
-                        char c1 = child[0].realValue;
-                        char c2 = child[2].realValue;
+                        char c1 = child[0].rval;
+                        char c2 = child[2].rval;
                         assert(c2 > c1);
                         set<char> rangeChars;
                         for (char c = c1; c <= c2; c++) {
                             rangeChars.insert(c);
                         }
-                        nextNode = Node({.id = prods.at(action.tgt).symbol,
-                                         .lexValue = child[0].lexValue + "-" +
-                                                     child[2].lexValue,
-                                         .rangeChars = rangeChars,
-                                         .st         = child[0].st,
-                                         .ed         = child[2].ed});
+                        nextNode =
+                            Node({.id   = prods.at(action.tgt).symbol,
+                                  .lval = child[0].lval + "-" + child[2].lval,
+                                  .rangeChars = rangeChars,
+                                  .st         = child[0].st,
+                                  .ed         = child[2].ed});
                         break;
                     }
                     case 18: { // RangeItem -> Char
-                        char      c          = child[0].realValue;
+                        char      c          = child[0].rval;
                         set<char> rangeChars = {c};
-                        nextNode = Node({.id = prods.at(action.tgt).symbol,
-                                         .lexValue   = child[0].lexValue,
+                        nextNode = Node({.id   = prods.at(action.tgt).symbol,
+                                         .lval = child[0].lval,
                                          .rangeChars = rangeChars,
                                          .st         = child[0].st,
                                          .ed         = child[0].ed});
@@ -530,12 +521,12 @@ void RegexParser::syntaxParse() {
                         int to2   = numNfaNodes++;
                         nfaEdges.push_back({EMPTY_SYMBOL, from2, from});
                         nfaEdges.push_back({EMPTY_SYMBOL, to, to2});
-                        nextNode = Node({.id = prods.at(action.tgt).symbol,
-                                         .lexValue = child[0].lexValue,
-                                         .nfaSt    = from2,
-                                         .nfaEd    = to2,
-                                         .st       = child[0].st,
-                                         .ed       = child[0].ed});
+                        nextNode = Node({.id    = prods.at(action.tgt).symbol,
+                                         .lval  = child[0].lval,
+                                         .nfaSt = from2,
+                                         .nfaEd = to2,
+                                         .st    = child[0].st,
+                                         .ed    = child[0].ed});
                         break;
                     }
                     default: {
@@ -545,7 +536,7 @@ void RegexParser::syntaxParse() {
                 }
 
                 // fmt::print("[{} \"{}\"]", symbolNames.at(nextNode.id),
-                //            nextNode.lexValue);
+                //            nextNode.lval);
 
                 nodes_.push(nextNode);
                 break;

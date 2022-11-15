@@ -10,22 +10,75 @@ using namespace krill::grammar;
 using namespace krill::grammar::core;
 using namespace krill::utils;
 
+
+void printProd(const Prod &prod, map<int, string> symbolNames, ostream &oss) {
+    oss << symbolNames[prod.symbol];
+    oss << " -> ";
+    for (int i = 0; i < prod.right.size(); i++) {
+        oss << symbolNames[prod.right[i]] << " ";
+    }
+    oss << "\n";
+}
+
+void printGrammar(const Grammar &grammar, ostream &oss) {
+    oss << "Grammar: \n";
+    for (int i = 0; i < grammar.prods.size(); i++) {
+        oss << fmt::format("({:d}) ", i + 1);
+        printProd(grammar.prods[i], grammar.symbolNames, oss);
+    }
+}
+
+void printFirstSet(const map<int, set<int>> &firstSet, ostream &oss) {
+    for (auto[symbol, nextSymbols] : firstSet) {
+        oss << symbol;
+        oss << ": {";
+        if (nextSymbols.size() != 0) {
+            auto it = nextSymbols.begin();
+            oss << *it;
+            for (it++; it != nextSymbols.end(); it++) {
+                oss << ", ";
+                oss << *it;
+            }
+        }
+        oss << "} \n";
+    }
+}
+
+void printActionTable(const ActionTable &actionTable,
+                      map<int, string> symbolNames, ostream &oss) {
+    oss << fmt::format("Analysis Table (size={}): \n", actionTable.size());
+    string typeName[] = {"ACTION", "REDUCE", "GOTO  ", "ACCEPT"};
+    for (auto[key, action] : actionTable) {
+        oss << fmt::format("s{:<2d} --> {:s} --> {:<6s} ", key.first,
+                           key.second != END_SYMBOL ? symbolNames[key.second]
+                                                    : "[end]",
+                           typeName[action.type]);
+        if (action.type == ACTION || action.type == GOTO) {
+            oss << fmt::format("s{:<2d}", action.tgt);
+        } else if (action.type == REDUCE) {
+            oss << fmt::format("r{:<2d}", action.tgt);
+        }
+        oss << "\n";
+    }
+}
+
+
 // test first set and follow set
 void test1() {
     printf("test first-set and follow-set \n");
     printf("----------------------------- \n");
     // initialize symbolset and grammar
-    auto[grammar, symbolNames] = getGrammarFromStr({
+    Grammar grammar({
         "Q -> S",
-        "S -> V = R",
+        "S -> V '=' R",
         "S -> R",
         "R -> L",
-        "L -> * R",
+        "L -> '*' R",
         "L -> i",
         "V -> a",
     });
     printf("> initial grammar: \n");
-    printGrammar(grammar, symbolNames, cout);
+    printGrammar(grammar, cout);
 
     auto firstSet  = getFirstSet(grammar);
     auto followSet = getFollowSet(grammar, firstSet);
@@ -77,13 +130,13 @@ GrammarNode *simpleSyntaxParser(vector<Prod> prods, ActionTable actionTable,
 
         Action action = actionTable[{states.back(), src[i]}];
         switch (action.type) {
-            case Action::ACTION: {
+            case ACTION: {
                 states.push_back(action.tgt);
                 stateNodes.push_back(new GrammarNode({{}, src[i]}));
                 i++;
                 break;
             }
-            case Action::REDUCE: {
+            case REDUCE: {
                 Prod                  r = prods[action.tgt];
                 vector<GrammarNode *> temp;
                 for (int j = 0; j < r.right.size(); j++) {
@@ -104,7 +157,7 @@ GrammarNode *simpleSyntaxParser(vector<Prod> prods, ActionTable actionTable,
                 stateNodes.push_back(nextNode);
                 break;
             }
-            case Action::ACCEPT: {
+            case ACCEPT: {
                 flag = false;
                 break;
             }
@@ -154,20 +207,20 @@ void test2() {
     printf("test LR(1) analysis procedure \n");
     printf("----------------------------- \n");
     // initialize symbolset and grammar
-    auto[grammar, symbolNames] = getGrammarFromStr({
+    Grammar grammar({
         "Q -> P",
         "P -> T",
         "T -> ( P )",
-        "T -> T * T",
-        "T -> T / T",
-        "P -> T + T",
-        "P -> T - T",
-        "T -> - T",
+        "T -> T '*' T",
+        "T -> T '/' T",
+        "P -> T '+' T",
+        "P -> T '-' T",
+        "T -> '-'' T",
         "T -> d",
     });
-    printGrammar(grammar, symbolNames, cout);
+    printGrammar(grammar, cout);
     printf("> symbol names:\n");
-    for (auto[id, str] : symbolNames) {
+    for (auto[id, str] : grammar.symbolNames) {
         cout << fmt::format("{:d}: {:s}\n", id, str);
     }
 
@@ -182,12 +235,12 @@ void test2() {
     auto lr1Automata = getLR1Automata(grammar);
     auto actionTable = getLR1table(grammar, lr1Automata);
     printf("> Action Table of LR(1) dfa: \n");
-    printActionTable(actionTable, symbolNames, cout);
+    printActionTable(actionTable, grammar.symbolNames, cout);
 
     printf("> use LR(1) Action Table to analyze: \n");
     printf("> input string: \n");
     string      src    = "(d+d*d)*d+(d)";
-    vector<int> tokens = simpleLexicalParser(symbolNames, src);
+    vector<int> tokens = simpleLexicalParser(grammar.symbolNames, src);
     printf("%s\n", src.c_str());
     for (int i : tokens) { printf("%d ", i); }
     printf("\n");
@@ -195,66 +248,66 @@ void test2() {
     GrammarNode *root =
         simpleSyntaxParser(grammar.prods, actionTable, tokens, true);
     printf("> grammar tree: \n");
-    printGrammarTreeNode(root, symbolNames, cout);
+    printGrammarTreeNode(root, grammar.symbolNames, cout);
 
     printf("\n");
 }
 
 // test syntax parsing
-void test3() {
-    printf("test LR(1) and LALR(1) analysis \n");
-    printf("------------------------------- \n");
-    // initialize symbolset and grammar
-    auto[grammar, symbolNames] = getGrammarFromStr({
-        "Q -> P",
-        "P -> T",
-        "T -> ( P )",
-        "T -> T * T",
-        "T -> T / T",
-        "P -> T + T",
-        "P -> T - T",
-        "T -> - T",
-        "T -> d",
-    });
-    printGrammar(grammar, symbolNames, cout);
+// void test3() {
+//     printf("test LR(1) and LALR(1) analysis \n");
+//     printf("------------------------------- \n");
+//     // initialize symbolset and grammar
+//     auto[grammar, symbolNames] = getGrammarFromStr({
+//         "Q -> P",
+//         "P -> T",
+//         "T -> ( P )",
+//         "T -> T * T",
+//         "T -> T / T",
+//         "P -> T + T",
+//         "P -> T - T",
+//         "T -> - T",
+//         "T -> d",
+//     });
+//     printGrammar(grammar, symbolNames, cout);
 
-    auto actionTable = getLR1table(grammar);
-    printf("> LR(1) Action Table size: %ld \n", actionTable.size());
-    // printf("> Action Table of LR(1) dfa: \n");
-    // printActionTable(actionTable, symbolNames, cout);
+//     auto actionTable = getLR1table(grammar);
+//     printf("> LR(1) Action Table size: %ld \n", actionTable.size());
+//     // printf("> Action Table of LR(1) dfa: \n");
+//     // printActionTable(actionTable, symbolNames, cout);
 
-    printf("> use LR(1) Action Table to analyze: \n");
-    printf("> input string: \n");
-    string      src    = "(d+d*d)*d+(d)";
-    vector<int> tokens = simpleLexicalParser(symbolNames, src);
-    printf("%s\n", src.c_str());
+//     printf("> use LR(1) Action Table to analyze: \n");
+//     printf("> input string: \n");
+//     string      src    = "(d+d*d)*d+(d)";
+//     vector<int> tokens = simpleLexicalParser(symbolNames, src);
+//     printf("%s\n", src.c_str());
 
-    GrammarNode *root =
-        simpleSyntaxParser(grammar.prods, actionTable, tokens, false);
-    printf("> grammar tree: \n");
-    printGrammarTreeNode(root, symbolNames, cout);
+//     GrammarNode *root =
+//         simpleSyntaxParser(grammar.prods, actionTable, tokens, false);
+//     printf("> grammar tree: \n");
+//     printGrammarTreeNode(root, symbolNames, cout);
 
-    auto actionTable2 = getLALR1table(grammar);
-    printf("> LALR(1) Action Table size: %ld \n", actionTable2.size());
-    // printf("> Action Table of LALR(1) dfa: \n");
-    // printActionTable(actionTable2, symbolNames, cout);
+//     auto actionTable2 = getLALR1table(grammar);
+//     printf("> LALR(1) Action Table size: %ld \n", actionTable2.size());
+//     // printf("> Action Table of LALR(1) dfa: \n");
+//     // printActionTable(actionTable2, symbolNames, cout);
 
-    printf("> use LALR(1) Action Table to analyze: \n");
-    printf("> input string: \n");
-    string      src2    = "(d+d*d)*d+(d)";
-    vector<int> tokens2 = simpleLexicalParser(symbolNames, src2);
-    printf("%s\n", src2.c_str());
+//     printf("> use LALR(1) Action Table to analyze: \n");
+//     printf("> input string: \n");
+//     string      src2    = "(d+d*d)*d+(d)";
+//     vector<int> tokens2 = simpleLexicalParser(symbolNames, src2);
+//     printf("%s\n", src2.c_str());
 
-    GrammarNode *root2 =
-        simpleSyntaxParser(grammar.prods, actionTable2, tokens2, false);
-    printf("> grammar tree: \n");
-    printGrammarTreeNode(root2, symbolNames, cout);
+//     GrammarNode *root2 =
+//         simpleSyntaxParser(grammar.prods, actionTable2, tokens2, false);
+//     printf("> grammar tree: \n");
+//     printGrammarTreeNode(root2, symbolNames, cout);
 
-    printf("\n");
-}
+//     printf("\n");
+// }
 
 int main() {
-    vector<void (*)()> testFuncs = {test1, test2, test3};
+    vector<void (*)()> testFuncs = {test1, test2};
     for (int i = 0; i < testFuncs.size(); i++) {
         cout << "#test " << (i + 1) << endl;
         testFuncs[i]();

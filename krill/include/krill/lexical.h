@@ -14,10 +14,6 @@ using std::pair, std::map, std::vector, std::string, std::istream;
 namespace krill::runtime {
 
 class LexicalParser {
-  protected:
-    DFA dfa_;
-    int state_;
-
   public:
     LexicalParser() = default;
     LexicalParser(DFA dfai);
@@ -26,6 +22,11 @@ class LexicalParser {
 
     Token         parseStep(istream &input);
     vector<Token> parseAll(istream &input);
+
+  protected:
+    DFA dfa_;
+    int state_;
+    string history_;
 };
 
 class SimpleLexicalParser : public LexicalParser {

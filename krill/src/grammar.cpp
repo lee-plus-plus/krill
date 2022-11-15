@@ -1,28 +1,14 @@
 #include "krill/grammar.h"
 #include "fmt/format.h"
 #include "krill/automata.h"
+#include "krill/utils.h"
 #include <queue>
 #include <tuple>
 using namespace krill::automata;
+using namespace krill::utils;
 
 namespace krill::grammar {
 
-vector<string> split(string str, const char *delim) {
-    vector<string> res;
-    char *         strc = &str[0];
-    char *         temp = strtok(strc, delim);
-    while (temp != NULL) {
-        res.push_back(string(temp));
-        temp = strtok(NULL, delim);
-    }
-    return res;
-}
-
-template <typename T1, typename T2> map<T2, T1> reverse(map<T1, T2> m) {
-    map<T2, T1> m_reversed;
-    for (auto[key, value] : m) { m_reversed[value] = key; }
-    return m_reversed;
-}
 
 // {"Term -> Term '+' Term D-Term", ... } =>
 //   (Prod) {{256 -> 256 43 256 257}, ...},
@@ -103,15 +89,15 @@ Grammar::Grammar(vector<string> prodStrs) {
 }
 
 bool Token::operator<(const Token &t) const {
-    return std::tie(id, lexValue) < std::tie(t.id, t.lexValue);
+    return std::tie(id, lval) < std::tie(t.id, t.lval);
 }
 
 bool Token::operator==(const Token &t) const {
-    return std::tie(id, lexValue) == std::tie(t.id, t.lexValue);
+    return std::tie(id, lval) == std::tie(t.id, t.lval);
 }
 
 bool Token::operator!=(const Token &t) const {
-    return std::tie(id, lexValue) != std::tie(t.id, t.lexValue);
+    return std::tie(id, lval) != std::tie(t.id, t.lval);
 }
 
 // LR(1) action table
@@ -345,10 +331,10 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
     for (Edge edge : edgeTable) {
         if (grammar.terminalSet.count(edge.symbol)) {
             // s1 ——a-> s2 ==> action[s1, a] = s2
-            actionTable[{edge.from, edge.symbol}] = {Action::ACTION, edge.to};
+            actionTable[{edge.from, edge.symbol}] = {ACTION, edge.to};
         } else {
             // s1 ——A-> s2 ==> goto[s1, A] = s2
-            actionTable[{edge.from, edge.symbol}] = {Action::GOTO, edge.to};
+            actionTable[{edge.from, edge.symbol}] = {GOTO, edge.to};
         }
     }
     // node ==> REDUCE and ACCEPT
@@ -357,13 +343,13 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
             if (item.symbol == prods[0].symbol &&
                 item.dot == item.right.size()) {
                 // s1: (S -> ...·, #) ==> accept[s1, #]
-                actionTable[{i, item.search}] = {Action::ACCEPT, 0};
+                actionTable[{i, item.search}] = {ACCEPT, 0};
             } else if (item.dot == item.right.size()) {
                 // s1: (A -> ...·, s), r2: A -> ... ==> reduce[s1, s] = r2
                 for (int j = 0; j < prods.size(); j++) {
                     if (prods[j].symbol == item.symbol &&
                         prods[j].right == item.right) {
-                        actionTable[{i, item.search}] = {Action::REDUCE, j};
+                        actionTable[{i, item.search}] = {REDUCE, j};
                         break;
                     }
                 }
