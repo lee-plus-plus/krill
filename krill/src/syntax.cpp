@@ -1,12 +1,16 @@
 #include "krill/syntax.h"
 #include "krill/grammar.h"
+#include "krill/utils.h"
 #include "fmt/format.h"
+#include "fmt/color.h"
 #include <cassert>
 #include <map>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 using namespace krill::grammar;
+using namespace krill::utils;
 using namespace std;
 
 namespace krill::runtime {
@@ -28,6 +32,14 @@ SyntaxParser::SyntaxParser(Grammar grammar, ActionTable actionTable)
     }
 }
 
+SyntaxParser::SyntaxParser(Grammar grammar, ActionTable actionTable,
+                           Afunc actionFunc, vector<Rfunc> reduceFunc)
+    : grammar_(grammar), actionTable_(actionTable), reduceFunc_(reduceFunc),
+      actionFunc_(actionFunc), offset_(0), isAccepted_(false), states_({0}),
+      history_("") {
+    assert(reduceFunc_.size() == grammar.prods.size());
+}
+
 void SyntaxParser::parse() {
     auto &prods_ = grammar_.prods;
 
@@ -36,9 +48,15 @@ void SyntaxParser::parse() {
 
         assert(states_.size() > 0);
         if (actionTable_.count({states_.top(), token.id}) == 0) {
+            // error
+            stringstream ssTree;
+            printAnnotatedParsingTree(ssTree);
             throw runtime_error(fmt::format(
-                "Syntax Error: unexpected token \"{}\" after \"{}\"\n",
-                token.lval, history_));
+                "Syntax Error: unexpected token <{} \"{}\"> after \"{}\"\n{}",
+                grammar_.symbolNames.at(token.id), 
+                fmt::format(fmt::emphasis::underline, "{}", krill::utils::unescape(token.lval)), 
+                fmt::format(fmt::emphasis::underline, "{}", krill::utils::unescape(history_)), 
+                ssTree.str()));
         }
 
         assert(actionTable_.count({states_.top(), token.id}) != 0);
@@ -56,7 +74,7 @@ void SyntaxParser::parse() {
 
                 history_ += token.lval;
                 if (history_.size() > 20) {
-                    history_ = history_.substr(10);
+                    history_ = history_.substr(history_.size() - 20);
                 }
 
                 offset_++;
@@ -135,13 +153,11 @@ APTnode *SyntaxParser::getAnnotatedParsingTree() {
 
 void printAPT_(APTnode *node, ostream &oss, map<int, string> symbolNames,
                bool forShort, vector<bool> isLast = {}) {
-    if (node == nullptr) { return; }
-    if (forShort) {
-        if (node->child.size() == 1) {
-            printAPT_(node->child[0].get(), oss, symbolNames, forShort, isLast);
-            return;
-        }
-    }
+    // if (node == nullptr) { return; }
+    if (forShort && node->child.size() == 1) {
+        printAPT_(node->child[0].get(), oss, symbolNames, forShort, isLast);
+        return;
+    } 
     if (isLast.size() == 0) { oss << fmt::format(" "); }
 
     for (int i = 0; i < isLast.size(); i++) {
@@ -152,10 +168,15 @@ void printAPT_(APTnode *node, ostream &oss, map<int, string> symbolNames,
         }
     }
     if (node->child.size() == 0) {
-        oss << fmt::format("{:s} \"{:s}\"\n", symbolNames.at(node->id),
-                           node->attr.Get<string>("lval"));
+        auto &attr = node->attr;
+        oss << fmt::format("<{:s}> \"{}\"\n", symbolNames.at(node->id),
+                           fmt::format(fmt::emphasis::underline, "{}", 
+                                       attr.Has<string>("lval")
+                                           ? unescape(attr.Get<string>("lval"))
+                                           : ""));
+        // oss << fmt::format("<{:s}>\n", symbolNames.at(node->id));
     } else {
-        oss << fmt::format("{:s}\n", symbolNames.at(node->id));
+        oss << fmt::format("<{:s}>\n", symbolNames.at(node->id));
     }
     isLast.push_back(false);
     for (auto it = node->child.begin(); it != node->child.end(); it++) {
@@ -165,10 +186,13 @@ void printAPT_(APTnode *node, ostream &oss, map<int, string> symbolNames,
 }
 
 void SyntaxParser::printAnnotatedParsingTree(ostream &oss) {
-    if (!isAccepted_) { return; }
-    APTnode *root     = getAnnotatedParsingTree();
-    bool     forShort = true;
-    printAPT_(root, oss, grammar_.symbolNames, forShort);
+    // if (!isAccepted_) { return; }
+    // APTnode *root     = getAnnotatedParsingTree();
+    bool     forShort = false;
+    vector<shared_ptr<APTnode>> unrootedNodes = to_vector(nodes_);
+    for (auto node : unrootedNodes) {
+        printAPT_(node.get(), oss, grammar_.symbolNames, forShort);
+    }
 }
 
 } // namespace krill::runtime

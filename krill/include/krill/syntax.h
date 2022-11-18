@@ -28,13 +28,17 @@ struct APTnode {
 using Rfunc = std::function<void(AttrDict &next, deque<AttrDict> &child)>;
 using Afunc = std::function<void(AttrDict &next, const Token &token)>;
 
+void defaultReduceFunc(AttrDict &next, deque<AttrDict> &child);
+void defaultActionFunc(AttrDict &next, const Token &token);
+
 class SyntaxParser {
   public:
+    Afunc         actionFunc_; // binded with default function
     vector<Rfunc> reduceFunc_; // binded with default function
-    Afunc         actionFunc_; // // binded with default function
 
     SyntaxParser() = default;
     SyntaxParser(Grammar grammar, ActionTable actionTable);
+    SyntaxParser(Grammar grammar, ActionTable actionTable, Afunc actionFunc, vector<Rfunc> reduceFunc);
 
     void clear();
     void parseStep(Token token);

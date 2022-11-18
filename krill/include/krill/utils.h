@@ -1,19 +1,16 @@
 #ifndef UTILS_H
 #define UTILS_H
-#include "defs.h"
+// #include "defs.h"
 #include <cstring>
 #include <map>
 #include <ostream>
 #include <set>
 #include <tuple>
+#include <stack>
 #include <sstream>
 #include <string>
 #include <vector>
 #include <functional>
-using std::ostream;
-using std::pair;
-using std::string;
-using std::vector, std::set, std::tuple, std::is_same;
 // using namespace std;
 // using namespace krill::automata;
 // using namespace krill::grammar;
@@ -26,7 +23,24 @@ template <typename T> inline std::string to_string(const T &v) {
     return ss.str();
 }
 
-inline std::vector<std::string> split(std::string str, const char *delim) {
+inline void replace_all(std::string &str, const std::string &from, const std::string &to) {
+  for (std::string::size_type pos = str.find(from); 
+       pos != std::string::npos; 
+       pos = str.find(from)) {
+    str.replace(pos, from.length(), to);
+  }
+}
+
+inline std::string unescape(std::string str) {
+    replace_all(str, "\t", "\\t");
+    replace_all(str, "\r", "\\r");
+    replace_all(str, "\n", "\\n");
+    replace_all(str, "\v", "\\v");
+    replace_all(str, "\a", "\\a");
+    return str;
+}
+
+inline std::vector<std::string> split(std::string str, const char *delim = "\r\n\0") {
     std::vector<std::string> res;
     char *                   strc = &str[0];
     char *                   temp = strtok(strc, delim);
@@ -37,17 +51,34 @@ inline std::vector<std::string> split(std::string str, const char *delim) {
     return res;
 }
 
-inline void ltrim(std::string &str, const string &val = " \r\n\0") {
+inline void ltrim(std::string &str, const std::string &val = " \r\n\0") {
     str.erase(0, str.find_first_not_of(val));
 }
 
-inline void rtrim(std::string &str, const string &val = " \r\n\0") {
+inline void rtrim(std::string &str, const std::string &val = " \r\n\0") {
     str.erase(str.find_last_not_of(val) + 1);
 }
 
-inline void trim(std::string &str, const string &val = " \r\n\0") {
+inline void trim(std::string &str, const std::string &val = " \r\n\0") {
     ltrim(str, val);
     rtrim(str, val);
+}
+
+template <typename T>
+inline std::vector<T> to_vector(std::stack<T> s) {
+    std::vector<T> v;
+    while (s.size() > 0) {
+        v.insert(v.begin(), s.top());
+        s.pop();
+    }
+    return v;
+}
+
+template <typename T> 
+inline std::vector<T> to_vector(std::set<T> s) {
+    std::vector<T> v;
+    v.assign(s.begin(), s.end());
+    return v;
 }
 
 template <typename T1, typename T2>
@@ -90,34 +121,34 @@ struct ToString {
     }
 
     template <typename L, typename R>
-    type operator()(const pair<L, R> p) const {
+    type operator()(const std::pair<L, R> p) const {
         return "<" + comb(p.first, p.second) + ">";
     }
 
     template <typename I, typename C = typename I::const_iterator>
     type operator()(const I &it) const {
-        string hv = "";
+        std::string hv = "";
         for (const auto &i : it) { hv = hv + ToString{}(i) + ","; }
         return "[" + hv + "]";
     }
 
     type operator()(const std::vector<bool> &bs) const {
-        string hv = "";
+        std::string hv = "";
         for (int i = 0; i < bs.size(); ++i) {
             hv = ToString{}((int) bs[i]) + ",";
         }
         return "[" + hv + "]";
     }
 
-    template <typename... Args> size_t operator()(const tuple<Args...> &tup) {
+    template <typename... Args> size_t operator()(const std::tuple<Args...> &tup) {
         return apply(
             [](Args... v) -> size_t { return ToString{}.comb<Args...>(v...); },
             tup);
     }
     template <typename ToStringable,
-              typename = is_same<
-                  decltype(std::declval<ToStringable>().ToString()), string>>
-    string operator()(const ToStringable &v) {
+              typename = std::is_same<
+                  decltype(std::declval<ToStringable>().ToString()), std::string>>
+    std::string operator()(const ToStringable &v) {
         return v.ToString();
     }
 };

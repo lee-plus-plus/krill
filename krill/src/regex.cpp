@@ -252,9 +252,8 @@ void RegexParser::syntaxParse() {
                         "\"{}\"\n {}",
                         tokens_[i].lval, regex_,
                         string(nodes_.top().st, ' ') +
-                            string(nodes_.top().st, ' ') +
-                            string(nodes_.top().ed - nodes_.top().st + 1, '~') +
-                            string(tokens_[i].ed - tokens_[i].st + 1, '^'));
+                        string(nodes_.top().ed - nodes_.top().st + 1, '~') +
+                        string(tokens_[i].ed - tokens_[i].st + 1, '^'));
             }
         }
 

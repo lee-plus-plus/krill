@@ -5,6 +5,7 @@
 #include "krill/regex.h"
 #include "krill/utils.h"
 #include <iostream>
+#include <sstream>
 #include <vector>
 using namespace std;
 using namespace krill::type;
@@ -94,13 +95,8 @@ void test1() {
     }
 }
 
-
 int main() {
-    vector<void (*)()> testFuncs = {test1};
-    for (int i = 0; i < testFuncs.size(); i++) {
-        cout << "#test " << (i + 1) << endl;
-        testFuncs[i]();
-        cout << endl << endl;
-    }
+    cerr << "#test 1\n";
+    test1();
     return 0;
 }
