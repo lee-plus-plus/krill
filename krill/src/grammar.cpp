@@ -1,10 +1,9 @@
-#include "krill/grammar.h"
 #include "fmt/format.h"
+#include "krill/grammar.h"
 #include "krill/automata.h"
 #include "krill/utils.h"
 #include <queue>
 #include <tuple>
-using namespace krill::automata;
 using namespace krill::utils;
 
 namespace krill::type {
@@ -85,18 +84,6 @@ Grammar::Grammar(vector<string> prodStrs) {
     for (int c : nonterminalSet) {
         if (terminalSet.count(c)) { terminalSet.erase(c); }
     }
-}
-
-bool Token::operator<(const Token &t) const {
-    return std::tie(id, lval) < std::tie(t.id, t.lval);
-}
-
-bool Token::operator==(const Token &t) const {
-    return std::tie(id, lval) == std::tie(t.id, t.lval);
-}
-
-bool Token::operator!=(const Token &t) const {
-    return std::tie(id, lval) != std::tie(t.id, t.lval);
 }
 
 } // namespace krill::type

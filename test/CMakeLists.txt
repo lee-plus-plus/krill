@@ -7,16 +7,5 @@ add_executable(test_codegen test_codegen.cpp)
 add_executable(test_regex test_regex.cpp)
 add_executable(test_lexical test_lexical.cpp)
 add_executable(test_syntax test_syntax.cpp)
-add_executable(test_demo test_demo.cpp)
 add_executable(test_minic test_minic.cpp)
-
-# add_custom_target(test_codegen 
-# 	DEPENDS test_codegen_c test_codegen_cpp test_codegen_regex
-# 	COMMAND ${CMAKE_COMMAND} -E make_directory ../demo
-# 	COMMAND test_codegen_c   > ../demo/calc.c
-# 	COMMAND test_codegen_cpp > ../demo/calc.cpp
-# 	COMMAND test_codegen_regex > ../demo/regex.cpp
-# 	COMMENT "generated as demo/calc.c, demo/calc.cpp, demo/regex.cpp"
-# 	)
-
 

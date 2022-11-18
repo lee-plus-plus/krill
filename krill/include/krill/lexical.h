@@ -1,15 +1,27 @@
 #ifndef LEXICAL_H
 #define LEXICAL_H
+#include "defs.h"
 #include "automata.h"
 #include "grammar.h"
-#include "defs.h"
 #include <istream>
 #include <string>
-#include <map>
 #include <vector>
-using krill::type::DFA;
-using krill::type::Grammar, krill::type::Token;
-using std::pair, std::map, std::vector, std::string, std::istream;
+using krill::type::Token, krill::type::DFA;
+using std::vector, std::string, std::istream;
+
+namespace krill::type {
+
+struct Token {
+    // lexical token
+    int    id;
+    string lval;
+    // to make std::set happy
+    bool operator<(const Token &t) const;
+    bool operator==(const Token &t) const;
+    bool operator!=(const Token &t) const;
+};
+
+} // namespace krill::type
 
 namespace krill::runtime {
 
@@ -24,20 +36,9 @@ class LexicalParser {
     vector<Token> parseAll(istream &input);
 
   protected:
-    DFA dfa_;
-    int state_;
+    DFA    dfa_;
+    int    state_;
     string history_;
-};
-
-class SimpleLexicalParser : public LexicalParser {
-  private:
-    map<int, int>    toSyntaxId_; // {x, syntaxId}
-    map<int, string> tokenNames_; // {syntaxId,  name}
-
-  public:
-    SimpleLexicalParser(Grammar grammar, map<string, string> nameToRegex);
-    Token         parseStep(istream &input);
-    vector<Token> parseAll(istream &input);
 };
 
 } // namespace krill::runtime

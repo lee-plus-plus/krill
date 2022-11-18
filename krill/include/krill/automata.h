@@ -9,8 +9,6 @@ using std::set, std::map, std::multimap, std::vector;
 
 namespace krill::type {
 
-const int EMPTY_SYMBOL = 0; // empty edge for NFA / EdgeTable
-
 using DFAgraph = map<int, map<int, int>>;      // {from, {symbol, to}}
 using NFAgraph = map<int, multimap<int, int>>; // {from, {symbol, to}}
 
@@ -39,11 +37,15 @@ using EdgeTable = vector<Edge>;
 
 
 namespace krill::automata {
+    
 using namespace krill::type;
 
 DFA getMinimizedDfa(DFA dfa);
 DFA getDFAfromNFA(NFA nfa);
 DFA getDFAintegrated(vector<DFA> dfas);
+
+// you don't use these
+// -------------------
 
 NFAgraph  toNFAgraph(EdgeTable edgeTable);
 DFAgraph  toDFAgraph(EdgeTable edgeTable);

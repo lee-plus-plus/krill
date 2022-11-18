@@ -1,4 +1,5 @@
 #include "krill/syntax.h"
+#include "krill/lexical.h"
 #include "krill/grammar.h"
 #include "krill/utils.h"
 #include "fmt/format.h"
@@ -9,6 +10,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+using namespace krill::type;
 using namespace krill::grammar;
 using namespace krill::utils;
 using namespace std;
@@ -162,7 +164,7 @@ void printAPT_(APTnode *node, ostream &oss, map<int, string> symbolNames,
 
     for (int i = 0; i < isLast.size(); i++) {
         if (i + 1 == isLast.size()) {
-            oss << fmt::format("{:s}", (isLast[i] ? " └─ " : " ├─ "));
+            oss << fmt::format("{:s}", (isLast[i] ? " └ " : " ├ "));
         } else {
             oss << fmt::format("{:s}", (isLast[i] ? "   " : " │ "));
         }

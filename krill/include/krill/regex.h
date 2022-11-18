@@ -1,3 +1,5 @@
+// poorly written, but it can run
+// maybe re-write later
 #ifndef REGEX_H
 #define REGEX_H
 #include "automata.h"
@@ -19,6 +21,7 @@ NFA getNFAfromRegex(string src);
 
 namespace krill::regex::core {
 
+// you don't use these
 struct Token {
     int    id;
     string lval;

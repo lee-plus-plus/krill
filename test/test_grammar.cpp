@@ -1,6 +1,5 @@
 #include "Krill/grammar.h"
 #include "krill/defs.h"
-#include "krill/utils.h"
 #include <cassert>
 #include <fmt/format.h>
 #include <iostream>
@@ -8,7 +7,6 @@
 using namespace std;
 using namespace krill::type;
 using namespace krill::grammar;
-using namespace krill::utils;
 
 
 void printProd(const Prod &prod, map<int, string> symbolNames, ostream &oss) {

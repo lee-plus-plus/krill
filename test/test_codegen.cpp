@@ -1,5 +1,5 @@
 #include "fmt/format.h"
-#include "krill/automata.h"
+// #include "krill/automata.h"
 #include "krill/codegen.h"
 #include "krill/defs.h"
 #include "krill/grammar.h"
@@ -9,54 +9,34 @@
 #include "krill/utils.h"
 #include <fmt/color.h>
 #include <iostream>
-#include <map>
+// #include <map>
 #include <sstream>
 #include <vector>
 using namespace std;
 using namespace krill::type;
-using namespace krill::automata;
+// using namespace krill::automata;
 using namespace krill::grammar;
 using namespace krill::regex;
 using namespace krill::utils;
 using namespace krill::codegen;
 using namespace krill::runtime;
 
-Grammar grammar = Grammar({
-    "RegEx -> Parallel",
-    "Parallel -> Parallel '|' Seq",
-    "Parallel -> Seq",
-    "Seq -> Seq Item",
-    "Seq -> Item ",
-    "Item -> Closure",
-    "Item -> Atom",
-    "Closure -> Atom '+'",
-    "Closure -> Atom '*'",
-    "Closure -> Atom '?'",
-    "Atom -> '(' Parallel ')'",
-    "Atom -> Char",
-    "Atom -> Range",
-    "Range -> '[' RangeSeq ']'",
-    "Range -> '[' '^' RangeSeq ']'",
-    "RangeSeq -> RangeSeq RangeItem",
-    "RangeSeq -> RangeItem",
-    "RangeItem -> Char '-' Char",
-    "RangeItem -> Char",
-    "Atom -> '.'",
-});
+void genLexical() {
+    cerr << "input multiple regexs, end with ^d\n";
+    vector<string> regexs;
+    while (true) {
+        string line;
+        getline(cin, line);
+        if (cin.eof()) { break; }
+        if (line.size() == 0) { continue; }
+        regexs.push_back(line);
+    }
 
-void test2() {
-    auto actionTable = getLALR1table(grammar);
-
-    cout << "\n// Action Table\n";
-    genActionTable(actionTable, cout);
-
-    cout << "\n// Grammar\n";
-    genGrammar(grammar, cout);
+    genLexicalParser(regexs, cout);
 }
 
-// read in grammar, output action table, grammar and so on
 void genSyntax() {
-    cerr << "input multiple regexs, end with ^d\n";
+    cerr << "input multiple grammar productions, end with ^d\n";
     vector<string> strs;
     while (true) {
         string line;
@@ -68,21 +48,6 @@ void genSyntax() {
 
     Grammar grammar(strs);
     genSyntaxParser(grammar, cout);
-}
-
-// read in grammar, output action table, grammar and so on
-void genLexical() {
-    cerr << "input multiple grammar productions, end with ^d\n";
-    vector<string> regexs;
-    while (true) {
-        string line;
-        getline(cin, line);
-        if (cin.eof()) { break; }
-        if (line.size() == 0) { continue; }
-        regexs.push_back(line);
-    }
-
-    genLexicalParser(regexs, cout);
 }
 
 void testRegex() {
@@ -184,8 +149,6 @@ void testSyntax() {
 }
 
 int main() {
-    // test1();
-    // test2();
     cerr << "[1] syntax codegen\n"
             "[2] lexical codegen\n"
             "[3] regex test\n"

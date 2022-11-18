@@ -1,7 +1,7 @@
 #ifndef GRAMMAR_H
 #define GRAMMAR_H
-#include "automata.h"
 #include "defs.h"
+#include "automata.h"
 #include <map>
 #include <set>
 #include <string>
@@ -10,8 +10,6 @@ using std::pair, std::set, std::map, std::multimap, std::vector;
 using std::string;
 
 namespace krill::type {
-
-const int END_SYMBOL = -1; // end of input in syntax parsing
 
 struct Prod {
     // Production (P -> Ab)
@@ -44,17 +42,6 @@ struct Action {
 };
 // {current_state, look_over_symbol, action}
 using ActionTable = map<pair<int, int>, Action>;
-
-struct Token {
-    // lexical token
-    int    id;
-    string lval;
-    // to make std::set happy
-    bool operator<(const Token &t) const;
-    bool operator==(const Token &t) const;
-    bool operator!=(const Token &t) const;
-};
-const Token END_TOKEN = Token({.id = END_SYMBOL, .lval = ""});
 
 }; // namespace krill::type
 

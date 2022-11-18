@@ -10,13 +10,13 @@
 #include <string>
 #include <vector>
 using krill::type::Grammar, krill::type::ActionTable;
-using krill::type::Token;
+using krill::type::Token, krill::type::APTnode;
 using krill::utils::AttrDict;
 using std::vector, std::deque, std::stack;
 using std::string, std::ostream;
 using std::shared_ptr;
 
-namespace krill::runtime {
+namespace krill::type {
 
 // Annotated Parsing Tree Node
 struct APTnode {
@@ -24,6 +24,10 @@ struct APTnode {
     AttrDict                   attr;
     deque<shared_ptr<APTnode>> child;
 };
+
+} // namepspace krill::type
+
+namespace krill::runtime {
 
 using Rfunc = std::function<void(AttrDict &next, deque<AttrDict> &child)>;
 using Afunc = std::function<void(AttrDict &next, const Token &token)>;

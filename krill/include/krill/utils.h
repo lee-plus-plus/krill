@@ -1,6 +1,5 @@
 #ifndef UTILS_H
 #define UTILS_H
-// #include "defs.h"
 #include <cstring>
 #include <map>
 #include <ostream>
@@ -11,9 +10,6 @@
 #include <string>
 #include <vector>
 #include <functional>
-// using namespace std;
-// using namespace krill::automata;
-// using namespace krill::grammar;
 
 namespace krill::utils {
 

@@ -4,16 +4,40 @@
 #include "krill/grammar.h"
 #include "krill/lexical.h"
 #include "krill/syntax.h"
+#include "krill/utils.h"
 #include <cstdlib>
 #include <iostream>
 #include <map>
 #include <sstream>
 #include <vector>
 using namespace std;
-using namespace krill::grammar;
+using namespace krill::type;
+using krill::grammar::getLALR1table;
 using namespace krill::utils;
 using namespace krill::runtime;
 
+vector<string> toRegexs(map<string, string> nameToRegex) {
+    vector<string> regexs;
+    for (auto[name, regex] : nameToRegex) { regexs.push_back(regex); }
+    return regexs;
+}
+
+// simple map lexical id to syntax id with same symbol name
+map<int, int> getToSyntaxIdMap(map<int, string>    symbolNames,
+                               map<string, string> nameToRegex) {
+    map<int, int> toSyntaxIdMap;
+    auto          symbolNames_r = reverse(symbolNames);
+
+    int i = 0;
+    for (auto[name, regex] : nameToRegex) {
+        if (symbolNames_r.count(name) > 0) {
+            toSyntaxIdMap[i] = symbolNames_r.at(name);
+        }
+        i++;
+    }
+    toSyntaxIdMap[END_SYMBOL] = END_SYMBOL;
+    return toSyntaxIdMap;
+}
 
 void test1() {
     Grammar             grammar({
@@ -38,18 +62,28 @@ void test1() {
     };
     ActionTable actionTable = getLALR1table(grammar);
 
-    SimpleLexicalParser lexicalParser(grammar, nameToRegex);
-    SyntaxParser        syntaxParser(grammar, actionTable);
+    LexicalParser lexicalParser(toRegexs(nameToRegex));
+    SyntaxParser  syntaxParser(grammar, actionTable);
+    map<int, int> toSyntaxId =
+        getToSyntaxIdMap(grammar.symbolNames, nameToRegex);
 
     string       src = "a = 1 + 21; b=2*0/1; 1/1-1; ";
     stringstream input;
     input << src;
 
     vector<Token> tokens = lexicalParser.parseAll(input);
-    syntaxParser.parseAll(tokens);
+    vector<Token> syntaxTokens;
+    for (auto elem : tokens) {
+        if (toSyntaxId.count(elem.id)) {
+            elem.id = toSyntaxId.at(elem.id);
+            syntaxTokens.push_back(elem);
+        }
+    }
+    syntaxParser.clear();
+    syntaxParser.parseAll(syntaxTokens);
 
     // APTnode *root = syntaxParser.getAnnotatedParsingTree();
-    syntaxParser.printAnnotatedParsingTree(cout);
+    syntaxParser.printAnnotatedParsingTree(cerr);
 }
 
 // regex-like grammar (cannot deal with escape like "\+", "\?" well)
@@ -82,23 +116,32 @@ void test2() {
     };
     ActionTable actionTable = getLALR1table(grammar);
 
-    SimpleLexicalParser lexicalParser(grammar, nameToRegex);
-    SyntaxParser        syntaxParser(grammar, actionTable);
+    LexicalParser lexicalParser(toRegexs(nameToRegex));
+    SyntaxParser  syntaxParser(grammar, actionTable);
+    map<int, int> toSyntaxId =
+        getToSyntaxIdMap(grammar.symbolNames, nameToRegex);
 
     // string src = "a =1 + 21; b=2*0/1; 1/1-1; ";
     while (true) {
         string s;
-        cout << "> input regex: ";
+        cerr << "> input regex: ";
         cin >> s;
         stringstream input;
         input << s;
 
         vector<Token> tokens = lexicalParser.parseAll(input);
+        vector<Token> syntaxTokens;
+        for (auto elem : tokens) {
+            if (toSyntaxId.count(elem.id)) {
+                elem.id = toSyntaxId.at(elem.id);
+                syntaxTokens.push_back(elem);
+            }
+        }
         syntaxParser.clear();
-        syntaxParser.parseAll(tokens);
+        syntaxParser.parseAll(syntaxTokens);
 
         // APTnode *root = syntaxParser.getAnnotatedParsingTree();
-        syntaxParser.printAnnotatedParsingTree(cout);
+        syntaxParser.printAnnotatedParsingTree(cerr);
     }
 }
 
@@ -126,8 +169,10 @@ void test3() {
 
     ActionTable actionTable = getLALR1table(grammar);
 
-    SimpleLexicalParser lexicalParser(grammar, nameToRegex);
-    SyntaxParser        syntaxParser(grammar, actionTable);
+    LexicalParser lexicalParser(toRegexs(nameToRegex));
+    SyntaxParser  syntaxParser(grammar, actionTable);
+    map<int, int> toSyntaxId =
+        getToSyntaxIdMap(grammar.symbolNames, nameToRegex);
 
     auto &rFunc = syntaxParser.reduceFunc_;
 
@@ -189,43 +234,55 @@ void test3() {
     };
 
     // string src = "a =1 + 21; b=2*0/1; 1/1-1; ";
+    cerr << "a very simple interpreter: \n"
+            "please input codes like: \n"
+            "\"a =1 + 21; b=2*0/1; 1 /1-1; \"\n";
     while (true) {
+        cerr << "> ";
         string s;
-        cout << "> input regex: ";
         getline(cin, s);
         stringstream input;
         input << s;
 
         vector<Token> tokens = lexicalParser.parseAll(input);
-        cout << "{";
+
+        cerr << "{";
         for (auto token : tokens) {
-            cout << fmt::format("[{}, \"{}\"]", token.id, token.lval);
+            cerr << fmt::format("[{}, \"{}\"]", token.id, token.lval);
         }
-        cout << "}\n";
+        cerr << "}\n";
 
+        vector<Token> syntaxTokens;
+        for (auto elem : tokens) {
+            if (toSyntaxId.count(elem.id)) {
+                elem.id = toSyntaxId.at(elem.id);
+                syntaxTokens.push_back(elem);
+            }
+        }
         syntaxParser.clear();
-        syntaxParser.parseAll(tokens);
+        syntaxParser.parseAll(syntaxTokens);
 
-        syntaxParser.printAnnotatedParsingTree(cout);
+
+        syntaxParser.printAnnotatedParsingTree(cerr);
         APTnode *root        = syntaxParser.getAnnotatedParsingTree();
         auto     var_list    = root->attr.Get<map<string, double>>("var_list");
         auto     retval_list = root->attr.Get<vector<double>>("retval_list");
 
-        cout << "{";
+        cerr << "variables: {";
         for (auto[key, value] : var_list) {
-            cout << fmt::format("\"{}\": {}, ", key, value);
+            cerr << fmt::format("\"{}\": {}, ", key, value);
         }
-        cout << "}\n";
-        cout << fmt::format("{{{}}}\n", fmt::join(retval_list, ", "));
+        cerr << "}\n";
+        cerr << fmt::format("returns: {{{}}}\n", fmt::join(retval_list, ", "));
     }
 }
 
 int main() {
     vector<void (*)()> testFuncs = {test1, test3};
     for (int i = 0; i < testFuncs.size(); i++) {
-        cout << "#test " << (i + 1) << endl;
+        cerr << "#test " << (i + 1) << endl;
         testFuncs[i]();
-        cout << endl << endl;
+        cerr << endl << endl;
     }
     return 0;
 }
