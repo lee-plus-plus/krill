@@ -1,4 +1,4 @@
-#include "Krill/grammar.h"
+#include "krill/grammar.h"
 #include "krill/defs.h"
 #include <cassert>
 #include <fmt/format.h>

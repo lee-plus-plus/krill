@@ -132,7 +132,7 @@ void testSyntax() {
                 cerr << fmt::format(
                     "unmatched token name \"{}\"\n",
                     fmt::format(fmt::emphasis::underline, name));
-                isNameOK == false;
+                isNameOK = false;
                 break;
             }
             int id = symbolId.at(name);

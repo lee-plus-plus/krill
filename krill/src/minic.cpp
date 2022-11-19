@@ -5428,12 +5428,7 @@ vector<Prod> prods = {
     /* 237 */ {declaration_list, {declaration_list, declaration}},
 };
 
-Grammar grammar({
-    .terminalSet    = terminalSet,
-    .nonterminalSet = nonterminalSet,
-    .prods          = prods,
-    .symbolNames    = symbolNames,
-});
+Grammar grammar(terminalSet, nonterminalSet, prods, symbolNames);
 
 } // namespace krill::minic::syntax
 
