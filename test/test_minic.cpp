@@ -1632,7 +1632,7 @@ void testSyntaxParsing() {
                 cerr << fmt::format(
                     "unmatched token name \"{}\"\n",
                     fmt::format(fmt::emphasis::underline, name));
-                isNameOK == false;
+                isNameOK = false;
                 break;
             }
             int id = symbolId.at(name);
@@ -1649,6 +1649,7 @@ void testSyntaxParsing() {
 }
 
 int main(int argc, char **argv) {
+    initSyntaxParser();
     // testLexicalParsing();
     cerr << "[1] lexical test\n"
             "[2] syntax test\n"
