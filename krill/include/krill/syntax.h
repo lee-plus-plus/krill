@@ -49,13 +49,11 @@ class SyntaxParser {
     void parseAll(vector<Token> tokens);
 
     APTnode *getAnnotatedParsingTree();
-    // void lrdVisit(APTnode *node, std::function<void(APTnode *)>);
     void printAnnotatedParsingTree(ostream &oss);
 
   private:
     Grammar       grammar_;
     ActionTable   actionTable_;
-    
 
     vector<Token>    tokens_;
     stack<int>       states_;
@@ -66,6 +64,7 @@ class SyntaxParser {
     string history_;
 
     void parse();
+    string getErrorMessage();
 };
 
 } // namespace krill::runtime

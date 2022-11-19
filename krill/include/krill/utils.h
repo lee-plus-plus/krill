@@ -128,10 +128,14 @@ struct ToString {
         return "[" + hv + "]";
     }
 
+    type operator()(const std::string &it) const {
+        return "\"" + unescape(it) + "\"";
+    }
+
     type operator()(const std::vector<bool> &bs) const {
         std::string hv = "";
         for (int i = 0; i < bs.size(); ++i) {
-            hv = ToString{}((int) bs[i]) + ",";
+            hv = ToString{}((int) bs[i]) + ", ";
         }
         return "[" + hv + "]";
     }
