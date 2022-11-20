@@ -21,9 +21,7 @@ void defaultReduceFunc(AttrDict &next, deque<AttrDict> &child) {
     // pass
 }
 
-void defaultActionFunc(AttrDict &next, const Token &token) {
-    next.Set<string>("lval", token.lval);
-}
+void defaultActionFunc(AttrDict &next, AttrDict &child) { next = child; }
 
 SyntaxParser::SyntaxParser(Grammar grammar, ActionTable actionTable)
     : grammar_(grammar), actionTable_(actionTable), offset_(0),
@@ -45,28 +43,28 @@ SyntaxParser::SyntaxParser(Grammar grammar, ActionTable actionTable,
 void SyntaxParser::parse() {
     auto &prods_ = grammar_.prods;
 
-    while (!isAccepted_ && offset_ < tokens_.size()) {
-        Token &token = tokens_.at(offset_);
+    while (!isAccepted_ && offset_ < inputs_.size()) {
+        APTnode &input = inputs_.at(offset_);
+        assert(input.attr.Has<string>("lval"));
 
         assert(states_.size() > 0);
-        if (actionTable_.count({states_.top(), token.id}) == 0) {
+        if (actionTable_.count({states_.top(), input.id}) == 0) {
             throw runtime_error(getErrorMessage());
         }
 
-        assert(actionTable_.count({states_.top(), token.id}) != 0);
-        Action action = actionTable_[{states_.top(), token.id}];
+        assert(actionTable_.count({states_.top(), input.id}) != 0);
+        Action action = actionTable_[{states_.top(), input.id}];
 
         switch (action.type) {
             case ACTION: {
                 states_.push(action.tgt);
 
-                shared_ptr<APTnode> nextNode(
-                    new APTnode({.id = token.id, .attr = {}, .child = {}}));
+                shared_ptr<APTnode> nextNode(new APTnode(input));
                 // ACTION action
-                actionFunc_(nextNode.get()->attr, token);
+                actionFunc_(nextNode.get()->attr, input.attr);
                 nodes_.push(nextNode);
 
-                history_ += token.lval;
+                history_ += input.attr.Get<string>("lval");
                 if (history_.size() > 30) {
                     history_ = history_.substr(history_.size() - 30);
                 }
@@ -118,7 +116,7 @@ void SyntaxParser::parse() {
 }
 
 void SyntaxParser::clear() {
-    tokens_.clear();
+    inputs_.clear();
     states_     = stack<int>();
     nodes_      = stack<shared_ptr<APTnode>>();
     offset_     = 0;
@@ -127,13 +125,34 @@ void SyntaxParser::clear() {
     history_ = "";
 }
 
+APTnode to_APTnode(const Token &token) {
+    APTnode node;
+    node.id = token.id;
+    node.attr.Set<string>("lval", token.lval);
+    return node;
+}
+
 void SyntaxParser::parseStep(Token token) {
-    tokens_.push_back(token);
+    inputs_.push_back(to_APTnode(token));
+    parse();
+}
+
+void SyntaxParser::parseStep(APTnode tokenWithAttr) {
+    inputs_.push_back(tokenWithAttr);
     parse();
 }
 
 void SyntaxParser::parseAll(vector<Token> tokens) {
-    tokens_.insert(tokens_.end(), tokens.begin(), tokens.end());
+    vector<APTnode> tokensWithAttr(tokens.size());
+    for (int i = 0; i < tokens.size(); i++) {
+        tokensWithAttr[i] = to_APTnode(tokens[i]);
+    }
+    inputs_.insert(inputs_.end(), tokensWithAttr.begin(), tokensWithAttr.end());
+    parse();
+}
+
+void SyntaxParser::parseAll(vector<APTnode> tokensWithAttr) {
+    inputs_.insert(inputs_.end(), tokensWithAttr.begin(), tokensWithAttr.end());
     parse();
 }
 
@@ -190,15 +209,17 @@ void SyntaxParser::printAnnotatedParsingTree(ostream &oss) {
 }
 
 string SyntaxParser::getErrorMessage() {
-    Token &      token = tokens_.at(offset_);
+    auto &tokenWithAttr = inputs_.at(offset_);
+
     stringstream ss;
     ss << fmt::format("{}: unexpected token <{} \"{}\"> after \"{}\"",
-                        fmt::format("Syntax Error", fmt::color::red),
-                        grammar_.symbolNames.at(token.id),
-                        fmt::format(fmt::emphasis::underline, "{}",
-                                    krill::utils::unescape(token.lval)),
-                        fmt::format(fmt::emphasis::underline, "{}",
-                                    krill::utils::unescape(history_)));
+                      fmt::format("Syntax Error", fmt::color::red),
+                      grammar_.symbolNames.at(tokenWithAttr.id),
+                      fmt::format(fmt::emphasis::underline, "{}",
+                                  krill::utils::unescape(
+                                      tokenWithAttr.attr.Get<string>("lval"))),
+                      fmt::format(fmt::emphasis::underline, "{}",
+                                  krill::utils::unescape(history_)));
     ss << "\n";
     printAnnotatedParsingTree(ss);
     return ss.str();

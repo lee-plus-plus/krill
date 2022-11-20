@@ -29,11 +29,11 @@ struct APTnode {
 
 namespace krill::runtime {
 
+using Afunc = std::function<void(AttrDict &next, AttrDict &child)>;
 using Rfunc = std::function<void(AttrDict &next, deque<AttrDict> &child)>;
-using Afunc = std::function<void(AttrDict &next, const Token &token)>;
 
 void defaultReduceFunc(AttrDict &next, deque<AttrDict> &child);
-void defaultActionFunc(AttrDict &next, const Token &token);
+void defaultActionFunc(AttrDict &next, AttrDict &child);
 
 class SyntaxParser {
   public:
@@ -46,7 +46,9 @@ class SyntaxParser {
 
     void clear();
     void parseStep(Token token);
+    void parseStep(APTnode tokenWithAttr);
     void parseAll(vector<Token> tokens);
+    void parseAll(vector<APTnode> tokensWithAttr);
 
     APTnode *getAnnotatedParsingTree();
     void printAnnotatedParsingTree(ostream &oss);
@@ -55,7 +57,7 @@ class SyntaxParser {
     Grammar       grammar_;
     ActionTable   actionTable_;
 
-    vector<Token>    tokens_;
+    vector<APTnode>  inputs_;
     stack<int>       states_;
     stack<shared_ptr<APTnode>> nodes_;
 
