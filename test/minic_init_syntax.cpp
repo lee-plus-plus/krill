@@ -16,9 +16,7 @@ using namespace krill::minic;
 // rfunc_0 = defaultReduceFunc;
 
 // syntax ACTION
-Afunc afunc_ = [](AttrDict &next, const Token &token) {
-    next.Set<string>("lval", token.lval); // DIY
-};
+Afunc afunc_ = defaultActionFunc;
 // 0: cpp_file -> translation_unit
 Rfunc rfunc_0 = defaultReduceFunc;
 // ...
