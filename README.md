@@ -103,7 +103,7 @@ $ make test_minic
 ### 语法解析器 (SyntaxParser)
 
 核心是一个lr1动作表. 
-为了在归约过程中执行动作, 语法解析器允许用户绑定函数到每一个归约位置上. 
+为了在归约过程中执行动作, 语法解析器允许用户绑定函数到每一个归约位置上 (语法制导翻译, SDD). 
 用了AttrDict存放Annotated Parsing Tree的各种中间变量, 因为AttrDict实际上是一个`map<string, any>`, 
 可以在运行时任意增减属性, 如果不出错的话用起来还是比较方便的. 
 
@@ -112,7 +112,16 @@ $ make test_minic
 
 ## TODO
 
-现在已经能解析代码了，接下来就是加归约动作，实现Annotated Parsing Tree, 生成三地址码，中间优化，目标代码生成。
+1. 增加测试用例 (`test/minic-testcase`), 确保Abstact Syntax Tree无误
+2. SDD支持表达式
+3. SDD支持类型表达式
+4. SDD支持数组
+5. SDD支持函数
+
+借此生成三地址码 (中间表示)
+
+然后再由三地址生成汇编代码 (指令相关)
+
 
 
 
