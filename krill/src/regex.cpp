@@ -514,7 +514,9 @@ void RegexParser::syntaxParse() {
                         int from = numNfaNodes++;
                         int to   = numNfaNodes++;
                         for (int c = 1; c <= 127; c++) {
-                            nfaEdges.push_back({c, from, to});
+                            if (c != '\r' && c != '\n') {
+                                nfaEdges.push_back({c, from, to});
+                            }
                         }
                         int from2 = numNfaNodes++;
                         int to2   = numNfaNodes++;
