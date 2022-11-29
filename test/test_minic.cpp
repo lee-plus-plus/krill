@@ -61,7 +61,7 @@ void testSyntaxParsing() {
             if (symbolId.count(name) == 0) {
                 cerr << fmt::format(
                     "unmatched token name \"{}\"\n",
-                    fmt::format(fmt::emphasis::underline, name));
+                    fmt::format(fmt::emphasis::underline, "{}", name));
                 isNameOK = false;
                 break;
             }

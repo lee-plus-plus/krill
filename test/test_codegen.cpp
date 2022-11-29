@@ -83,7 +83,7 @@ void testRegex() {
         for (auto token : tokens) {
             cerr << fmt::format(
                 "[{:d} \"{}\"] ", token.id,
-                fmt::format(fmt::emphasis::underline, token.lval));
+                fmt::format(fmt::emphasis::underline, "{}", token.lval));
         }
         cerr << "\n";
     }
@@ -131,7 +131,7 @@ void testSyntax() {
             if (symbolId.count(name) == 0) {
                 cerr << fmt::format(
                     "unmatched token name \"{}\"\n",
-                    fmt::format(fmt::emphasis::underline, name));
+                    fmt::format(fmt::emphasis::underline, "{}", name));
                 isNameOK = false;
                 break;
             }
