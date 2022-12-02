@@ -1,19 +1,28 @@
-inline int h() {}
-struct {
-	int l1;
-} l;	
 
-int main() {
-	auto int a = 1;
-	_Bool b = 0;
-	char c = 'c';
-	const int d = 3;
-	double e = 5;
-	enum f {F1, F2, F3};
-	extern long g;
+void test1(int a) {
+	if (a) a=1; else a=2;
+	if (a) {return 1;}
+	if (a) return 1; else return 2;
+}
 
-	register int i;
-	short j;
-	signed int k;
-	static int l;
+void test2(int b) {
+	while (b) {
+		b--;
+		continue;
+		break;
+	}
+	while (b) {
+		b--;
+	}
+}
+
+void test3(int c) {
+	int x, y, z;
+}
+
+int main(void) {
+	int a, b, c;
+	test1(a);
+	test2(b);
+	test3(c);
 }

@@ -31,6 +31,7 @@ void genLexical() {
         if (line.size() == 0) { continue; }
         regexs.push_back(line);
     }
+    cerr << "start generate lexical parser ...\n";
 
     genLexicalParser(regexs, cout);
 }
@@ -45,6 +46,7 @@ void genSyntax() {
         if (line.size() == 0) { continue; }
         strs.push_back(line);
     }
+    cerr << "start generate syntax parser ...\n";
 
     Grammar grammar(strs);
     genSyntaxParser(grammar, cout);

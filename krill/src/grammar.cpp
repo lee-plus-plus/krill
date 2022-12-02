@@ -4,6 +4,7 @@
 #include "krill/utils.h"
 #include <queue>
 #include <tuple>
+#include <iostream>
 using namespace krill::utils;
 
 namespace krill::type {
@@ -181,7 +182,11 @@ map<int, set<int>> getFirstSet(Grammar grammar) {
     return firstSet;
 }
 
+// TODO
+// 添加文法左递归检查，左递归消除
+
 map<int, set<int>> getFollowSet(Grammar grammar, map<int, set<int>> firstSet) {
+    // 要求文法无左递归
     map<int, set<int>> followSet;
     followSet[grammar.prods[0].symbol].insert(END_SYMBOL);
 
@@ -201,6 +206,15 @@ map<int, set<int>> getFollowSet(Grammar grammar, map<int, set<int>> firstSet) {
                             if (followSet[A].count(elem) == 0) {
                                 isChanged = true;
                                 followSet[A].insert(elem);
+                            }
+                        }
+                        if (firstSet[b].count(0)) {
+                            // B -> αAβ (β nullable) ==> follow(A) += follow(β)
+                            for (int elem : followSet[b]) {
+                                if (followSet[A].count(elem) == 0) {
+                                    isChanged = true;
+                                    followSet[A].insert(elem);
+                                }
                             }
                         }
                     } else {
@@ -337,6 +351,16 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                 for (int j = 0; j < prods.size(); j++) {
                     if (prods[j].symbol == item.symbol &&
                         prods[j].right == item.right) {
+                        // REDUCE / ACTION confilct
+                        // e.g. IF cond expr ELSE expr
+                        //      IF cond expr
+                        if (actionTable.count({i, item.search}) != 0) {
+                            if (actionTable.at({i, item.search}).type == ACTION) {
+                                std::cerr << fmt::format("REDUCE / ACTION confilct of prod {}\n", (j+1));
+                            } else if (actionTable.at({i, item.search}).type == REDUCE) {
+                                std::cerr << fmt::format("REDUCE / REDUCE confilct of prod {}\n", (j+1));
+                            }
+                        }
                         actionTable[{i, item.search}] = {REDUCE, j};
                         break;
                     }
