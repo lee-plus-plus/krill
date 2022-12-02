@@ -34,10 +34,10 @@ bool Token::operator!=(const Token &t) const {
 
 namespace krill::runtime {
 
-LexicalParser::LexicalParser(DFA dfai) : state_(0), dfa_(dfai) {}
+LexicalParser::LexicalParser(DFA dfai) : dfa_(dfai), state_(0) {}
 
 LexicalParser::LexicalParser(vector<DFA> dfas)
-    : state_(0), dfa_(getDFAintegrated(dfas)) {}
+    : dfa_(getDFAintegrated(dfas)), state_(0) {}
 
 LexicalParser::LexicalParser(vector<string> regexs) {
     state_ = 0;

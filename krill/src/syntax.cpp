@@ -24,8 +24,8 @@ void defaultReduceFunc(AttrDict &next, deque<AttrDict> &child) {
 void defaultActionFunc(AttrDict &next, AttrDict &child) { next = child; }
 
 SyntaxParser::SyntaxParser(Grammar grammar, ActionTable actionTable)
-    : grammar_(grammar), actionTable_(actionTable), offset_(0),
-      isAccepted_(false), states_({0}), history_("") {
+    : grammar_(grammar), actionTable_(actionTable), states_({0}), offset_(0),
+      isAccepted_(false), history_("") {
     actionFunc_ = defaultActionFunc;
     for (int i = 0; i < grammar.prods.size(); i++) {
         reduceFunc_.push_back(defaultReduceFunc);
@@ -34,8 +34,8 @@ SyntaxParser::SyntaxParser(Grammar grammar, ActionTable actionTable)
 
 SyntaxParser::SyntaxParser(Grammar grammar, ActionTable actionTable,
                            Afunc actionFunc, vector<Rfunc> reduceFunc)
-    : grammar_(grammar), actionTable_(actionTable), reduceFunc_(reduceFunc),
-      actionFunc_(actionFunc), offset_(0), isAccepted_(false), states_({0}),
+    : actionFunc_(actionFunc), reduceFunc_(reduceFunc), grammar_(grammar),
+      actionTable_(actionTable), states_({0}), offset_(0), isAccepted_(false),
       history_("") {
     assert(reduceFunc_.size() == grammar.prods.size());
 }

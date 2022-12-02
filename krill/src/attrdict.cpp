@@ -31,7 +31,7 @@ map<string, string> AttrDict::ToStrDict() const {
             retval.emplace(k, tid.name());
         }
     }
-    return move(retval);
+    return retval;
 }
 
 string AttrDict::str() const {

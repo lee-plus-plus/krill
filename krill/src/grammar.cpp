@@ -1,10 +1,10 @@
-#include "fmt/format.h"
 #include "krill/grammar.h"
+#include "fmt/format.h"
 #include "krill/automata.h"
 #include "krill/utils.h"
+#include <iostream>
 #include <queue>
 #include <tuple>
-#include <iostream>
 using namespace krill::utils;
 
 namespace krill::type {
@@ -355,10 +355,16 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                         // e.g. IF cond expr ELSE expr
                         //      IF cond expr
                         if (actionTable.count({i, item.search}) != 0) {
-                            if (actionTable.at({i, item.search}).type == ACTION) {
-                                std::cerr << fmt::format("REDUCE / ACTION confilct of prod {}\n", (j+1));
-                            } else if (actionTable.at({i, item.search}).type == REDUCE) {
-                                std::cerr << fmt::format("REDUCE / REDUCE confilct of prod {}\n", (j+1));
+                            if (actionTable.at({i, item.search}).type ==
+                                ACTION) {
+                                std::cerr << fmt::format(
+                                    "REDUCE / ACTION confilct of prod {}\n",
+                                    (j + 1));
+                            } else if (actionTable.at({i, item.search}).type ==
+                                       REDUCE) {
+                                std::cerr << fmt::format(
+                                    "REDUCE / REDUCE confilct of prod {}\n",
+                                    (j + 1));
                             }
                         }
                         actionTable[{i, item.search}] = {REDUCE, j};
@@ -412,7 +418,7 @@ LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata) {
     vector<LR1State> resStates;
     EdgeTable        resEdgeTable;
     set<Edge>        resEdgeTable0;
-    for (const auto[LALR1Idex, stateIdxs] : LALRIdx2stateIdxs) {
+    for (const auto & [ LALR1Idex, stateIdxs ] : LALRIdx2stateIdxs) {
         LR1State resState;
         for (int idx : stateIdxs) {
             for (auto item : states[idx]) { resState.insert(item); }

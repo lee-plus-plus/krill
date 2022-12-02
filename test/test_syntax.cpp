@@ -218,7 +218,7 @@ void test3() {
         } else if (oprt == "/") {
             value = v1 / v2;
         }
-        next.Set<double>("val", {value});
+        next.Set<double>("val", value);
     };
     // Exp     -> num
     rFunc[6] = [](AttrDict &next, deque<AttrDict> &child) {
