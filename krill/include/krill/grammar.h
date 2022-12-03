@@ -15,10 +15,12 @@ struct Prod {
     // Production (P -> Ab)
     int         symbol; // left, nonterminal symbol
     vector<int> right;  // mixed with nonterminals and terminals
+    Prod() = default;
     Prod(int symbol, vector<int> right) : symbol(symbol), right(right){};
     // to make std::set happy
     bool operator<(const Prod &p) const;
     bool operator==(const Prod &p) const;
+    string str(map<int, string> symbolNames) const;
 };
 
 struct Grammar {
@@ -27,7 +29,16 @@ struct Grammar {
     set<int>         nonterminalSet;
     vector<Prod>     prods;
     map<int, string> symbolNames;
+    map<int, int>    prodsPriority;
+
+    // ambiguous grammar setting (unnecessary)
+    enum class Associate {kLeft, kRight};
+    map<int, Associate> symbolAssociate;
+
     Grammar() = default;
+    Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
+            map<int, string> symbolNames, map<int, int> prodsPriority, 
+            map<int, Associate> symbolAssociate);
     Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
             map<int, string> symbolNames);
     Grammar(vector<Prod> prods);
@@ -62,6 +73,7 @@ struct ProdItem : Prod {
     // to make std::set happy
     bool operator<(const ProdItem &p) const;
     bool operator==(const ProdItem &p) const;
+    string str(map<int, string> symbolNames) const;
 };
 
 // LR1 Production Item (P -> A·b, a)
@@ -72,6 +84,7 @@ struct ProdLR1Item : ProdItem {
     // to make std::set happy
     bool operator<(const ProdLR1Item &p) const;
     bool operator==(const ProdLR1Item &p) const;
+    string str(map<int, string> symbolNames) const;
 };
 
 // Set of LR1 Production Item {(P -> A·b, a), (S -> Sb·, b), }
@@ -81,6 +94,7 @@ using LR1State = set<ProdLR1Item>;
 struct LR1Automata {
     vector<LR1State> states;
     EdgeTable        edgeTable;
+    string str(map<int, string> symbolNames) const;
 };
 
 map<int, set<int>> getFirstSet(Grammar grammar);

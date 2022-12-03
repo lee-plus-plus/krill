@@ -305,15 +305,19 @@ void test3() {
     //     "Bs ->", 
     // });
     Grammar grammar({
-        "S -> P", 
-        "P -> ( As Bs )", 
-        "P -> ( As )", 
-        "P -> ( Bs )", 
-        "P -> ( )", 
-        "As -> A As",
-        "As -> A", 
-        "Bs -> B Bs",
-        "Bs -> B", 
+        // "S -> P", 
+        // "P -> ( As Bs )", 
+        // "P -> ( As )", 
+        // "P -> ( Bs )", 
+        // "P -> ( )", 
+        // "As -> A As",
+        // "As -> A", 
+        // "Bs -> B Bs",
+        // "Bs -> B", 
+        "P -> S", 
+        "S -> i S t S e S", 
+        "S -> i S t S", 
+        "S -> D", 
     });
     printGrammar(grammar, cout);
     printf("> symbol names:\n");
@@ -338,9 +342,9 @@ void test3() {
     printActionTable(actionTable, grammar.symbolNames, cout);
 
 
-
     printf("> use LR(1) Action Table to analyze: \n");
-    string src = "()";
+    // string src = "()";
+    string src = "iDtiDtDeD";
     fmt::print("> input string: {}\n", src);
     vector<int> tokens = simpleLexicalParser(grammar.symbolNames, src);
     printf("%s\n", src.c_str());

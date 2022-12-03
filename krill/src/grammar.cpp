@@ -2,10 +2,16 @@
 #include "fmt/format.h"
 #include "krill/automata.h"
 #include "krill/utils.h"
+#include "spdlog/spdlog.h"
+#include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <queue>
+#include <sstream>
 #include <tuple>
 using namespace krill::utils;
+using std::min, std::max;
+using std::stringstream;
 
 namespace krill::type {
 
@@ -57,10 +63,31 @@ bool Prod::operator==(const Prod &p) const {
     return std::tie(symbol, right) == std::tie(p.symbol, p.right);
 }
 
+string Prod::str(map<int, string> symbolNames) const {
+    stringstream ss;
+    ss << symbolNames[this->symbol];
+    ss << " -> ";
+    for (int i = 0; i < this->right.size(); i++) {
+        ss << symbolNames[this->right[i]] << " ";
+    }
+    return ss.str();
+}
+
+Grammar::Grammar(set<int> terminalSet, set<int> nonterminalSet,
+                 vector<Prod> prods, map<int, string> symbolNames,
+                 map<int, int>       prodsPriority,
+                 map<int, Associate> symbolAssociate)
+    : terminalSet(terminalSet), nonterminalSet(nonterminalSet), prods(prods),
+      symbolNames(symbolNames), prodsPriority(prodsPriority),
+      symbolAssociate(symbolAssociate) {}
+
 Grammar::Grammar(set<int> terminalSet, set<int> nonterminalSet,
                  vector<Prod> prods, map<int, string> symbolNames)
     : terminalSet(terminalSet), nonterminalSet(nonterminalSet), prods(prods),
-      symbolNames(symbolNames) {}
+      symbolNames(symbolNames) {
+    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i; }
+}
+
 
 Grammar::Grammar(vector<Prod> prods) : prods(prods) {
     for (const Prod &prod : prods) {
@@ -72,6 +99,7 @@ Grammar::Grammar(vector<Prod> prods) : prods(prods) {
     }
     for (int c : terminalSet) { symbolNames[c] = fmt::format("_{:d}", c); }
     for (int c : nonterminalSet) { symbolNames[c] = fmt::format("_{:d}", c); }
+    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i; }
 }
 
 Grammar::Grammar(vector<string> prodStrs) {
@@ -85,6 +113,7 @@ Grammar::Grammar(vector<string> prodStrs) {
     for (int c : nonterminalSet) {
         if (terminalSet.count(c)) { terminalSet.erase(c); }
     }
+    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i; }
 }
 
 } // namespace krill::type
@@ -116,6 +145,19 @@ bool ProdItem::operator==(const ProdItem &p) const {
     return std::tie(symbol, right, dot) == std::tie(p.symbol, p.right, p.dot);
 }
 
+string ProdItem::str(map<int, string> symbolNames) const {
+    stringstream ss;
+    ss << fmt::format("  {} ->", symbolNames.at(this->symbol));
+    for (int i = 0; i < this->dot; i++) {
+        ss << fmt::format(" {}", symbolNames.at(this->right[i]));
+    }
+    ss << " .";
+    for (int i = this->dot; i < this->right.size(); i++) {
+        ss << fmt::format(" {}", symbolNames.at(this->right[i]));
+    }
+    return ss.str();
+}
+
 bool ProdLR1Item::operator<(const ProdLR1Item &p) const {
     return std::tie(symbol, right, dot, search) <
            std::tie(p.symbol, p.right, p.dot, p.search);
@@ -124,6 +166,25 @@ bool ProdLR1Item::operator<(const ProdLR1Item &p) const {
 bool ProdLR1Item::operator==(const ProdLR1Item &p) const {
     return std::tie(symbol, right, dot, search) ==
            std::tie(p.symbol, p.right, p.dot, p.search);
+}
+
+string ProdLR1Item::str(map<int, string> symbolNames) const {
+    stringstream ss;
+    ss << fmt::format("  {} ->", symbolNames.at(this->symbol));
+    for (int i = 0; i < this->dot; i++) {
+        ss << fmt::format(" {}", symbolNames.at(this->right[i]));
+    }
+    ss << " .";
+    for (int i = this->dot; i < this->right.size(); i++) {
+        ss << fmt::format(" {}", symbolNames.at(this->right[i]));
+    }
+    ss << fmt::format(" || {}", symbolNames[this->search], this->search);
+    return ss.str();
+}
+
+string LR1Automata::str(map<int, string> symbolNames) const {
+    stringstream ss;
+    return ss.str();
 }
 
 map<int, set<int>> getFirstSet(Grammar grammar) {
@@ -249,6 +310,7 @@ LR1Automata getLR1Automata(Grammar grammar) {
 
     // bfs, generate follow states
     EdgeTable edgeTable;
+    EdgeTable edgePriority;
     for (int i = 0; i < states.size(); i++) {
         map<int, LR1State> nextStatess;
         for (ProdLR1Item prodItem : states[i]) {
@@ -269,7 +331,7 @@ LR1Automata getLR1Automata(Grammar grammar) {
                 if (nextStates == states[tgtIdx]) { break; }
             }
             if (tgtIdx == states.size()) { states.push_back(nextStates); }
-            // printf("[%d,%d,%d]", symbol, i, tgtIdx);
+
             edgeTable.push_back({symbol, i, tgtIdx});
         }
     }
@@ -322,15 +384,28 @@ void setLR1StateExpanded(LR1State &state, map<int, set<int>> firstSet,
     }
 }
 
+string toStr(const LR1State &state, map<int, string> symbolNames) {
+    stringstream ss;
+    for (const auto &item : state) { ss << "  " << item.str(symbolNames) << "\n"; }
+    return ss.str();
+}
+
 ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
     vector<LR1State> &states    = lr1Automata.states;
     EdgeTable &       edgeTable = lr1Automata.edgeTable;
 
-    vector<Prod> &prods = grammar.prods;
+    const auto &prods = grammar.prods;
+    const auto &symbolNames = grammar.symbolNames;
     ActionTable   actionTable;
 
     // edges ==> ACTION and GOTO
     for (Edge edge : edgeTable) {
+        if (actionTable.count({edge.from, edge.symbol}) != 0) {
+            // ACTION / ACTION confict
+            spdlog::warn(
+                "lr1 table ACTION / ACTION confilct: of state s{}, symbol {}",
+                edge.from, edge.symbol);
+        }
         if (grammar.terminalSet.count(edge.symbol)) {
             // s1 ——a-> s2 ==> action[s1, a] = s2
             actionTable[{edge.from, edge.symbol}] = {ACTION, edge.to};
@@ -344,31 +419,88 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
         for (ProdLR1Item item : states[i]) {
             if (item.symbol == prods[0].symbol &&
                 item.dot == item.right.size()) {
-                // s1: (S -> ...·, #) ==> accept[s1, #]
+                // s1: (S -> ...·, #) ==> action[s1, #] = ACCEPT
                 actionTable[{i, item.search}] = {ACCEPT, 0};
+
             } else if (item.dot == item.right.size()) {
-                // s1: (A -> ...·, s), r2: A -> ... ==> reduce[s1, s] = r2
-                for (int j = 0; j < prods.size(); j++) {
-                    if (prods[j].symbol == item.symbol &&
-                        prods[j].right == item.right) {
-                        // REDUCE / ACTION confilct
-                        // e.g. IF cond expr ELSE expr
-                        //      IF cond expr
-                        if (actionTable.count({i, item.search}) != 0) {
-                            if (actionTable.at({i, item.search}).type ==
-                                ACTION) {
-                                std::cerr << fmt::format(
-                                    "REDUCE / ACTION confilct of prod {}\n",
-                                    (j + 1));
-                            } else if (actionTable.at({i, item.search}).type ==
-                                       REDUCE) {
-                                std::cerr << fmt::format(
-                                    "REDUCE / REDUCE confilct of prod {}\n",
-                                    (j + 1));
+                // s1: (A -> BC·, s), r2: A -> BC ==> action[s1, s] = reduce r2
+                int r;
+                for (r = 0; r < prods.size(); r++) {
+                    if (prods[r].symbol == item.symbol &&
+                          prods[r].right == item.right) {
+                        break;
+                    }
+                }
+
+                if (actionTable.count({i, item.search}) == 0) {
+                    // no conflict, reduce
+                    actionTable[{i, item.search}] = {REDUCE, r};
+                } else {
+                    // REDUCE / ACTION confilct
+                    Action theirAction = actionTable.at({i, item.search});
+                    Action ourAction   = {REDUCE, r};
+                    assert(theirAction.type == ACTION);
+
+                    spdlog::info("lr1 REDUCE / ACTION confilct: state s{}, "
+                                 "prod p{}, search {}:",
+                                 i, r + 1, symbolNames.at(item.search));
+                    spdlog::info("state s{}: \n{}", i,
+                                 toStr(states[i], symbolNames));
+                    spdlog::info("item p{}: \n  {}", r + 1, item.str(symbolNames));
+
+                    int a;
+                    for (a = 0; a < prods.size(); a++) {
+                        auto it = find(prods[a].right.begin(),
+                                       prods[a].right.end(), item.search);
+                        if (it != prods[a].right.end()) { break; }
+                    }
+                    int rPrior = grammar.prodsPriority.at(r);
+                    int aPrior = grammar.prodsPriority.at(a);
+
+                    if (rPrior != aPrior) {
+                        // use priority to resolve conflict
+                        bool useOurs = (rPrior < aPrior);
+                        actionTable[{i, item.search}] =
+                            useOurs ? ourAction : theirAction;
+                        spdlog::info(
+                            "lr1 confilct resolved: {} (priority r={}, a={})",
+                            (useOurs ? "REDUCE" : "ACTION"), rPrior, aPrior);
+                        if (min(rPrior, aPrior) >= 0) {
+                            // resolved by default priority, which is not
+                            // recommended
+                            spdlog::warn("lr1 conflit resolved by default "
+                                         "priority, may not be what you want");
+                        }
+                    } else {
+                        // use associativity to resolve conflict
+                        bool hasAssociativity = false;
+                        int  assoSymbol;
+                        for (int symbol : prods[r].right) {
+                            if (grammar.symbolAssociate.count(symbol) > 0) {
+                                hasAssociativity = true;
+                                assoSymbol       = symbol;
+                                break;
                             }
                         }
-                        actionTable[{i, item.search}] = {REDUCE, j};
-                        break;
+                        if (hasAssociativity) {
+                            auto asso = grammar.symbolAssociate.at(assoSymbol);
+                            bool useOurs = (asso == Grammar::Associate::kLeft);
+                            actionTable[{i, item.search}] =
+                                useOurs ? ourAction : theirAction;
+                            spdlog::info("lr1 confilct resolved: {} (priority "
+                                         "{} is {} associate)",
+                                         (useOurs ? "REDUCE" : "ACTION"),
+                                         symbolNames.at(assoSymbol),
+                                         (useOurs ? "Left" : "Right"));
+
+                        } else {
+                            // no associativity (resolve failed), FORCING reduce
+                            actionTable[{i, item.search}] = ourAction;
+                            spdlog::info("lr1 confilct resolved: REDUCE "
+                                         "(priority Left associate)");
+                            spdlog::warn("lr1 conflit resolved by FORCING "
+                                         "reduce, may not be what you want");
+                        }
                     }
                 }
             }
