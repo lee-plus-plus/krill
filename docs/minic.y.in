@@ -51,43 +51,35 @@ if_stmt : IF '(' expr ')' stmt
 if_stmt :  IF '(' expr ')' stmt ELSE stmt
 return_stmt : RETURN ';'
 return_stmt :  RETURN expr ';'
-expr : logical_expr
-logical_expr : logical_expr AND logical_expr
-logical_expr : logical_expr OR logical_expr
-logical_expr : bit_op_expr
-bit_op_expr : bit_op_expr '&' bit_op_expr
-bit_op_expr : bit_op_expr '|' bit_op_expr
-bit_op_expr : bit_op_expr '^' bit_op_expr
-bit_op_expr : relational_expr
-relational_expr : relational_expr EQ relational_expr
-relational_expr : relational_expr NE relational_expr
-relational_expr : relational_expr LE relational_expr
-relational_expr : relational_expr '<' relational_expr
-relational_expr : relational_expr GE relational_expr
-relational_expr : relational_expr '>' relational_expr
-relational_expr : shift_expr
-shift_expr : shift_expr LSHIFT add_expr
-shift_expr : shift_expr RSHIFT add_expr
-shift_expr : add_expr
-add_expr : add_expr '+' mul_expr
-add_expr : add_expr '-' mul_expr
-add_expr : mul_expr
-mul_expr : unary_expr
-mul_expr : mul_expr '*' unary_expr
-mul_expr : mul_expr '/' unary_expr
-mul_expr : mul_expr '%' unary_expr
-unary_expr : '!' unary_expr
-unary_expr : '-' unary_expr
-unary_expr : '+' unary_expr
-unary_expr : '$' unary_expr
-unary_expr : '~' unary_expr
-unary_expr : primary_expr
-primary_expr : int_literal
-primary_expr : '(' expr ')'
-primary_expr : IDENT '[' expr ']'
-primary_expr : IDENT '(' args_ ')'
-primary_expr : IDENT '(' ')'
-primary_expr : IDENT
+expr : expr AND expr
+expr : expr OR expr
+expr : expr '&' expr
+expr : expr '|' expr
+expr : expr '^' expr
+expr : expr EQ expr
+expr : expr NE expr
+expr : expr LE expr
+expr : expr '<' expr
+expr : expr GE expr
+expr : expr '>' expr
+expr : expr LSHIFT expr
+expr : expr RSHIFT expr
+expr : expr '+' expr
+expr : expr '-' expr
+expr : expr '*' expr
+expr : expr '/' expr
+expr : expr '%' expr
+expr : '!' expr
+expr : '-' expr
+expr : '+' expr
+expr : '$' expr
+expr : '~' expr
+expr : int_literal
+expr : '(' expr ')'
+expr : IDENT '[' expr ']'
+expr : IDENT '(' args_ ')'
+expr : IDENT '(' ')'
+expr : IDENT
 int_literal : DECNUM
 int_literal : HEXNUM
 arg_list : arg_list ',' expr

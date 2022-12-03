@@ -20,7 +20,7 @@ struct Prod {
     // to make std::set happy
     bool operator<(const Prod &p) const;
     bool operator==(const Prod &p) const;
-    string str(map<int, string> symbolNames) const;
+    string str(const map<int, string> &symbolNames) const;
 };
 
 struct Grammar {
@@ -73,7 +73,7 @@ struct ProdItem : Prod {
     // to make std::set happy
     bool operator<(const ProdItem &p) const;
     bool operator==(const ProdItem &p) const;
-    string str(map<int, string> symbolNames) const;
+    string str(const map<int, string> &symbolNames) const;
 };
 
 // LR1 Production Item (P -> A·b, a)
@@ -84,7 +84,7 @@ struct ProdLR1Item : ProdItem {
     // to make std::set happy
     bool operator<(const ProdLR1Item &p) const;
     bool operator==(const ProdLR1Item &p) const;
-    string str(map<int, string> symbolNames) const;
+    string str(const map<int, string> &symbolNames) const;
 };
 
 // Set of LR1 Production Item {(P -> A·b, a), (S -> Sb·, b), }
@@ -94,13 +94,12 @@ using LR1State = set<ProdLR1Item>;
 struct LR1Automata {
     vector<LR1State> states;
     EdgeTable        edgeTable;
-    string str(map<int, string> symbolNames) const;
 };
 
-map<int, set<int>> getFirstSet(Grammar grammar);
-map<int, set<int>> getFollowSet(Grammar grammar, map<int, set<int>> firstSet);
+map<int, set<int>> getFirstSets(Grammar grammar);
+map<int, set<int>> getFollowSets(Grammar grammar, map<int, set<int>> firstSets);
 
-void setLR1StateExpanded(LR1State &states, map<int, set<int>> followSet,
+void setLR1StateExpanded(LR1State &states, map<int, set<int>> followSets,
                          Grammar grammar);
 
 LR1Automata getLR1Automata(Grammar grammar);

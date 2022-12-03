@@ -208,7 +208,7 @@ void test3() {
         double v1   = child[0].Get<double>("val");
         double v2   = child[2].Get<double>("val");
         string oprt = child[1].Get<string>("lval");
-        double value;
+        double value = 0.0;
         if (oprt == "+") {
             value = v1 + v2;
         } else if (oprt == "-") {

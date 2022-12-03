@@ -49,7 +49,8 @@ pair<vector<Prod>, map<int, string>> getProdsFromStr(vector<string> prodStrs) {
         prods.push_back({symbol, right});
     }
 
-    symbolId["END_"] = END_SYMBOL;
+    symbolId["ζ"] = END_SYMBOL;
+    symbolId["ε"] = EMPTY_SYMBOL;
 
     map<int, string> symbolNames = reverse(symbolId);
     return {prods, symbolNames};
@@ -63,12 +64,12 @@ bool Prod::operator==(const Prod &p) const {
     return std::tie(symbol, right) == std::tie(p.symbol, p.right);
 }
 
-string Prod::str(map<int, string> symbolNames) const {
+string Prod::str(const map<int, string> &symbolNames) const {
     stringstream ss;
-    ss << symbolNames[this->symbol];
+    ss << symbolNames.at(this->symbol);
     ss << " -> ";
     for (int i = 0; i < this->right.size(); i++) {
-        ss << symbolNames[this->right[i]] << " ";
+        ss << symbolNames.at(this->right[i]) << " ";
     }
     return ss.str();
 }
@@ -79,12 +80,19 @@ Grammar::Grammar(set<int> terminalSet, set<int> nonterminalSet,
                  map<int, Associate> symbolAssociate)
     : terminalSet(terminalSet), nonterminalSet(nonterminalSet), prods(prods),
       symbolNames(symbolNames), prodsPriority(prodsPriority),
-      symbolAssociate(symbolAssociate) {}
+      symbolAssociate(symbolAssociate) {
+    // check
+    assert(prods[0].right.size() == 1);
+    for (int i = 0; i < prods.size(); i++) {
+        assert(prodsPriority.count(i) > 0);
+    }
+}
 
 Grammar::Grammar(set<int> terminalSet, set<int> nonterminalSet,
                  vector<Prod> prods, map<int, string> symbolNames)
     : terminalSet(terminalSet), nonterminalSet(nonterminalSet), prods(prods),
       symbolNames(symbolNames) {
+    assert(prods[0].right.size() == 1);
     for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i; }
 }
 
@@ -94,6 +102,7 @@ Grammar::Grammar(vector<Prod> prods) : prods(prods) {
         nonterminalSet.insert(prod.symbol);
         for (int c : prod.right) { terminalSet.insert(c); }
     }
+    assert(prods[0].right.size() == 1);
     for (int c : nonterminalSet) {
         if (terminalSet.count(c)) { terminalSet.erase(c); }
     }
@@ -104,8 +113,9 @@ Grammar::Grammar(vector<Prod> prods) : prods(prods) {
 
 Grammar::Grammar(vector<string> prodStrs) {
     auto[prods_, symbolNames_] = getProdsFromStr(prodStrs);
-    prods                      = prods_;
-    symbolNames                = symbolNames_;
+    assert(prods_[0].right.size() == 1);
+    prods       = prods_;
+    symbolNames = symbolNames_;
     for (const Prod &prod : prods) {
         nonterminalSet.insert(prod.symbol);
         for (int c : prod.right) { terminalSet.insert(c); }
@@ -145,7 +155,7 @@ bool ProdItem::operator==(const ProdItem &p) const {
     return std::tie(symbol, right, dot) == std::tie(p.symbol, p.right, p.dot);
 }
 
-string ProdItem::str(map<int, string> symbolNames) const {
+string ProdItem::str(const map<int, string> &symbolNames) const {
     stringstream ss;
     ss << fmt::format("  {} ->", symbolNames.at(this->symbol));
     for (int i = 0; i < this->dot; i++) {
@@ -168,7 +178,7 @@ bool ProdLR1Item::operator==(const ProdLR1Item &p) const {
            std::tie(p.symbol, p.right, p.dot, p.search);
 }
 
-string ProdLR1Item::str(map<int, string> symbolNames) const {
+string ProdLR1Item::str(const map<int, string> &symbolNames) const {
     stringstream ss;
     ss << fmt::format("  {} ->", symbolNames.at(this->symbol));
     for (int i = 0; i < this->dot; i++) {
@@ -178,30 +188,25 @@ string ProdLR1Item::str(map<int, string> symbolNames) const {
     for (int i = this->dot; i < this->right.size(); i++) {
         ss << fmt::format(" {}", symbolNames.at(this->right[i]));
     }
-    ss << fmt::format(" || {}", symbolNames[this->search], this->search);
+    ss << fmt::format(" || {}", symbolNames.at(this->search), this->search);
     return ss.str();
 }
 
-string LR1Automata::str(map<int, string> symbolNames) const {
-    stringstream ss;
-    return ss.str();
-}
-
-map<int, set<int>> getFirstSet(Grammar grammar) {
-    map<int, set<int>> firstSet;
+map<int, set<int>> getFirstSets(Grammar grammar) {
+    map<int, set<int>> firstSets;
     // first(a) = {a}
-    for (int c : grammar.terminalSet) { firstSet[c] = {c}; }
+    for (int c : grammar.terminalSet) { firstSets[c] = {c}; }
     // first(A) = {}
-    for (int symbol : grammar.nonterminalSet) { firstSet[symbol] = {}; }
+    for (int symbol : grammar.nonterminalSet) { firstSets[symbol] = {}; }
 
     for (Prod prod : grammar.prods) {
         // prod: X -> ...
         if (prod.right.size() > 0 && grammar.terminalSet.count(prod.right[0])) {
             // X -> a... ==> first(X) += {a}
-            firstSet[prod.symbol].insert(prod.right[0]);
+            firstSets[prod.symbol].insert(prod.right[0]);
         } else if (prod.right.size() == 0) {
             // X -> epsilon ==> first(X) += {epsilon}
-            firstSet[prod.symbol].insert(EMPTY_SYMBOL);
+            firstSets[prod.symbol].insert(EMPTY_SYMBOL);
         }
     }
 
@@ -214,24 +219,24 @@ map<int, set<int>> getFirstSet(Grammar grammar) {
                 // prod: X -> Y0 Y1...Yi γ, epsilon ∈ first(Y0),...,first(Yi)
                 // ==> first(X) += first(γ)
                 int      y       = prod.right[i];
-                set<int> tempSet = firstSet[y];
+                set<int> tempSet = firstSets[y];
                 tempSet.erase(EMPTY_SYMBOL);
                 for (int elem : tempSet) {
-                    if (firstSet[prod.symbol].count(elem) == 0) {
+                    if (firstSets[prod.symbol].count(elem) == 0) {
                         isChanged = true;
-                        firstSet[prod.symbol].insert(elem);
+                        firstSets[prod.symbol].insert(elem);
                     }
                 }
 
-                if (firstSet[y].count(EMPTY_SYMBOL) == 0) {
+                if (firstSets[y].count(EMPTY_SYMBOL) == 0) {
                     break;
                 } else {
                     // prod: X -> Y0 Y1...Yi, epsilon ∈ first(Y0),...,first(Yi)
                     // ==> first(X) += {epsilon}
                     if (i == prod.right.size() - 1) {
-                        if (firstSet[prod.symbol].count(EMPTY_SYMBOL) == 0) {
+                        if (firstSets[prod.symbol].count(EMPTY_SYMBOL) == 0) {
                             isChanged = true;
-                            firstSet[prod.symbol].insert(EMPTY_SYMBOL);
+                            firstSets[prod.symbol].insert(EMPTY_SYMBOL);
                         }
                     }
                 }
@@ -240,16 +245,17 @@ map<int, set<int>> getFirstSet(Grammar grammar) {
         if (isChanged == false) { break; }
     }
 
-    return firstSet;
+    return firstSets;
 }
 
 // TODO
 // 添加文法左递归检查，左递归消除
 
-map<int, set<int>> getFollowSet(Grammar grammar, map<int, set<int>> firstSet) {
+map<int, set<int>> getFollowSets(Grammar            grammar,
+                                 map<int, set<int>> firstSets) {
     // 要求文法无左递归
-    map<int, set<int>> followSet;
-    followSet[grammar.prods[0].symbol].insert(END_SYMBOL);
+    map<int, set<int>> followSets;
+    followSets[grammar.prods[0].symbol].insert(END_SYMBOL);
 
     while (true) {
         bool isChanged = false;
@@ -261,20 +267,20 @@ map<int, set<int>> getFollowSet(Grammar grammar, map<int, set<int>> firstSet) {
                         // B -> αAβ ==> follow(A) += {first(β) - epsilon}
                         int      A       = prod.right[i];
                         int      b       = prod.right[i + 1];
-                        set<int> tempSet = firstSet[b];
+                        set<int> tempSet = firstSets[b];
                         tempSet.erase(EMPTY_SYMBOL);
                         for (int elem : tempSet) {
-                            if (followSet[A].count(elem) == 0) {
+                            if (followSets[A].count(elem) == 0) {
                                 isChanged = true;
-                                followSet[A].insert(elem);
+                                followSets[A].insert(elem);
                             }
                         }
-                        if (firstSet[b].count(0)) {
+                        if (firstSets[b].count(0)) {
                             // B -> αAβ (β nullable) ==> follow(A) += follow(β)
-                            for (int elem : followSet[b]) {
-                                if (followSet[A].count(elem) == 0) {
+                            for (int elem : followSets[b]) {
+                                if (followSets[A].count(elem) == 0) {
                                     isChanged = true;
-                                    followSet[A].insert(elem);
+                                    followSets[A].insert(elem);
                                 }
                             }
                         }
@@ -282,10 +288,10 @@ map<int, set<int>> getFollowSet(Grammar grammar, map<int, set<int>> firstSet) {
                         // B -> αA ==> follow(A) += {follow(B)}
                         int A = prod.right[i];
                         int B = prod.symbol;
-                        for (int elem : followSet[B]) {
-                            if (followSet[A].count(elem) == 0) {
+                        for (int elem : followSets[B]) {
+                            if (followSets[A].count(elem) == 0) {
                                 isChanged = true;
-                                followSet[A].insert(elem);
+                                followSets[A].insert(elem);
                             }
                         }
                     }
@@ -295,17 +301,17 @@ map<int, set<int>> getFollowSet(Grammar grammar, map<int, set<int>> firstSet) {
         if (isChanged == false) { break; }
     }
 
-    return followSet;
+    return followSets;
 }
 
 LR1Automata getLR1Automata(Grammar grammar) {
-    auto firstSet  = getFirstSet(grammar);
-    auto followSet = getFollowSet(grammar, firstSet);
+    auto firstSets  = getFirstSets(grammar);
+    auto followSets = getFollowSets(grammar, firstSets);
     // generate states
     vector<LR1State> states;
     LR1State         initStates = {
         {grammar.prods[0].symbol, grammar.prods[0].right, 0, END_SYMBOL}};
-    setLR1StateExpanded(initStates, firstSet, grammar);
+    setLR1StateExpanded(initStates, firstSets, grammar);
     states.push_back(initStates); // generate inital state
 
     // bfs, generate follow states
@@ -325,7 +331,7 @@ LR1Automata getLR1Automata(Grammar grammar) {
         }
 
         for (auto[symbol, nextStates] : nextStatess) {
-            setLR1StateExpanded(nextStates, firstSet, grammar);
+            setLR1StateExpanded(nextStates, firstSets, grammar);
             int tgtIdx;
             for (tgtIdx = 0; tgtIdx < states.size(); tgtIdx++) {
                 if (nextStates == states[tgtIdx]) { break; }
@@ -340,8 +346,25 @@ LR1Automata getLR1Automata(Grammar grammar) {
 }
 
 // expand the LR(1) state (epsilon-closure method)
-void setLR1StateExpanded(LR1State &state, map<int, set<int>> firstSet,
+void setLR1StateExpanded(LR1State &state, map<int, set<int>> firstSets,
                          Grammar grammar) {
+    // given αβ...γ, return {c | c in first(αβ...γ) and c is terminals}
+    auto getSeqFirstSetTerminals =
+        [grammar, firstSets](vector<int> symbolSeq) -> set<int> {
+        set<int> seqFirstSet;
+        for (int s : symbolSeq) {
+            if (s == END_SYMBOL) {
+                seqFirstSet.insert(s);
+                break;
+            }
+            for (int t : firstSets.at(s)) {
+                if (grammar.terminalSet.count(t)) { seqFirstSet.insert(t); }
+            }
+            if (firstSets.at(s).count(0) == 0) { break; }
+        }
+        return seqFirstSet;
+    };
+
     std::queue<ProdLR1Item> q;
     for (ProdLR1Item prodItem : state) { q.push(prodItem); }
     while (q.size()) { // bfs
@@ -354,27 +377,18 @@ void setLR1StateExpanded(LR1State &state, map<int, set<int>> firstSet,
             continue;
         }
 
-        // (A -> α·B..., s), check prods with right started by B
-        if (prodItem.dot + 1 < prodItem.right.size()) {
-            // (A -> α·Bβ, s) => state += (B -> ·..., first(β))
-            for (Prod prod : grammar.prods) {
-                if (prod.symbol != prodItem.right[prodItem.dot]) { continue; }
+        // for item (A -> α·Bβ, s) in item-set I:
+        //   for all production (B -> γ):
+        //     state += (B -> ·γ, {c | c in first(βs) and c is terminals})
+        for (Prod prod : grammar.prods) {
+            if (prod.symbol != prodItem.right[prodItem.dot]) { continue; }
 
-                set<int> nextSet = firstSet[prodItem.right[prodItem.dot + 1]];
-                for (int c : nextSet) {
-                    ProdLR1Item nextProdItem({prod.symbol, prod.right, 0, c});
-                    if (state.count(nextProdItem) == 0) {
-                        state.insert(nextProdItem);
-                        q.push(nextProdItem);
-                    }
-                }
-            }
-        } else {
-            // (A -> α·B, s) => state += (B -> ·..., s)
-            for (Prod prod : grammar.prods) {
-                if (prod.symbol != prodItem.right[prodItem.dot]) { continue; }
-                ProdLR1Item nextProdItem(
-                    {prod.symbol, prod.right, 0, prodItem.search});
+            vector<int> afterSeq(prodItem.right.begin() + prodItem.dot + 1,
+                                 prodItem.right.end());
+            afterSeq.push_back(prodItem.search);
+            set<int> nextSet = getSeqFirstSetTerminals(afterSeq);
+            for (int c : nextSet) {
+                ProdLR1Item nextProdItem({prod.symbol, prod.right, 0, c});
                 if (state.count(nextProdItem) == 0) {
                     state.insert(nextProdItem);
                     q.push(nextProdItem);
@@ -386,7 +400,9 @@ void setLR1StateExpanded(LR1State &state, map<int, set<int>> firstSet,
 
 string toStr(const LR1State &state, map<int, string> symbolNames) {
     stringstream ss;
-    for (const auto &item : state) { ss << "  " << item.str(symbolNames) << "\n"; }
+    for (const auto &item : state) {
+        ss << "  " << item.str(symbolNames) << "\n";
+    }
     return ss.str();
 }
 
@@ -394,9 +410,9 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
     vector<LR1State> &states    = lr1Automata.states;
     EdgeTable &       edgeTable = lr1Automata.edgeTable;
 
-    const auto &prods = grammar.prods;
+    const auto &prods       = grammar.prods;
     const auto &symbolNames = grammar.symbolNames;
-    ActionTable   actionTable;
+    ActionTable actionTable;
 
     // edges ==> ACTION and GOTO
     for (Edge edge : edgeTable) {
@@ -427,7 +443,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                 int r;
                 for (r = 0; r < prods.size(); r++) {
                     if (prods[r].symbol == item.symbol &&
-                          prods[r].right == item.right) {
+                        prods[r].right == item.right) {
                         break;
                     }
                 }
@@ -436,17 +452,40 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                     // no conflict, reduce
                     actionTable[{i, item.search}] = {REDUCE, r};
                 } else {
-                    // REDUCE / ACTION confilct
                     Action theirAction = actionTable.at({i, item.search});
                     Action ourAction   = {REDUCE, r};
-                    assert(theirAction.type == ACTION);
 
+                    // REDUCE / REDUCE confilct
+                    // (indicate that grammar is not lr(1) grammar)
+                    if (theirAction.type == REDUCE) {
+                        spdlog::critical(
+                            "lr1 REDUCE / REDUCE confilct: state s{}, "
+                            "prod p{}, search {}:",
+                            i, r + 1, symbolNames.at(item.search));
+                        int r2 = theirAction.tgt;
+                        spdlog::critical("prod1 p{}: {}", r + 1,
+                                         item.str(symbolNames));
+                        spdlog::critical("prod2 p{}: {}", r2 + 1,
+                                         prods[r2].str(symbolNames));
+                        int p1 = grammar.prodsPriority.at(r);
+                        int p2 = grammar.prodsPriority.at(r2);
+                        spdlog::critical("lr1 confilct resolved: use p{} "
+                                         "(priority p1={}, p2={})",
+                                         ((p1 <= p2) ? (r + 1) : (r2 + 1)), p1,
+                                         p2);
+                        actionTable[{i, item.search}] =
+                            (p1 <= p2) ? ourAction : theirAction;
+                        continue;
+                    }
+
+                    // REDUCE / ACTION confilct
+                    assert(theirAction.type == ACTION);
                     spdlog::info("lr1 REDUCE / ACTION confilct: state s{}, "
                                  "prod p{}, search {}:",
                                  i, r + 1, symbolNames.at(item.search));
-                    spdlog::info("state s{}: \n{}", i,
-                                 toStr(states[i], symbolNames));
-                    spdlog::info("item p{}: \n  {}", r + 1, item.str(symbolNames));
+                    // spdlog::info("state s{}: \n{}", i,
+                    //              toStr(states[i], symbolNames));
+                    spdlog::info("item p{}: {}", r + 1, item.str(symbolNames));
 
                     int a;
                     for (a = 0; a < prods.size(); a++) {
@@ -473,6 +512,8 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                         }
                     } else {
                         // use associativity to resolve conflict
+                        spdlog::info("symbolAssociate.size = {}",
+                                     grammar.symbolAssociate.size());
                         bool hasAssociativity = false;
                         int  assoSymbol;
                         for (int symbol : prods[r].right) {
@@ -487,17 +528,16 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                             bool useOurs = (asso == Grammar::Associate::kLeft);
                             actionTable[{i, item.search}] =
                                 useOurs ? ourAction : theirAction;
-                            spdlog::info("lr1 confilct resolved: {} (priority "
+                            spdlog::info("lr1 confilct resolved: {} ("
                                          "{} is {} associate)",
                                          (useOurs ? "REDUCE" : "ACTION"),
                                          symbolNames.at(assoSymbol),
                                          (useOurs ? "Left" : "Right"));
-
                         } else {
                             // no associativity (resolve failed), FORCING reduce
                             actionTable[{i, item.search}] = ourAction;
                             spdlog::info("lr1 confilct resolved: REDUCE "
-                                         "(priority Left associate)");
+                                         "(default Left associate)");
                             spdlog::warn("lr1 conflit resolved by FORCING "
                                          "reduce, may not be what you want");
                         }

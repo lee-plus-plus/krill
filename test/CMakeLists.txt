@@ -8,4 +8,3 @@ add_executable(test_regex test_regex.cpp)
 add_executable(test_lexical test_lexical.cpp)
 add_executable(test_syntax test_syntax.cpp)
 add_executable(test_minic test_minic.cpp minic_init_syntax.cpp minic_init_lexical.cpp)
-

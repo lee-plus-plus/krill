@@ -64,6 +64,7 @@ void testRegex() {
         if (line.size() == 0) { break; }
         regexs.push_back(line);
     }
+    cerr << "start generate lexical parser ...\n";
 
     for (int i = 0; i < regexs.size(); i++) {
         cerr << fmt::format("{:d}) {}\n", i, regexs[i]);
@@ -102,6 +103,7 @@ void testSyntax() {
         if (line.size() == 0) { break; }
         strs.push_back(line);
     }
+    cerr << "start generate syntax parser ...\n";
 
     Grammar      grammar(strs);
     auto         actionTable = getLALR1table(grammar);
