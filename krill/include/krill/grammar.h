@@ -20,6 +20,7 @@ struct Prod {
     // to make std::set happy
     bool operator<(const Prod &p) const;
     bool operator==(const Prod &p) const;
+
     string str(const map<int, string> &symbolNames) const;
 };
 
@@ -38,11 +39,14 @@ struct Grammar {
     Grammar() = default;
     Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
             map<int, string> symbolNames, map<int, int> prodsPriority, 
-            map<int, Associate> symbolAssociate);
+            map<int, Associate> symbolAssociate); // for ambiguous grammar codegen
     Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
-            map<int, string> symbolNames);
-    Grammar(vector<Prod> prods);
-    Grammar(vector<string> prodStrs);
+            map<int, string> symbolNames); // for regular grammar codegen
+    Grammar(vector<Prod> prods); 
+    Grammar(vector<vector<string>> prodStrs); // for quick use
+    Grammar(vector<string> prodStrs); // for quick use
+
+    string str() const;
 };
 
 enum ActionType { ACTION = 0, REDUCE = 1, GOTO = 2, ACCEPT = 3 };
@@ -73,6 +77,7 @@ struct ProdItem : Prod {
     // to make std::set happy
     bool operator<(const ProdItem &p) const;
     bool operator==(const ProdItem &p) const;
+
     string str(const map<int, string> &symbolNames) const;
 };
 
@@ -84,6 +89,7 @@ struct ProdLR1Item : ProdItem {
     // to make std::set happy
     bool operator<(const ProdLR1Item &p) const;
     bool operator==(const ProdLR1Item &p) const;
+
     string str(const map<int, string> &symbolNames) const;
 };
 

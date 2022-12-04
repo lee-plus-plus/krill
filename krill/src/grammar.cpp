@@ -19,18 +19,17 @@ namespace krill::type {
 //   (Prod) {{256 -> 256 43 256 257}, ...},
 //   (symbolNames) {{256, "Term"}, {43, "'+'"}, ...}
 // assign id for symbols, in the order of occurrence
-pair<vector<Prod>, map<int, string>> getProdsFromStr(vector<string> prodStrs) {
+// please always use this function to automatically assign the id of symbols
+pair<vector<Prod>, map<int, string>> getProdsFromStr(const vector<vector<string>> &prodSymbolStrs) {
     vector<Prod>     prods;
     map<string, int> symbolId;
     int              numSymbols = 0;
 
-    for (string prodStr : prodStrs) {
-        vector<string> words = split(prodStr, " ");
-        // assume words like {"Term", "->", "Term", "'+'", "D-Term"}
+    for (vector<string> words : prodSymbolStrs) {
+        // assume words like {"Stmt", "Term", "'+'", "D-Term"}
         int         symbol;
         vector<int> right;
         for (int i = 0; i < words.size(); i++) {
-            if (i == 1) { continue; } // throw away the 2nd element "->"
             const string &word = words[i];
             if (symbolId.count(word) == 0) { // single char like "'+'"
                 if (word.size() == 3 && word[0] == '\'' && word[2] == '\'') {
@@ -54,6 +53,32 @@ pair<vector<Prod>, map<int, string>> getProdsFromStr(vector<string> prodStrs) {
 
     map<int, string> symbolNames = reverse(symbolId);
     return {prods, symbolNames};
+}
+
+// please always use this function to automatically assign the id of symbols
+pair<vector<Prod>, map<int, string>> getProdsFromStr(const vector<string> &prodStrs) {
+    vector<vector<string>> prodSymbolStrs;
+    // assume words like {"Term", "->", "Term", "'+'", "D-Term"}
+    for (string prodStr : prodStrs) {
+        // drop 2nd elem
+        prodSymbolStrs.push_back(split(prodStr, " "));
+        prodSymbolStrs.back().erase(prodSymbolStrs.back().begin() + 1);
+    }
+    return getProdsFromStr(prodSymbolStrs);
+}
+
+// return NonterminalSet, TerminalSet
+pair<set<int>, set<int>> getNonterminalAndTerminalSet(const vector<Prod> &prods) {
+    set<int> nonterminalSet;
+    set<int> terminalSet;
+    for (const Prod &prod : prods) {
+        nonterminalSet.insert(prod.symbol);
+        for (int c : prod.right) { terminalSet.insert(c); }
+    }
+    for (int c : nonterminalSet) {
+        if (terminalSet.count(c)) { terminalSet.erase(c); }
+    }
+    return make_pair(nonterminalSet, terminalSet);
 }
 
 bool Prod::operator<(const Prod &p) const {
@@ -93,22 +118,28 @@ Grammar::Grammar(set<int> terminalSet, set<int> nonterminalSet,
     : terminalSet(terminalSet), nonterminalSet(nonterminalSet), prods(prods),
       symbolNames(symbolNames) {
     assert(prods[0].right.size() == 1);
-    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i; }
+    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i + 1; }
 }
 
-
 Grammar::Grammar(vector<Prod> prods) : prods(prods) {
-    for (const Prod &prod : prods) {
-        nonterminalSet.insert(prod.symbol);
-        for (int c : prod.right) { terminalSet.insert(c); }
-    }
     assert(prods[0].right.size() == 1);
-    for (int c : nonterminalSet) {
-        if (terminalSet.count(c)) { terminalSet.erase(c); }
-    }
+    auto [nonTs, ts] = getNonterminalAndTerminalSet(prods);
+    nonterminalSet = nonTs;
+    terminalSet = ts;
     for (int c : terminalSet) { symbolNames[c] = fmt::format("_{:d}", c); }
     for (int c : nonterminalSet) { symbolNames[c] = fmt::format("_{:d}", c); }
-    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i; }
+    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i + 1; }
+}
+
+Grammar::Grammar(vector<vector<string>> prodStrs) {
+    auto[prods_, symbolNames_] = getProdsFromStr(prodStrs);
+    assert(prods_[0].right.size() == 1);
+    prods       = prods_;
+    symbolNames = symbolNames_;
+    auto [nonTs, ts] = getNonterminalAndTerminalSet(prods);
+    nonterminalSet = nonTs;
+    terminalSet = ts;
+    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i + 1; }
 }
 
 Grammar::Grammar(vector<string> prodStrs) {
@@ -116,14 +147,36 @@ Grammar::Grammar(vector<string> prodStrs) {
     assert(prods_[0].right.size() == 1);
     prods       = prods_;
     symbolNames = symbolNames_;
-    for (const Prod &prod : prods) {
-        nonterminalSet.insert(prod.symbol);
-        for (int c : prod.right) { terminalSet.insert(c); }
+    auto [nonTs, ts] = getNonterminalAndTerminalSet(prods);
+    nonterminalSet = nonTs;
+    terminalSet = ts;
+    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i + 1; }
+}
+
+string Grammar::str() const {
+    stringstream ss;
+    ss << "Grammar: \n";
+    ss << "Left Associate: \n  ";
+    for (auto [symbol, asso] : symbolAssociate) {
+        if (asso == Grammar::Associate::kLeft) {
+            ss << symbolNames.at(symbol) << " ";
+        }
     }
-    for (int c : nonterminalSet) {
-        if (terminalSet.count(c)) { terminalSet.erase(c); }
+    ss << "\nRight Associate: \n  ";
+    for (auto [symbol, asso] : symbolAssociate) {
+        if (asso == Grammar::Associate::kRight) {
+            ss << symbolNames.at(symbol) << " ";
+        }
     }
-    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i; }
+    ss << "\nProductions: \n";
+    for (int i = 0; i < prods.size(); i++) {
+        ss << fmt::format("{:-5d} {:-5s} {}\n", 
+            prodsPriority.at(i), 
+            fmt::format("({:d})", i + 1), 
+            prods[i].str(symbolNames)
+        );
+    }
+    return ss.str();
 }
 
 } // namespace krill::type
@@ -305,6 +358,7 @@ map<int, set<int>> getFollowSets(Grammar            grammar,
 }
 
 LR1Automata getLR1Automata(Grammar grammar) {
+    spdlog::info("begin generating LR1 Automata");
     auto firstSets  = getFirstSets(grammar);
     auto followSets = getFollowSets(grammar, firstSets);
     // generate states
@@ -342,6 +396,7 @@ LR1Automata getLR1Automata(Grammar grammar) {
         }
     }
 
+    spdlog::info("complete generating LR1 Automata");
     return LR1Automata({states, edgeTable});
 }
 
@@ -407,6 +462,7 @@ string toStr(const LR1State &state, map<int, string> symbolNames) {
 }
 
 ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
+    spdlog::info("begin generating LR1 Action Table");
     vector<LR1State> &states    = lr1Automata.states;
     EdgeTable &       edgeTable = lr1Automata.edgeTable;
 
@@ -546,10 +602,12 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
             }
         }
     }
+    spdlog::info("complete generating LR1 Action Table");
     return actionTable;
 }
 
 LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata) {
+    spdlog::info("begin transferring LR1 Automata to LALR1 Automata");
     vector<LR1State> &states    = lr1Automata.states;
     EdgeTable &       edgeTable = lr1Automata.edgeTable;
 
@@ -603,6 +661,7 @@ LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata) {
     }
     for (auto edge : resEdgeTable0) { resEdgeTable.push_back(edge); }
 
+    spdlog::info("complete transferring LR1 Automata to LALR1 Automata");
     return LR1Automata({resStates, resEdgeTable});
 }
 

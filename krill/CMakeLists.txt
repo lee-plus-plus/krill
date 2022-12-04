@@ -25,12 +25,6 @@ message("Fetch Complete!")
 file (GLOB_RECURSE KRILL_HEADER include/*.h)
 file (GLOB_RECURSE KRILL_SRC    src/*.cpp)
 
-# for profile
-set(CMAKE_CXX_FLAGS   "${CMAKE_CXX_FLAGS} -pg")
-set(CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} -pg")
-set(CMAKE_EXE_LINKER_FLAGS    "${CMAKE_EXE_LINKER_FLAGS} -pg")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
-
 add_library(krill ${KRILL_SRC} ${KRILL_HEADER})
 target_link_libraries(krill PUBLIC fmt)
 target_link_libraries(krill PUBLIC spdlog::spdlog)
