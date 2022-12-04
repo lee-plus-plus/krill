@@ -24,7 +24,7 @@ void printFirstSets(map<int, set<int>> &    firstSets,
         for (auto s : nextSymbols) {
             nextSymbolNames.push_back(symbolNames.at(s));
         }
-        oss << fmt::format("{} : {{{}}}\n", symbol,
+        oss << fmt::format("{} : {{{}}}\n", symbolNames.at(symbol),
                            fmt::join(nextSymbolNames, ", "));
     }
 }
@@ -263,12 +263,12 @@ void test2() {
         cout << fmt::format("{:d}: {:s}\n", id, str);
     }
 
-    // auto firstSets  = getFirstSets(grammar);
-    // auto followSets = getFollowSets(grammar, firstSets);
-    // printf("> first-set: \n");
-    // printFirstSets(firstSets, grammar.symbolNames, cout);
-    // printf("> follow-set: \n");
-    // printFirstSets(followSets, grammar.symbolNames, cout);
+    auto firstSets  = getFirstSets(grammar);
+    auto followSets = getFollowSets(grammar, firstSets);
+    printf("> first-set: \n");
+    printFirstSets(firstSets, grammar.symbolNames, cout);
+    printf("> follow-set: \n");
+    printFirstSets(followSets, grammar.symbolNames, cout);
 
     auto lr1Automata = getLR1Automata(grammar);
     // printf("> LR1 Automata: \n");
@@ -372,14 +372,12 @@ void test4() {
     grammar.prodsPriority[4] = -2;
     grammar.prodsPriority[5] = -3;
     grammar.prodsPriority[6] = -3;
-    grammar.symbolAssociate  = {
-        {symbolId("+"), Grammar::Associate::kLeft},
-        {symbolId("-"), Grammar::Associate::kLeft},
-        {symbolId("*"), Grammar::Associate::kLeft},
-        {symbolId("/"), Grammar::Associate::kLeft},
-        {symbolId("<"), Grammar::Associate::kRight},
-        {symbolId(">"), Grammar::Associate::kRight},
-    };
+    grammar.prodsAssociate[1] = Grammar::Associate::kLeft;
+    grammar.prodsAssociate[2] = Grammar::Associate::kLeft;
+    grammar.prodsAssociate[3] = Grammar::Associate::kLeft;
+    grammar.prodsAssociate[4] = Grammar::Associate::kLeft;
+    grammar.prodsAssociate[5] = Grammar::Associate::kRight;
+    grammar.prodsAssociate[6] = Grammar::Associate::kRight;
 
     printGrammar(grammar, cout);
     printf("> symbol names:\n");

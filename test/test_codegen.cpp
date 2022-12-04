@@ -1,7 +1,4 @@
 #include "fmt/format.h"
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/sinks/basic_file_sink.h"
 #include "krill/codegen.h"
 #include "krill/defs.h"
 #include "krill/grammar.h"
@@ -9,6 +6,9 @@
 #include "krill/regex.h"
 #include "krill/syntax.h"
 #include "krill/utils.h"
+#include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/spdlog.h"
 #include <fmt/color.h>
 #include <iostream>
 #include <sstream>
@@ -168,21 +168,21 @@ Grammar parsingYacc(istream &input) {
     assert(i < 3);
 
     vector<string> &tokenStmts = lines[0];
-    vector<string> &prodStmts = lines[1];
+    vector<string> &prodStmts  = lines[1];
     // vector<string> &subStmts = lines[2];
 
     // token statement processing
-    int priority = -1;
+    int priority    = -1;
     using Associate = Grammar::Associate;
     map<string, Associate> wordsAssociate;
-    map<string, int> wordsPriority;
-    string startWord;
+    map<string, int>       wordsPriority;
+    string                 startWord;
 
     for (string line : tokenStmts) {
         vector<string> words = split(line, " ");
         if (words.size() == 0) {
             continue;
-        spdlog::info("look {}", words[0]);
+            spdlog::info("look {}", words[0]);
         } else if (words[0] == "%token") {
             // drop line
         } else if (words[0] == "%left") {
@@ -190,7 +190,7 @@ Grammar parsingYacc(istream &input) {
                 assert(wordsAssociate.count(words[j]) == 0);
                 assert(wordsPriority.count(words[j]) == 0);
                 wordsAssociate[words[j]] = Associate::kLeft;
-                wordsPriority[words[j]] = priority;
+                wordsPriority[words[j]]  = priority;
                 spdlog::info("add Left Associate Token:  {}", words[j]);
             }
             priority -= 1;
@@ -199,7 +199,7 @@ Grammar parsingYacc(istream &input) {
                 assert(wordsAssociate.count(words[j]) == 0);
                 assert(wordsPriority.count(words[j]) == 0);
                 wordsAssociate[words[j]] = Associate::kRight;
-                wordsPriority[words[j]] = priority;
+                wordsPriority[words[j]]  = priority;
                 spdlog::info("add Right Associate Token:  {}", words[j]);
             }
             priority -= 1;
@@ -218,25 +218,27 @@ Grammar parsingYacc(istream &input) {
     }
 
     // productions statement processing
-    vector<vector<string>> prodStrs;
-    map<int, int> prodsPriority;
+    vector<vector<string>> prodSymbolStrs;
+    map<int, int>          prodsPrior;
+    map<int, Associate>    prodsAsso;
+
     stringstream ss;
-    for (string line : prodStmts) {
-        ss << line << " ";
-    }
-    vector<string> singleProdStrs;
-    bool flagPrec = false;
+    for (string line : prodStmts) { ss << line << " "; }
+
+
+    vector<string> currProdStr;
+    bool           flagPrec = false;
     while (ss.good() && !ss.eof()) {
         string w;
         ss >> w;
         if (w == "|") {
-            prodStrs.push_back(singleProdStrs);
-            spdlog::info("add prod:  {}", fmt::join(singleProdStrs, " "));
-            singleProdStrs.resize(1); // reserve first elem
+            prodSymbolStrs.push_back(currProdStr);
+            spdlog::info("add prod:  {}", fmt::join(currProdStr, " "));
+            currProdStr.resize(1); // reserve first elem
         } else if (w == ";") {
-            prodStrs.push_back(singleProdStrs);
-            spdlog::info("add prod:  {}", fmt::join(singleProdStrs, " "));
-            singleProdStrs.resize(0); // reserve first elem
+            prodSymbolStrs.push_back(currProdStr);
+            spdlog::info("add prod:  {}", fmt::join(currProdStr, " "));
+            currProdStr.resize(0);
         } else if (w == ":") {
             continue; // week format check
         } else if (w[0] == '/' && w[1] == '*') {
@@ -247,14 +249,27 @@ Grammar parsingYacc(istream &input) {
         } else if (w == "%prec") {
             flagPrec = true;
         } else {
+            static string assoName[] = {"None", "Left", "Right"};
             if (flagPrec) {
-                int prodIdx = prodStrs.size();
-                int priority = wordsPriority.at(w);
-                prodsPriority[prodIdx] = priority;
-                flagPrec = false;
-                spdlog::info("set priority:  {}", priority);
+                int  p     = prodSymbolStrs.size();
+                int  prior = wordsPriority.at(w);
+                auto asso  = wordsAssociate.at(w);
+                flagPrec   = false;
+
+                prodsPrior[p]  = prior;
+                prodsAsso[p] = asso;
+                spdlog::info("set priority:  {}", prior);
+                spdlog::info("set associativity:  {}",
+                             assoName[static_cast<int>(asso)]);
             } else {
-                singleProdStrs.push_back(w);
+                if (wordsAssociate.count(w) > 0) {
+                    int  p    = prodSymbolStrs.size();
+                    auto asso = wordsAssociate.at(w);
+                    prodsAsso[p] = asso;
+                    spdlog::info("set associativity:  {}",
+                                 assoName[static_cast<int>(asso)]);
+                }
+                currProdStr.push_back(w);
             }
         }
     }
@@ -263,29 +278,12 @@ Grammar parsingYacc(istream &input) {
     // pass
 
     // summurize
-    Grammar grammar(prodStrs);
-    auto symbolId = [grammar](string s) -> int {
-        for (auto[id, str] : grammar.symbolNames) {
-            if (str == s) { return id; }
-        }
-        assert(false);
-        return -1;
-    };
-    map<int, Associate> symbolAssociate;
-    for (auto [word, asso] : wordsAssociate) {
-        symbolAssociate[symbolId(word)] = asso;
+    Grammar grammar(prodSymbolStrs);
+    for (auto[p, prior] : prodsPrior) {
+        grammar.prodsPriority[p] = prior;
     }
-    grammar.symbolAssociate = symbolAssociate;
-    for (int i = 0; i < prodStrs.size(); i++) {
-        for (string word : prodStrs[i]) {
-            if (wordsPriority.count(word)) {
-                int v = wordsPriority.at(word);
-                grammar.prodsPriority[i] = min(grammar.prodsPriority[i], v);
-            }
-        }
-    }
-    for (auto [i, v] : prodsPriority) {
-        grammar.prodsPriority[i] = min(grammar.prodsPriority[i], v);
+    for (auto[p, asso] : prodsAsso) {
+        grammar.prodsAssociate[p] = asso;
     }
 
     return grammar;
@@ -323,8 +321,7 @@ void printActionTable(const ActionTable &     actionTable,
     string typeName[] = {"ACTION", "REDUCE", "GOTO  ", "ACCEPT"};
     for (auto[key, action] : actionTable) {
         oss << fmt::format("s{:<2d} --> {:s} --> {:<6s} ", key.first,
-                           symbolNames.at(key.second),
-                           typeName[action.type]);
+                           symbolNames.at(key.second), typeName[action.type]);
         if (action.type == ACTION || action.type == GOTO) {
             oss << fmt::format("s{:<2d}", action.tgt);
         } else if (action.type == REDUCE) {
@@ -337,7 +334,8 @@ void printActionTable(const ActionTable &     actionTable,
 
 
 void testAmbiguousSyntax() {
-    cerr << "input yacc definition of ambiguous lr1 grammar, end with empty line\n";
+    cerr << "input yacc definition of ambiguous lr1 grammar, end with empty "
+            "line\n";
     vector<string> strs;
 
     cin.ignore();
@@ -348,7 +346,7 @@ void testAmbiguousSyntax() {
     cout << "\n";
 
     cerr << "start generate Lr1 Automata ...\n";
-    auto lr1Automata = getLR1Automata(grammar);
+    auto lr1Automata   = getLR1Automata(grammar);
     auto lalr1Automata = getLALR1fromLR1(grammar, lr1Automata);
     printLr1Automata(lalr1Automata, grammar.symbolNames, cout);
 

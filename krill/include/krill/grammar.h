@@ -30,16 +30,16 @@ struct Grammar {
     set<int>         nonterminalSet;
     vector<Prod>     prods;
     map<int, string> symbolNames;
-    map<int, int>    prodsPriority;
 
     // ambiguous grammar setting (unnecessary)
-    enum class Associate {kLeft, kRight};
-    map<int, Associate> symbolAssociate;
+    enum class Associate {kNone = 0, kLeft = 1, kRight = 2};
+    vector<int>       prodsPriority;
+    vector<Associate> prodsAssociate;
 
     Grammar() = default;
     Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
-            map<int, string> symbolNames, map<int, int> prodsPriority, 
-            map<int, Associate> symbolAssociate); // for ambiguous grammar codegen
+            map<int, string> symbolNames, vector<int> prodsPriority,
+            vector<Associate> prodsAssociate); // for ambiguous grammar codegen
     Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
             map<int, string> symbolNames); // for regular grammar codegen
     Grammar(vector<vector<string>> prodStrs); // for quick use
@@ -98,7 +98,7 @@ struct ProdLR1Item : ProdItem {
 
 // Set of LR1 Production Item {(P -> A·b, a), (S -> Sb·, b), }
 using LR1State = set<ProdLR1Item>;
-string str(const LR1State &state, const map<int, string> &symbolNames);
+string to_string(const LR1State &state, const map<int, string> &symbolNames);
 
 // LR1 Automata (LR1 states, EdgeTable)
 struct LR1Automata {
