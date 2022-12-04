@@ -42,7 +42,6 @@ struct Grammar {
             map<int, Associate> symbolAssociate); // for ambiguous grammar codegen
     Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
             map<int, string> symbolNames); // for regular grammar codegen
-    Grammar(vector<Prod> prods); 
     Grammar(vector<vector<string>> prodStrs); // for quick use
     Grammar(vector<string> prodStrs); // for quick use
 
@@ -54,9 +53,13 @@ struct Action {
     // Action of LR1 parse (ACTION | GOTO | REDUCE | ACCEPT, tgt)
     ActionType type; // action type
     int        tgt;  // ACTION or GOTO: tgt=next_state; REDUCE: tgt=prod_idx
+
+    string str() const;
 };
 // {current_state, look_over_symbol, action}
 using ActionTable = map<pair<int, int>, Action>;
+
+string to_string(const ActionTable &tbl, const map<int, string> &symbolNames);
 
 }; // namespace krill::type
 
@@ -95,11 +98,14 @@ struct ProdLR1Item : ProdItem {
 
 // Set of LR1 Production Item {(P -> A·b, a), (S -> Sb·, b), }
 using LR1State = set<ProdLR1Item>;
+string str(const LR1State &state, const map<int, string> &symbolNames);
 
 // LR1 Automata (LR1 states, EdgeTable)
 struct LR1Automata {
     vector<LR1State> states;
     EdgeTable        edgeTable;
+
+    string str(const map<int, string> &symbolNames) const;
 };
 
 map<int, set<int>> getFirstSets(Grammar grammar);

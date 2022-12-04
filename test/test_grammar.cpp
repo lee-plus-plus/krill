@@ -272,10 +272,10 @@ void test2() {
 
     auto lr1Automata = getLR1Automata(grammar);
     // printf("> LR1 Automata: \n");
-    // printLr1Automata(lr1Automata, grammar.symbolNames, cout);
+    printLr1Automata(lr1Automata, grammar.symbolNames, cout);
     auto actionTable = getLR1table(grammar, lr1Automata);
     // printf("> Action Table of LR(1) dfa: \n");
-    // printActionTable(actionTable, grammar.symbolNames, cout);
+    printActionTable(actionTable, grammar.symbolNames, cout);
 
     printf("> use LR(1) Action Table to analyze: \n");
     string src = "(d+d)*d+(d)";

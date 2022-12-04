@@ -1,15 +1,18 @@
 #ifndef UTILS_H
 #define UTILS_H
 #include <cstring>
+#include <functional>
 #include <map>
 #include <ostream>
 #include <set>
-#include <tuple>
-#include <stack>
 #include <sstream>
+#include <stack>
 #include <string>
+#include <tuple>
 #include <vector>
-#include <functional>
+#include <type_traits>
+#include <numeric>
+#include <algorithm>
 
 namespace krill::utils {
 
@@ -19,12 +22,12 @@ template <typename T> inline std::string to_string(const T &v) {
     return ss.str();
 }
 
-inline void replace_all(std::string &str, const std::string &from, const std::string &to) {
-  for (std::string::size_type pos = str.find(from); 
-       pos != std::string::npos; 
-       pos = str.find(from)) {
-    str.replace(pos, from.length(), to);
-  }
+inline void replace_all(std::string &str, const std::string &from,
+                        const std::string &to) {
+    for (std::string::size_type pos = str.find(from); pos != std::string::npos;
+         pos                        = str.find(from)) {
+        str.replace(pos, from.length(), to);
+    }
 }
 
 inline std::string unescape(std::string str) {
@@ -36,7 +39,8 @@ inline std::string unescape(std::string str) {
     return str;
 }
 
-inline std::vector<std::string> split(std::string str, const char *delim = "\r\n\0") {
+inline std::vector<std::string> split(std::string str,
+                                      const char *delim = " \t\r\n\0") {
     std::vector<std::string> res;
     char *                   strc = &str[0];
     char *                   temp = strtok(strc, delim);
@@ -60,8 +64,12 @@ inline void trim(std::string &str, const std::string &val = " \r\n\0") {
     rtrim(str, val);
 }
 
-template <typename T>
-inline std::vector<T> to_vector(std::stack<T> s) {
+inline std::string trimmed(std::string str, const std::string &val = " \r\n\0") {
+    trim(str, val);
+    return str;
+}
+
+template <typename T> inline std::vector<T> to_vector(std::stack<T> s) {
     std::vector<T> v;
     while (s.size() > 0) {
         v.insert(v.begin(), s.top());
@@ -70,11 +78,45 @@ inline std::vector<T> to_vector(std::stack<T> s) {
     return v;
 }
 
-template <typename T> 
-inline std::vector<T> to_vector(std::set<T> s) {
+template <typename T> inline std::vector<T> to_vector(std::set<T> s) {
     std::vector<T> v;
     v.assign(s.begin(), s.end());
     return v;
+}
+
+template <typename T1, typename T2>
+inline std::vector<T2> apply_map(std::vector<T1> v, const std::map<T1, T2> &m) {
+    std::vector<T2> r;
+    transform(v.begin(), v.end(), back_inserter(r),
+              [&m](const T1 &x) { return m.at(x); });
+    return r;
+}
+
+template <typename T, typename F>
+inline auto apply_map(std::vector<T> v, F func)
+    -> std::vector<typename std::result_of<F(T &)>::type> {
+    std::vector<typename std::result_of<F(T &)>::type> r;
+    transform(v.begin(), v.end(), back_inserter(r), func);
+    return r;
+}
+
+template <typename T, typename R, typename F>
+inline R apply_reduce(std::vector<T> v, R init, F func) {
+    return accumulate(v.begin(), v.end(), init, func);
+}
+
+template <typename T, typename F>
+inline std::vector<T> apply_filter(std::vector<T> &v, F func) {
+    std::vector<T> r;
+    copy_if(v.begin(), v.end(), back_inserter(r), func);
+    return r;
+}
+
+template <typename T>
+inline std::vector<T> slice(std::vector<T> v, int st, int ed) {
+    if (st < 0) { st = v.size() + (st % v.size()); }
+    if (ed < 0) { ed = v.size() + (ed % v.size()); }
+    return std::vector<T>(v.begin() + st, v.begin() + ed);
 }
 
 template <typename T1, typename T2>
@@ -84,13 +126,14 @@ inline std::map<T2, T1> reverse(std::map<T1, T2> m) {
     return m_reversed;
 }
 
-// Jerry Yang's magic, 
+// Jerry Yang's magic,
 // don't touch!
 struct ToString {
     std::stringstream ss;
     using type = std::string;
     template <typename T>
-    typename std::enable_if<!std::is_class<T>::value, type>::type operator()(const T &v) {
+    typename std::enable_if<!std::is_class<T>::value, type>::type
+    operator()(const T &v) {
         ss << v;
         return ss.str();
     }
@@ -140,14 +183,16 @@ struct ToString {
         return "[" + hv + "]";
     }
 
-    template <typename... Args> size_t operator()(const std::tuple<Args...> &tup) {
+    template <typename... Args>
+    size_t operator()(const std::tuple<Args...> &tup) {
         return apply(
             [](Args... v) -> size_t { return ToString{}.comb<Args...>(v...); },
             tup);
     }
-    template <typename ToStringable,
-              typename = std::is_same<
-                  decltype(std::declval<ToStringable>().ToString()), std::string>>
+    template <
+        typename ToStringable,
+        typename = std::is_same<
+            decltype(std::declval<ToStringable>().ToString()), std::string>>
     std::string operator()(const ToStringable &v) {
         return v.ToString();
     }

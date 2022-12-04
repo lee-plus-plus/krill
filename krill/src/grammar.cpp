@@ -15,62 +15,47 @@ using std::stringstream;
 
 namespace krill::type {
 
-// {"Term -> Term '+' Term D-Term", ... } =>
-//   (Prod) {{256 -> 256 43 256 257}, ...},
-//   (symbolNames) {{256, "Term"}, {43, "'+'"}, ...}
 // assign id for symbols, in the order of occurrence
-// please always use this function to automatically assign the id of symbols
-pair<vector<Prod>, map<int, string>> getProdsFromStr(const vector<vector<string>> &prodSymbolStrs) {
+// additional change of grammarStrs <=> additional change of prod
+pair<vector<Prod>, map<int, string>>
+assignSymbolId(const vector<vector<string>> &prodSymbolStrs) {
     vector<Prod>     prods;
     map<string, int> symbolId;
     int              numSymbols = 0;
 
     for (vector<string> words : prodSymbolStrs) {
         // assume words like {"Stmt", "Term", "'+'", "D-Term"}
-        int         symbol;
-        vector<int> right;
+        Prod currentProd;
         for (int i = 0; i < words.size(); i++) {
             const string &word = words[i];
             if (symbolId.count(word) == 0) { // single char like "'+'"
                 if (word.size() == 3 && word[0] == '\'' && word[2] == '\'') {
                     symbolId[word] = (int) word[1];
                 } else { // long symbol like "Term"
-                    symbolId[word] = 256 + numSymbols;
-                    numSymbols++;
+                    symbolId[word] = 256 + numSymbols++;
                 }
             }
             if (i == 0) {
-                symbol = symbolId[word];
+                currentProd.symbol = symbolId[word];
             } else {
-                right.push_back(symbolId[word]);
+                currentProd.right.push_back(symbolId[word]);
             }
         }
-        prods.push_back({symbol, right});
+        prods.emplace_back(currentProd);
     }
 
-    symbolId["ζ"] = END_SYMBOL;
-    symbolId["ε"] = EMPTY_SYMBOL;
-
+    symbolId["ζ"]                = END_SYMBOL;
+    symbolId["ε"]                = EMPTY_SYMBOL;
     map<int, string> symbolNames = reverse(symbolId);
+
     return {prods, symbolNames};
 }
 
-// please always use this function to automatically assign the id of symbols
-pair<vector<Prod>, map<int, string>> getProdsFromStr(const vector<string> &prodStrs) {
-    vector<vector<string>> prodSymbolStrs;
-    // assume words like {"Term", "->", "Term", "'+'", "D-Term"}
-    for (string prodStr : prodStrs) {
-        // drop 2nd elem
-        prodSymbolStrs.push_back(split(prodStr, " "));
-        prodSymbolStrs.back().erase(prodSymbolStrs.back().begin() + 1);
-    }
-    return getProdsFromStr(prodSymbolStrs);
-}
-
 // return NonterminalSet, TerminalSet
-pair<set<int>, set<int>> getNonterminalAndTerminalSet(const vector<Prod> &prods) {
-    set<int> nonterminalSet;
+pair<set<int>, set<int>>
+getTerminalAndNonterminalSet(const vector<Prod> &prods) {
     set<int> terminalSet;
+    set<int> nonterminalSet;
     for (const Prod &prod : prods) {
         nonterminalSet.insert(prod.symbol);
         for (int c : prod.right) { terminalSet.insert(c); }
@@ -78,7 +63,7 @@ pair<set<int>, set<int>> getNonterminalAndTerminalSet(const vector<Prod> &prods)
     for (int c : nonterminalSet) {
         if (terminalSet.count(c)) { terminalSet.erase(c); }
     }
-    return make_pair(nonterminalSet, terminalSet);
+    return {terminalSet, nonterminalSet};
 }
 
 bool Prod::operator<(const Prod &p) const {
@@ -91,21 +76,16 @@ bool Prod::operator==(const Prod &p) const {
 
 string Prod::str(const map<int, string> &symbolNames) const {
     stringstream ss;
-    ss << symbolNames.at(this->symbol);
-    ss << " -> ";
-    for (int i = 0; i < this->right.size(); i++) {
-        ss << symbolNames.at(this->right[i]) << " ";
-    }
+    ss << fmt::format("{} -> {}", symbolNames.at(this->symbol), 
+                      fmt::join(apply_map(this->right, symbolNames), " "));
     return ss.str();
 }
 
-Grammar::Grammar(set<int> terminalSet, set<int> nonterminalSet,
-                 vector<Prod> prods, map<int, string> symbolNames,
-                 map<int, int>       prodsPriority,
-                 map<int, Associate> symbolAssociate)
-    : terminalSet(terminalSet), nonterminalSet(nonterminalSet), prods(prods),
-      symbolNames(symbolNames), prodsPriority(prodsPriority),
-      symbolAssociate(symbolAssociate) {
+Grammar::Grammar(set<int> ts, set<int> nts, vector<Prod> prods,
+                 map<int, string> names, map<int, int> privs,
+                 map<int, Associate> assos)
+    : terminalSet(ts), nonterminalSet(nts), prods(prods), symbolNames(names),
+      prodsPriority(privs), symbolAssociate(assos) {
     // check
     assert(prods[0].right.size() == 1);
     for (int i = 0; i < prods.size(); i++) {
@@ -113,68 +93,73 @@ Grammar::Grammar(set<int> terminalSet, set<int> nonterminalSet,
     }
 }
 
-Grammar::Grammar(set<int> terminalSet, set<int> nonterminalSet,
-                 vector<Prod> prods, map<int, string> symbolNames)
-    : terminalSet(terminalSet), nonterminalSet(nonterminalSet), prods(prods),
-      symbolNames(symbolNames) {
+Grammar::Grammar(set<int> ts, set<int> nts, vector<Prod> prods,
+                 map<int, string> names)
+    : terminalSet(ts), nonterminalSet(nts), prods(prods), symbolNames(names) {
+    // check
     assert(prods[0].right.size() == 1);
     for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i + 1; }
 }
 
-Grammar::Grammar(vector<Prod> prods) : prods(prods) {
-    assert(prods[0].right.size() == 1);
-    auto [nonTs, ts] = getNonterminalAndTerminalSet(prods);
-    nonterminalSet = nonTs;
-    terminalSet = ts;
-    for (int c : terminalSet) { symbolNames[c] = fmt::format("_{:d}", c); }
-    for (int c : nonterminalSet) { symbolNames[c] = fmt::format("_{:d}", c); }
-    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i + 1; }
-}
-
-Grammar::Grammar(vector<vector<string>> prodStrs) {
-    auto[prods_, symbolNames_] = getProdsFromStr(prodStrs);
-    assert(prods_[0].right.size() == 1);
-    prods       = prods_;
-    symbolNames = symbolNames_;
-    auto [nonTs, ts] = getNonterminalAndTerminalSet(prods);
-    nonterminalSet = nonTs;
-    terminalSet = ts;
-    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i + 1; }
+Grammar::Grammar(vector<vector<string>> prodSymbolStrs) {
+    auto[prods_, symbolNames_] = assignSymbolId(prodSymbolStrs);
+    auto[ts_, nts_] = getTerminalAndNonterminalSet(prods_);
+    new (this) Grammar(ts_, nts_, prods_, symbolNames_);
 }
 
 Grammar::Grammar(vector<string> prodStrs) {
-    auto[prods_, symbolNames_] = getProdsFromStr(prodStrs);
-    assert(prods_[0].right.size() == 1);
-    prods       = prods_;
-    symbolNames = symbolNames_;
-    auto [nonTs, ts] = getNonterminalAndTerminalSet(prods);
-    nonterminalSet = nonTs;
-    terminalSet = ts;
-    for (int i = 0; i < prods.size(); i++) { prodsPriority[i] = i + 1; }
+    // assume prods like {"Term -> Term '+' D-Term"}
+    // always drop 2nd elem
+    vector<vector<string>> prodSymbolStrs;
+    for (const string &prodStr : prodStrs) {
+        prodSymbolStrs.push_back(split(prodStr, " "));
+        prodSymbolStrs.back().erase(prodSymbolStrs.back().begin() + 1);
+    }
+    new (this) Grammar(prodSymbolStrs);
 }
 
 string Grammar::str() const {
     stringstream ss;
     ss << "Grammar: \n";
     ss << "Left Associate: \n  ";
-    for (auto [symbol, asso] : symbolAssociate) {
+    for (auto[symbol, asso] : symbolAssociate) {
         if (asso == Grammar::Associate::kLeft) {
             ss << symbolNames.at(symbol) << " ";
         }
     }
     ss << "\nRight Associate: \n  ";
-    for (auto [symbol, asso] : symbolAssociate) {
+    for (auto[symbol, asso] : symbolAssociate) {
         if (asso == Grammar::Associate::kRight) {
             ss << symbolNames.at(symbol) << " ";
         }
     }
-    ss << "\nProductions: \n";
+    ss << "\nProductions: \npriov   idx  symbols\n";
     for (int i = 0; i < prods.size(); i++) {
-        ss << fmt::format("{:-5d} {:-5s} {}\n", 
-            prodsPriority.at(i), 
-            fmt::format("({:d})", i + 1), 
-            prods[i].str(symbolNames)
-        );
+        ss << fmt::format("{:-5d} {:-5s} {}\n", prodsPriority.at(i),
+                          fmt::format("({:d})", i + 1),
+                          prods[i].str(symbolNames));
+    }
+    return ss.str();
+}
+
+string Action::str() const {
+    static string typeName[4] = {"ACTION, REDUCE, GOTO, ACCEPT"};
+    stringstream  ss;
+    ss << fmt::format("{}", typeName[type]);
+    if (type == ACTION || type == GOTO) {
+        ss << fmt::format("s{:<2d}", tgt);
+    } else if (type == REDUCE) {
+        ss << fmt::format("r{:<2d}", tgt + 1);
+    }
+    return ss.str();
+}
+
+string to_string(const ActionTable &tbl, const map<int, string> &symbolNames) {
+    stringstream ss;
+    ss << fmt::format("Action Table (size={}):\n", tbl.size());
+    for (auto[key, action] : tbl) {
+        ss << fmt::format("s{:<2d} --> {:s} --> {}\n", key.first,
+                          symbolNames.at(key.second), action.str());
     }
     return ss.str();
 }
@@ -237,11 +222,11 @@ string ProdLR1Item::str(const map<int, string> &symbolNames) const {
     for (int i = 0; i < this->dot; i++) {
         ss << fmt::format(" {}", symbolNames.at(this->right[i]));
     }
-    ss << " .";
+    ss << " ●";
     for (int i = this->dot; i < this->right.size(); i++) {
         ss << fmt::format(" {}", symbolNames.at(this->right[i]));
     }
-    ss << fmt::format(" || {}", symbolNames.at(this->search), this->search);
+    ss << fmt::format("  || {}", symbolNames.at(this->search), this->search);
     return ss.str();
 }
 
@@ -300,9 +285,6 @@ map<int, set<int>> getFirstSets(Grammar grammar) {
 
     return firstSets;
 }
-
-// TODO
-// 添加文法左递归检查，左递归消除
 
 map<int, set<int>> getFollowSets(Grammar            grammar,
                                  map<int, set<int>> firstSets) {
@@ -453,7 +435,7 @@ void setLR1StateExpanded(LR1State &state, map<int, set<int>> firstSets,
     }
 }
 
-string toStr(const LR1State &state, map<int, string> symbolNames) {
+string to_string(const LR1State &state, const map<int, string> &symbolNames) {
     stringstream ss;
     for (const auto &item : state) {
         ss << "  " << item.str(symbolNames) << "\n";
@@ -540,7 +522,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                                  "prod p{}, search {}:",
                                  i, r + 1, symbolNames.at(item.search));
                     // spdlog::info("state s{}: \n{}", i,
-                    //              toStr(states[i], symbolNames));
+                    //              to_string(states[i], symbolNames));
                     spdlog::info("item p{}: {}", r + 1, item.str(symbolNames));
 
                     int a;
