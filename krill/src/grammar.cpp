@@ -38,7 +38,7 @@ vector<Prod> getSymbolIdAssigned(const vector<vector<string>> &prodSymbolStrs,
                     break;
                 } else if (symbolIds.count(word) == 0) {
                     // not previous defined
-                    logger.warn("token {} not previous defined, added", word);
+                    logger.info("token {} not previous defined, added", word);
                     symbolIds[word] = symbolId++;
                 }
             }
@@ -164,7 +164,7 @@ Grammar::Grammar(vector<vector<string>> prodSymbolStrs,
     auto[prodsPriors, prodsAssos] = getPriorityAndAsscociate(
         prodSymbolStrs, symbolPriority, symbolAssociate);
     new (this) Grammar(ts, nts, prods, symbolNames, prodsPriors, prodsAssos);
-    logger.info("Grammar generated:\n{}", this->str());
+    logger.info("grammar generated:\n{}", this->str());
 }
 
 Grammar::Grammar(vector<string> prodStrs) {
@@ -180,7 +180,7 @@ Grammar::Grammar(vector<string> prodStrs) {
 
 string Grammar::str() const {
     stringstream  ss;
-    static string assoName[] = {"", "Left", "Right"};
+    static string assoName[] = {"", "Left", "Righ"};
     ss << "Grammar: \n";
     ss << "Terminal set:\n  ";
     for (int s : this->terminalSet) {
@@ -190,9 +190,9 @@ string Grammar::str() const {
     for (int s : this->nonterminalSet) {
         ss << fmt::format("{} ", this->symbolNames.at(s));
     }
-    ss << "\nProductions:\n  asso prior   idx  symbols\n";
+    ss << "\nProductions:\n   prior   idx  prod\n";
     for (int i = 0; i < prods.size(); i++) {
-        ss << fmt::format("{:>6s}{:-6d}{:>6s}  {}\n",
+        ss << fmt::format("{:>4s}{:-4d}{:>6s}  {}\n",
                           assoName[static_cast<int>(prodsAssociate[i])],
                           prodsPriority[i], fmt::format("({:d})", i + 1),
                           prods[i].str(symbolNames));

@@ -151,6 +151,24 @@ inline std::map<T2, T1> reverse(std::map<T1, T2> m) {
     return m_reversed;
 }
 
+template <typename T>
+inline std::vector<T> reverse(std::vector<T> m) {
+    std::vector<T> m_reversed;
+    std::reverse_copy(m.begin, m.end, back_inserter(m_reversed));
+    return m_reversed;
+}
+
+template <typename T>
+inline std::vector<T> get_top(std::stack<T> s, int size) {
+    assert(size >= 0);
+    std::vector<T> v(size);
+    for (int i = 0; i < size; i++) {
+        v[i] = s.top();
+        s.pop();
+    }
+    return v;
+}
+
 // Jerry Yang's magic,
 // don't touch!
 struct ToString {

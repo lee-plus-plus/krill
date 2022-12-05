@@ -9,14 +9,6 @@ using namespace std;
 using namespace krill::type;
 using namespace krill::grammar;
 
-void printGrammar(const Grammar &grammar, ostream &oss) {
-    oss << "Grammar: \n";
-    for (int i = 0; i < grammar.prods.size(); i++) {
-        oss << fmt::format("({:d}) ", i + 1);
-        oss << grammar.prods[i].str(grammar.symbolNames) << "\n";
-    }
-}
-
 void printFirstSets(map<int, set<int>> &    firstSets,
                     const map<int, string> &symbolNames, ostream &oss) {
     for (auto[symbol, nextSymbols] : firstSets) {
@@ -231,7 +223,7 @@ void test1() {
         "V -> a",
     });
     printf("> initial grammar: \n");
-    printGrammar(grammar, cout);
+    cout << grammar.str();
 
     auto firstSets  = getFirstSets(grammar);
     auto followSets = getFollowSets(grammar, firstSets);
@@ -258,7 +250,7 @@ void test2() {
         "M -> ( A )",
         "M -> d",
     });
-    printGrammar(grammar, cout);
+    cout << grammar.str();
     printf("> symbol names:\n");
     for (auto[id, str] : grammar.symbolNames) {
         cout << fmt::format("{:d}: {:s}\n", id, str);
@@ -306,7 +298,7 @@ void test3() {
     });
     grammar.prodsPriority[1] = -1;
 
-    printGrammar(grammar, cout);
+    cout << grammar.str();
     printf("> symbol names:\n");
     for (auto[id, str] : grammar.symbolNames) {
         cout << fmt::format("{:d}: {:s}\n", id, str);
@@ -380,7 +372,7 @@ void test4() {
     grammar.prodsAssociate[5] = Associate::kRight;
     grammar.prodsAssociate[6] = Associate::kRight;
 
-    printGrammar(grammar, cout);
+    cout << grammar.str();
     printf("> symbol names:\n");
     for (auto[id, str] : grammar.symbolNames) {
         cout << fmt::format("{:d}: {:s}\n", id, str);

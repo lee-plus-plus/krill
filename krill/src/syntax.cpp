@@ -10,12 +10,15 @@
 #include <sstream>
 #include <string>
 #include <vector>
+using krill::log::logger;
 using namespace krill::type;
 using namespace krill::grammar;
 using namespace krill::utils;
 using namespace std;
 
 namespace krill::runtime {
+
+// const int STATES_SIZE_MAX = 1000;
 
 void defaultReduceFunc(AttrDict &next, deque<AttrDict> &child) {
     // pass
@@ -41,11 +44,17 @@ SyntaxParser::SyntaxParser(Grammar grammar, ActionTable actionTable,
 }
 
 void SyntaxParser::parse() {
-    auto &prods_ = grammar_.prods;
+    auto &      prods_   = grammar_.prods;
+    const auto &symNames = grammar_.symbolNames;
 
     while (!isAccepted_ && offset_ < inputs_.size()) {
         APTnode &input = inputs_.at(offset_);
         assert(input.attr.Has<string>("lval"));
+
+        logger.debug("states_: [{}]", fmt::join(to_vector(states_), ","));
+        logger.debug("symbols_: [{}]",
+                     fmt::join(apply_map(to_vector(symbols_), symNames), ","));
+        logger.debug("  look: {}", symNames.at(input.id));
 
         assert(states_.size() > 0);
         if (actionTable_.count({states_.top(), input.id}) == 0) {
@@ -57,7 +66,9 @@ void SyntaxParser::parse() {
 
         switch (action.type) {
             case ACTION: {
+                logger.debug("  ACTION push s{}", action.tgt);
                 states_.push(action.tgt);
+                symbols_.push(input.id);
 
                 shared_ptr<APTnode> nextNode(new APTnode(input));
                 // ACTION action
@@ -77,8 +88,10 @@ void SyntaxParser::parse() {
                 deque<shared_ptr<APTnode>> childNodes;
                 deque<AttrDict>            childAttrs;
 
+                auto poped_states = get_top(states_, r.right.size());
                 for (int j = 0; (int) j < r.right.size(); j++) {
                     states_.pop();
+                    symbols_.pop();
                     childNodes.push_front(nodes_.top());
                     childAttrs.push_front(nodes_.top()->attr);
                     nodes_.pop();
@@ -88,12 +101,14 @@ void SyntaxParser::parse() {
                 Action action2 = actionTable_[{states_.top(), r.symbol}];
                 assert(action2.type == GOTO);
                 states_.push(action2.tgt);
+                symbols_.push(r.symbol);
                 assert(0 <= action.tgt && action.tgt < prods_.size());
 
-                shared_ptr<APTnode> nextNode(
-                    new APTnode({.id    = prods_.at(action.tgt).symbol,
-                                 .attr  = {},
-                                 .child = childNodes}));
+                logger.debug("  REDUCE r{} pop [{}] GOTO {}", action.tgt + 1,
+                             fmt::join(poped_states, ","), action2.tgt);
+
+                shared_ptr<APTnode> nextNode(new APTnode(
+                    {.id = r.symbol, .attr = {}, .child = childNodes}));
                 // REDUCE action
                 reduceFunc_[action.tgt](nextNode.get()->attr, childAttrs);
                 for (int j = 0; (int) j < r.right.size(); j++) {
@@ -104,6 +119,11 @@ void SyntaxParser::parse() {
                 break;
             }
             case ACCEPT: {
+                logger.debug("  ACCEPT");
+                logger.info("syntax parsing complete successfully");
+                stringstream ss_ast;
+                printAnnotatedParsingTree(ss_ast);
+                logger.debug("Current AST: \n{}", ss_ast.str());
                 isAccepted_ = true;
                 break;
             }
@@ -209,20 +229,21 @@ void SyntaxParser::printAnnotatedParsingTree(ostream &oss) {
 }
 
 string SyntaxParser::getErrorMessage() {
-    auto &tokenWithAttr = inputs_.at(offset_);
+    auto & tokenWithAttr = inputs_.at(offset_);
+    string errorMsg      = fmt::format(
+        "Syntax Parsing Error: unexpected token <{} \"{}\">",
+        grammar_.symbolNames.at(tokenWithAttr.id),
+        fmt::format(fmt::emphasis::underline, "{}",
+                    unescape(tokenWithAttr.attr.Get<string>("lval"))));
 
-    stringstream ss;
-    ss << fmt::format("{}: unexpected token <{} \"{}\"> after \"{}\"",
-                      fmt::format("Syntax Error", fmt::color::red),
-                      grammar_.symbolNames.at(tokenWithAttr.id),
-                      fmt::format(fmt::emphasis::underline, "{}",
-                                  krill::utils::unescape(
-                                      tokenWithAttr.attr.Get<string>("lval"))),
-                      fmt::format(fmt::emphasis::underline, "{}",
-                                  krill::utils::unescape(history_)));
-    ss << "\n";
-    printAnnotatedParsingTree(ss);
-    return ss.str();
+    logger.error("{}", errorMsg);
+    logger.error("Context: {}", unescape(history_));
+
+    stringstream ss_ast;
+    printAnnotatedParsingTree(ss_ast);
+    logger.error("Current AST: \n{}", ss_ast.str());
+
+    return errorMsg;
 }
 
 } // namespace krill::runtime

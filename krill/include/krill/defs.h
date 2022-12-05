@@ -1,13 +1,19 @@
 #ifndef DEFS_H
 #define DEFS_H
+#include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/dist_sink.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/spdlog.h"
 #include <map>
 #include <vector>
-
-#include "spdlog/spdlog.h"
+#include <iostream>
 
 // clang-format off
 namespace krill {
 	namespace log {
+		extern std::shared_ptr<spdlog::sinks::stdout_color_sink_st> sink_cout;
+		extern std::shared_ptr<spdlog::sinks::stderr_color_sink_st> sink_cerr;
+		extern std::shared_ptr<spdlog::sinks::basic_file_sink_mt> sink_file;
 		extern spdlog::logger logger;
 	}
 	namespace type {

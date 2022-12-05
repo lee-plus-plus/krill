@@ -237,6 +237,7 @@ void test2() {
 }
 
 int main() {
+    krill::log::sink_cerr->set_level(spdlog::level::debug);
     vector<void (*)()> testFuncs = {test1, test2};
     for (int i = 0; i < testFuncs.size(); i++) {
         cout << "#test " << (i + 1) << endl;

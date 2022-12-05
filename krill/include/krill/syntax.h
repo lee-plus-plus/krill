@@ -59,6 +59,7 @@ class SyntaxParser {
 
     vector<APTnode>  inputs_;
     stack<int>       states_;
+    stack<int>       symbols_; // for debug
     stack<shared_ptr<APTnode>> nodes_;
 
     int  offset_;

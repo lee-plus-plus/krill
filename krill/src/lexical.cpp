@@ -8,6 +8,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+using krill::log::logger;
 using namespace krill::type;
 using namespace std;
 using krill::automata::getDFAintegrated;
@@ -64,6 +65,8 @@ Token LexicalParser::parseStep(istream &input) {
 
             // assert(dfa_.finality.at(state_) != 0); // failed
             if (dfa_.finality.at(state_) == 0) {
+                logger.error("Lexical Error: unmatched \"{}\" in \"{}\"\n",
+                                buffer.str() + c, history_ + c);
                 throw runtime_error(
                     fmt::format("Lexical Error: unmatched \"{}\" in \"{}\"\n",
                                 buffer.str() + c, history_ + c));
@@ -75,7 +78,9 @@ Token LexicalParser::parseStep(istream &input) {
             buffer.clear();
 
             assert(tokenLexValue.size() > 0);
-            return Token({tokenId, tokenLexValue});
+            Token token({tokenId, tokenLexValue});
+            logger.debug("parsed lexical token id={} lval=\"{}\"", token.id, token.lval);
+            return token;
         }
 
         // continue
