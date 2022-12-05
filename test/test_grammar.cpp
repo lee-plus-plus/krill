@@ -29,9 +29,9 @@ void printActionTable(const ActionTable &     actionTable,
         oss << fmt::format("s{:<2d} --> {:s} --> {:<6s} ", key.first,
                            symbolNames.at(key.second),
                            typeName[action.type]);
-        if (action.type == ACTION || action.type == GOTO) {
+        if (action.type == Action::Type::kAction || action.type == Action::Type::kGoto) {
             oss << fmt::format("s{:<2d}", action.tgt);
-        } else if (action.type == REDUCE) {
+        } else if (action.type == Action::Type::kReduce) {
             oss << fmt::format("r{:<2d}", action.tgt);
         }
         oss << "\n";
@@ -118,7 +118,7 @@ GrammarNode *simpleSyntaxParser(Grammar grammar, ActionTable actionTable,
 
         Action action = actionTable[{states.back(), src[i]}];
         switch (action.type) {
-            case ACTION: {
+            case Action::Type::kAction: {
                 if (showStates) {
                     cout << fmt::format("ACTION push s{}", action.tgt);
                 }
@@ -127,7 +127,7 @@ GrammarNode *simpleSyntaxParser(Grammar grammar, ActionTable actionTable,
                 i++;
                 break;
             }
-            case REDUCE: {
+            case Action::Type::kReduce: {
                 Prod                  r = prods[action.tgt];
                 vector<GrammarNode *> temp;
 
@@ -158,7 +158,7 @@ GrammarNode *simpleSyntaxParser(Grammar grammar, ActionTable actionTable,
                 stateNodes.push_back(nextNode);
                 break;
             }
-            case ACCEPT: {
+            case Action::Type::kAccept: {
                 if (showStates) { cout << "ACCEPT\t\t"; }
                 flag = false;
                 break;

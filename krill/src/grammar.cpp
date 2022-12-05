@@ -204,9 +204,9 @@ string Action::str() const {
     static string typeName[] = {"ACTION", "REDUCE", "GOTO", "ACCEPT"};
     stringstream  ss;
     ss << fmt::format("{} ", typeName[static_cast<int>(type)]);
-    if (type == ACTION || type == GOTO) {
+    if (type == Action::Type::kAction || type == Action::Type::kGoto) {
         ss << fmt::format("s{:<2d}", tgt);
-    } else if (type == REDUCE) {
+    } else if (type == Action::Type::kReduce) {
         ss << fmt::format("r{:<2d}", tgt + 1);
     }
     return ss.str();
@@ -539,7 +539,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
         if (isConflit) {
             // ACTION / ACTION confict
             Action theirAction = actionTable.at({from, search});
-            Action ourAction   = {ACTION, to};
+            Action ourAction   = {Action::Type::kAction, to};
             logger.critical(
                 "lr1 conflit at state s{}, search {}: ours: {}, theirs: {}",
                 symbolNames.at(search), ourAction.str(), theirAction.str());
@@ -548,10 +548,10 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
         }
         if (grammar.terminalSet.count(search)) {
             // s1 ——a-> s2 ==> action[s1, a] = s2
-            actionTable[{from, search}] = {ACTION, to};
+            actionTable[{from, search}] = {Action::Type::kAction, to};
         } else {
             // s1 ——A-> s2 ==> goto[s1, A] = s2
-            actionTable[{from, search}] = {GOTO, to};
+            actionTable[{from, search}] = {Action::Type::kGoto, to};
         }
         if (isConflit) {
             logger.critical("conflit resolved by FORCING overwrite, may not "
@@ -564,7 +564,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
             // s1: (S -> ...·, #) ==> action[s1, #] = ACCEPT
             if (item.symbol == prods[0].symbol &&
                 item.dot == item.right.size()) {
-                actionTable[{i, item.search}] = {ACCEPT, 0};
+                actionTable[{i, item.search}] = {Action::Type::kAccept, 0};
                 continue;
             } else if (item.dot != item.right.size()) {
                 continue;
@@ -580,12 +580,12 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
 
             if (actionTable.count({i, item.search}) == 0) {
                 // no conflict, reduce
-                actionTable[{i, item.search}] = {REDUCE, r};
+                actionTable[{i, item.search}] = {Action::Type::kReduce, r};
                 continue;
             } else {
                 // conflict
                 Action theirAction = actionTable.at({i, item.search});
-                Action ourAction   = {REDUCE, r};
+                Action ourAction   = {Action::Type::kReduce, r};
                 logger.info(
                     "lr1 conflit at state s{}, search {}: ours: {}, theirs: {}",
                     i, symbolNames.at(item.search), ourAction.str(),
@@ -593,7 +593,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
 
                 // REDUCE / REDUCE conflict
                 // (indicate that grammar is not lr(1) grammar)
-                if (theirAction.type == REDUCE) {
+                if (theirAction.type == Action::Type::kReduce) {
                     logger.critical("REDUCE / REDUCE conflict: state s{}, "
                                      "prod p{}, search {}:",
                                      i, r + 1, symbolNames.at(item.search));
@@ -613,7 +613,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                 }
 
                 // REDUCE / ACTION conflict
-                assert(theirAction.type == ACTION);
+                assert(theirAction.type == Action::Type::kAction);
                 logger.info("item p{}: {}", r + 1, item.str(symbolNames));
 
                 int a;

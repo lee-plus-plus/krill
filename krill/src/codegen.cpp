@@ -17,17 +17,22 @@ namespace krill::codegen {
 void genActionTable(const ActionTable &actionTable, ostream &oss) {
     stringstream def_actionTable;
     def_actionTable << "{\n";
-    const string typeName[] = {"ACTION", "REDUCE", "GOTO", "ACCEPT"};
+    const string typeName[] = {"AT0", "AT1", "AT2", "AT3"};
     for (auto[key, action] : actionTable) {
-        def_actionTable << "  {{" << key.first << "," << key.second << "},{"
-                        << typeName[action.type] << "," << action.tgt
-                        << "}},\n";
+        def_actionTable << fmt::format(
+            "{{{{{}, {}}}, {{{}, {}}}}}, ", key.first, key.second,
+            typeName[static_cast<int>(action.type)], action.tgt);
     }
     def_actionTable << "}";
 
-    oss << "\n";
-    oss << "struct Action {"
-           "  enum TYPE { ACTION = 0, REDUCE = 1, GOTO = 2, ACCEPT = 3 };\n"
+    oss << "\n"
+           "#define AT0 Action::Type::kAction\n"
+           "#define AT1 Action::Type::kReduce\n"
+           "#define AT2 Action::Type::kGoto\n"
+           "#define AT3 Action::Type::kAccept\n"
+           "\n";
+    oss << "struct Action {\n"
+           "  enum Type { kAction = 0, kReduce = 1, kGoto = 2, kAccept = 3 };\n"
            "  TYPE type; int tgt;\n"
            "};\n";
     oss << "using ActionTable = map<pair<int, int>, Action>;\n";
@@ -91,15 +96,36 @@ void genGrammar(const Grammar &grammar, ostream &oss) {
     }
     def_prods << "}";
 
+    // prodsPriority
+    stringstream def_prodsPriority;
+    def_prodsPriority << fmt::format("{{{}}}", fmt::join(grammar.prodsPriority, ", "));
+
+    // prodsAssociate
+    // enum class Associate {kNone = 0, kLeft = 1, kRight = 2};
+    stringstream def_prodsAssociate;
+    map<Associate, string> assoName = {{Associate::kNone, "AS0"},
+                                       {Associate::kLeft, "AS1"},
+                                       {Associate::kRight, "AS2"}};
+    def_prodsAssociate << fmt::format(
+        "{{{}}}", fmt::join(apply_map(grammar.prodsAssociate, assoName), ", "));
+
     oss << fmt::format("{}\n", def_symbols.str());
     oss << "struct Prod { int symbol; vector<int> right; };\n";
-    oss << "struct Grammar { set<int> terminalSet; set<int> nonterminalSet; "
-           "vector<Prod> prods; map<int, string> symbolNames; };\n";
+    oss << "enum class Associate {kNone = 0, kLeft = 1, kRight = 2};\n"
+           "struct Grammar { set<int> terminalSet; set<int> nonterminalSet; "
+           "vector<Prod> prods; map<int, string> symbolNames; vector<int> "
+           "prodsPriority; vector<Associate> prodsAssociate; };\n"
+           "#define AS0 Associate::kNone\n"
+           "#define AS1 Associate::kLeft\n"
+           "#define AS2 Associate::kRight\n";
+
     oss << fmt::format("map<int, string> symbolNames = {};\n\n",
                        def_symbolnames.str());
     oss << fmt::format("set<int> terminalSet = {};\n\n", def_terminals.str());
     oss << fmt::format("set<int> nonterminalSet = {};\n\n",
                        def_nonterminals.str());
+    oss << fmt::format("vector<int> prodsPriority = {};\n", def_prodsPriority.str());
+    oss << fmt::format("vector<Associate> prodsAssociate = {};\n", def_prodsAssociate.str());
     oss << def_prods_comment.str();
     oss << fmt::format("vector<Prod> prods = {};\n\n", def_prods.str());
     oss << "Grammar grammar({\n"
@@ -107,6 +133,8 @@ void genGrammar(const Grammar &grammar, ostream &oss) {
            "  .nonterminalSet=nonterminalSet,\n"
            "  .prods=prods,\n"
            "  .symbolNames=symbolNames,\n"
+           "  .prodsPriority=prodsPriority,\n"
+           "  .prodsAssociate=prodsAssociate,\n"
            "});\n";
 }
 

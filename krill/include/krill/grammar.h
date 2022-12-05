@@ -54,11 +54,11 @@ struct Grammar {
 
 };
 
-enum ActionType { ACTION = 0, REDUCE = 1, GOTO = 2, ACCEPT = 3 };
 struct Action {
     // Action of LR1 parse (ACTION | GOTO | REDUCE | ACCEPT, tgt)
-    ActionType type; // action type
-    int        tgt;  // ACTION or GOTO: tgt=next_state; REDUCE: tgt=prod_idx
+    enum Type { kAction = 0, kReduce = 1, kGoto = 2, kAccept = 3 };
+    Type type; // action type
+    int  tgt;  // ACTION or GOTO: tgt=next_state; REDUCE: tgt=prod_idx
 
     string str() const;
 };

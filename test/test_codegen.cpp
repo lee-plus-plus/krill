@@ -323,7 +323,7 @@ int main() {
         testSyntax();
     } else if (i == 5) {
         testYaccSyntax();
-    } else if (i == 5) {
+    } else if (i == 6) {
         genYaccSyntax();
     }
     return 0;

@@ -65,7 +65,7 @@ void SyntaxParser::parse() {
         Action action = actionTable_[{states_.top(), input.id}];
 
         switch (action.type) {
-            case ACTION: {
+            case Action::Type::kAction: {
                 logger.debug("  ACTION push s{}", action.tgt);
                 states_.push(action.tgt);
                 symbols_.push(input.id);
@@ -83,7 +83,7 @@ void SyntaxParser::parse() {
                 offset_++;
                 break;
             }
-            case REDUCE: {
+            case Action::Type::kReduce: {
                 Prod                       r = prods_[action.tgt];
                 deque<shared_ptr<APTnode>> childNodes;
                 deque<AttrDict>            childAttrs;
@@ -99,7 +99,7 @@ void SyntaxParser::parse() {
 
                 assert(actionTable_.count({states_.top(), r.symbol}) != 0);
                 Action action2 = actionTable_[{states_.top(), r.symbol}];
-                assert(action2.type == GOTO);
+                assert(action2.type == Action::Type::kGoto);
                 states_.push(action2.tgt);
                 symbols_.push(r.symbol);
                 assert(0 <= action.tgt && action.tgt < prods_.size());
@@ -118,7 +118,7 @@ void SyntaxParser::parse() {
                 nodes_.push(nextNode);
                 break;
             }
-            case ACCEPT: {
+            case Action::Type::kAccept: {
                 logger.debug("  ACCEPT");
                 logger.info("syntax parsing complete successfully");
                 stringstream ss_ast;
