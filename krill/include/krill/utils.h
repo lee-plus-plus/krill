@@ -100,8 +100,8 @@ inline auto apply_map(std::vector<T> v, F func)
     return r;
 }
 
-template <typename T, typename R, typename F>
-inline R apply_reduce(std::vector<T> v, R init, F func) {
+template <typename Container, typename R, typename F>
+inline R apply_reduce(Container v, R init, F func) {
     return accumulate(v.begin(), v.end(), init, func);
 }
 
@@ -113,10 +113,35 @@ inline std::vector<T> apply_filter(std::vector<T> &v, F func) {
 }
 
 template <typename T>
-inline std::vector<T> slice(std::vector<T> v, int st, int ed) {
-    if (st < 0) { st = v.size() + (st % v.size()); }
-    if (ed < 0) { ed = v.size() + (ed % v.size()); }
-    return std::vector<T>(v.begin() + st, v.begin() + ed);
+inline std::vector<T> slice(const std::vector<T> &v, int st, int ed) {
+    int size = static_cast<int>(v.size());
+    if (st < 0) { st = size + st; }
+    if (ed < 0) { ed = size + size; }
+    if (st >= size || ed < 0 || st >= ed) {
+        return std::vector<T>();
+    } else {
+        if (st < 0) { st = 0; }
+        if (ed > size) { ed = size; }
+        return std::vector<T>(v.begin() + st, v.begin() + ed);
+    }
+}
+
+inline std::string slice(const std::string &s, int st, int ed) {
+    int size = static_cast<int>(s.size());
+    if (st < 0) { st = size + st; }
+    if (ed < 0) { ed = size + size; }
+    if (st >= size || ed < 0 || st >= ed) {
+        return string("");
+    } else {
+        if (st < 0) { st = 0; }
+        if (ed > size) { ed = size; }
+        return s.substr(st, ed - st);
+    }
+}
+
+template <typename T>
+inline T slice(const T &s, int st) {
+    return slice(s, st, s.size());
 }
 
 template <typename T1, typename T2>

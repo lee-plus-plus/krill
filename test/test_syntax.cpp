@@ -237,13 +237,14 @@ void test3() {
     cerr << "a very simple interpreter: \n"
             "please input codes like: \n"
             "\"a =1 + 21; b=2*0/1; 1 /1-1; \"\n";
-    while (true) {
-        cerr << "> ";
-        string s;
-        getline(cin, s);
-        stringstream input;
-        input << s;
+    vector<string> inputs = {
+        "a =1 + 21; b=2*0/1; 1 /1-1; ",
+    };
 
+    for (string line : inputs) {
+        stringstream input;
+        input << line;
+        cerr << "input: " << line << "\n";
         vector<Token> tokens = lexicalParser.parseAll(input);
 
         cerr << "{";

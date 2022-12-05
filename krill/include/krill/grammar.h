@@ -24,6 +24,9 @@ struct Prod {
     string str(const map<int, string> &symbolNames) const;
 };
 
+enum class Associate {kNone = 0, kLeft = 1, kRight = 2};
+string to_string(const Associate &associate);
+
 struct Grammar {
     // Grammar {(P -> Ab), (A -> Abc), (A -> b), ...}
     set<int>         terminalSet;
@@ -32,20 +35,23 @@ struct Grammar {
     map<int, string> symbolNames;
 
     // ambiguous grammar setting (unnecessary)
-    enum class Associate {kNone = 0, kLeft = 1, kRight = 2};
     vector<int>       prodsPriority;
     vector<Associate> prodsAssociate;
 
     Grammar() = default;
     Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
-            map<int, string> symbolNames, vector<int> prodsPriority,
-            vector<Associate> prodsAssociate); // for ambiguous grammar codegen
-    Grammar(set<int> terminalSet, set<int> nonterminalSet, vector<Prod> prods,
-            map<int, string> symbolNames); // for regular grammar codegen
-    Grammar(vector<vector<string>> prodStrs); // for quick use
-    Grammar(vector<string> prodStrs); // for quick use
+            map<int, string> symbolNames, vector<int> prodsPriority = {},
+            vector<Associate> prodsAssociate = {}); // for codegen
+    // Grammar(vector<vector<string>> prodStrs); // for quick use
+    // Grammar(vector<string> prodStrs); // for quick use
 
+    Grammar(vector<vector<string>> prodSymbolStrs,
+            map<string, int>       symbolIds       = {},
+            map<string, int>       symbolPriority  = {},
+            map<string, Associate> symbolAssociate = {});
+    Grammar(vector<string> prodStrs);
     string str() const;
+
 };
 
 enum ActionType { ACTION = 0, REDUCE = 1, GOTO = 2, ACCEPT = 3 };

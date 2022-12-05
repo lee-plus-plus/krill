@@ -155,79 +155,84 @@ void testSyntax() {
 
 Grammar parsingYacc(istream &input) {
     vector<string> lines[3];
-
     // Yacc -> TokenStmts DELIM ProdStmts DELIM SubStmts
     int i = 0;
+    spdlog::info("input token statements");
     while (input.good() && !input.eof()) {
         string line;
         getline(input, line);
         trim(line);
-        lines[i].push_back(line);
-        if (line == "%%") { i++; }
+        
+        if (line == "%%") {
+            i++;
+            if (i == 1) {
+                spdlog::info("input production statements");
+            } else if (i == 2) {
+                spdlog::info("input additional statements");
+            } else {
+                spdlog::error("invalid input");
+                assert(false);
+            }
+            continue;
+        } else {
+            lines[i].push_back(line);
+        }
     }
+    spdlog::info("end input");
     assert(i < 3);
-
-    vector<string> &tokenStmts = lines[0];
-    vector<string> &prodStmts  = lines[1];
+    vector<string> &tokenStmtsLines = lines[0];
+    vector<string> &prodStmtsLines  = lines[1];
     // vector<string> &subStmts = lines[2];
 
     // token statement processing
-    int priority    = -1;
-    using Associate = Grammar::Associate;
-    map<string, Associate> wordsAssociate;
-    map<string, int>       wordsPriority;
-    string                 startWord;
+    int                    priority = -1;
+    int                    tokenId  = 258;
+    map<string, int>       tokenIds;
+    map<string, int>       tokenPriority;
+    map<string, Associate> tokenAssociate;
+    string                 startToken;
 
-    for (string line : tokenStmts) {
+    static const map<string, Associate> toAsso = {
+        {"%nonassoc", Associate::kNone},
+        {"%left", Associate::kLeft},
+        {"%right", Associate::kRight},
+    };
+    spdlog::info("parsing token statements");
+    for (string line : tokenStmtsLines) {
         vector<string> words = split(line, " ");
-        if (words.size() == 0) {
-            continue;
-            spdlog::info("look {}", words[0]);
-        } else if (words[0] == "%token") {
-            // drop line
-        } else if (words[0] == "%left") {
+        if (words.size() == 0) { continue; }
+        if (words[0] == "%token") {
             for (int j = 1; j < words.size(); j++) {
-                assert(wordsAssociate.count(words[j]) == 0);
-                assert(wordsPriority.count(words[j]) == 0);
-                wordsAssociate[words[j]] = Associate::kLeft;
-                wordsPriority[words[j]]  = priority;
-                spdlog::info("add Left Associate Token:  {}", words[j]);
+                const string &w = words[j];
+                assert(tokenIds.count(w) == 0);
+                tokenIds[w] = tokenId++;
             }
-            priority -= 1;
-        } else if (words[0] == "%right") {
+        } else if (toAsso.count(words[0]) > 0) {
+            Associate asso = toAsso.at(words[0]);
             for (int j = 1; j < words.size(); j++) {
-                assert(wordsAssociate.count(words[j]) == 0);
-                assert(wordsPriority.count(words[j]) == 0);
-                wordsAssociate[words[j]] = Associate::kRight;
-                wordsPriority[words[j]]  = priority;
-                spdlog::info("add Right Associate Token:  {}", words[j]);
-            }
-            priority -= 1;
-        } else if (words[0] == "%nonassoc") {
-            for (int j = 1; j < words.size(); j++) {
-                assert(wordsPriority.count(words[j]) == 0);
-                wordsPriority[words[j]] = priority;
-                spdlog::info("add Non Associate Token:  {}", words[j]);
+                const string &w = words[j];
+                assert(tokenPriority.count(w) == 0);
+                assert(tokenAssociate.count(w) == 0);
+                tokenPriority[w]  = priority;
+                tokenAssociate[w] = asso;
             }
             priority -= 1;
         } else if (words[0] == "%start") {
             assert(words.size() == 2);
-            spdlog::info("add Start Token:  {}", words[1]);
-            startWord = words[1];
+            startToken = words[1];
+        } else {
+            spdlog::error("invalid token statement type: {}", words[0]);
+            throw runtime_error("parsing failed");
         }
     }
 
     // productions statement processing
     vector<vector<string>> prodSymbolStrs;
-    map<int, int>          prodsPrior;
-    map<int, Associate>    prodsAsso;
-
-    stringstream ss;
-    for (string line : prodStmts) { ss << line << " "; }
-
 
     vector<string> currProdStr;
-    bool           flagPrec = false;
+    stringstream   ss;
+    for (string line : prodStmtsLines) { ss << line << " "; }
+    spdlog::info("parsing productions statements");
     while (ss.good() && !ss.eof()) {
         string w;
         ss >> w;
@@ -240,37 +245,14 @@ Grammar parsingYacc(istream &input) {
             spdlog::info("add prod:  {}", fmt::join(currProdStr, " "));
             currProdStr.resize(0);
         } else if (w == ":") {
-            continue; // week format check
-        } else if (w[0] == '/' && w[1] == '*') {
-            while (!(w[w.size() - 2] == '*' && w[w.size() - 1] == '/')) {
-                ss >> w; // ignore comment
+            continue; // simply drop it, weak format check
+        } else if (slice(w, 0, 2) == "/*") {
+            while (slice(w, w.size() - 2) != "*/") {
+                ss >> w; // ignore comment, weak format check
                 if (!(ss.good() && !ss.eof())) { break; }
             }
-        } else if (w == "%prec") {
-            flagPrec = true;
         } else {
-            static string assoName[] = {"None", "Left", "Right"};
-            if (flagPrec) {
-                int  p     = prodSymbolStrs.size();
-                int  prior = wordsPriority.at(w);
-                auto asso  = wordsAssociate.at(w);
-                flagPrec   = false;
-
-                prodsPrior[p]  = prior;
-                prodsAsso[p] = asso;
-                spdlog::info("set priority:  {}", prior);
-                spdlog::info("set associativity:  {}",
-                             assoName[static_cast<int>(asso)]);
-            } else {
-                if (wordsAssociate.count(w) > 0) {
-                    int  p    = prodSymbolStrs.size();
-                    auto asso = wordsAssociate.at(w);
-                    prodsAsso[p] = asso;
-                    spdlog::info("set associativity:  {}",
-                                 assoName[static_cast<int>(asso)]);
-                }
-                currProdStr.push_back(w);
-            }
+            currProdStr.push_back(w);
         }
     }
 
@@ -278,22 +260,9 @@ Grammar parsingYacc(istream &input) {
     // pass
 
     // summurize
-    Grammar grammar(prodSymbolStrs);
-    for (auto[p, prior] : prodsPrior) {
-        grammar.prodsPriority[p] = prior;
-    }
-    for (auto[p, asso] : prodsAsso) {
-        grammar.prodsAssociate[p] = asso;
-    }
-
+    spdlog::info("parsing complete");
+    Grammar grammar(prodSymbolStrs, tokenIds, tokenPriority, tokenAssociate);
     return grammar;
-}
-
-void printLR1State(LR1State state, const map<int, string> &symbolNames,
-                   ostream &oss) {
-    for (const auto &item : state) {
-        oss << "  " << item.str(symbolNames) << "\n";
-    }
 }
 
 void printEdgeTable(EdgeTable edgeTable, const map<int, string> &symbolNames,
@@ -310,7 +279,7 @@ void printLr1Automata(LR1Automata             lr1Automata,
     int i = 0;
     for (LR1State state : lr1Automata.states) {
         cout << fmt::format("{}): \n", i++);
-        printLR1State(state, symbolNames, oss);
+        oss << to_string(state, symbolNames);
     }
     printEdgeTable(lr1Automata.edgeTable, symbolNames, oss);
 }

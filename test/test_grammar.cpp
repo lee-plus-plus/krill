@@ -48,9 +48,10 @@ void printActionTable(const ActionTable &     actionTable,
 
 void printLR1State(LR1State state, const map<int, string> &symbolNames,
                    ostream &oss) {
-    for (const auto &item : state) {
-        oss << "  " << item.str(symbolNames) << "\n";
-    }
+    oss << to_string(state, symbolNames);
+    // for (const auto &item : state) {
+    //     oss << "  " << item.str(symbolNames) << "\n";
+    // }
 }
 
 void printEdgeTable(EdgeTable edgeTable, const map<int, string> &symbolNames,
@@ -372,12 +373,12 @@ void test4() {
     grammar.prodsPriority[4] = -2;
     grammar.prodsPriority[5] = -3;
     grammar.prodsPriority[6] = -3;
-    grammar.prodsAssociate[1] = Grammar::Associate::kLeft;
-    grammar.prodsAssociate[2] = Grammar::Associate::kLeft;
-    grammar.prodsAssociate[3] = Grammar::Associate::kLeft;
-    grammar.prodsAssociate[4] = Grammar::Associate::kLeft;
-    grammar.prodsAssociate[5] = Grammar::Associate::kRight;
-    grammar.prodsAssociate[6] = Grammar::Associate::kRight;
+    grammar.prodsAssociate[1] = Associate::kLeft;
+    grammar.prodsAssociate[2] = Associate::kLeft;
+    grammar.prodsAssociate[3] = Associate::kLeft;
+    grammar.prodsAssociate[4] = Associate::kLeft;
+    grammar.prodsAssociate[5] = Associate::kRight;
+    grammar.prodsAssociate[6] = Associate::kRight;
 
     printGrammar(grammar, cout);
     printf("> symbol names:\n");
