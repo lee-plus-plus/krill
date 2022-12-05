@@ -215,7 +215,8 @@ struct ToString {
     }
 
     type operator()(const std::string &it) const {
-        return "\"" + unescape(it) + "\"";
+        // return "\"" + unescape(it) + "\"";
+        return unescape(it);
     }
 
     type operator()(const std::vector<bool> &bs) const {

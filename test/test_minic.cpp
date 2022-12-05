@@ -7,6 +7,7 @@
 #include <sstream>
 #include <cstring>
 #include <vector>
+using krill::log::logger;
 using namespace std;
 using namespace krill::type;
 using namespace krill::utils;
@@ -72,7 +73,7 @@ void testSyntaxParsing() {
         tokens.push_back(END_TOKEN);
 
         syntaxParser.parseAll(tokens);
-        syntaxParser.printAnnotatedParsingTree(cout);
+        syntaxParser.printAPT(cout);
 
         cout << "\n";
     }
@@ -134,8 +135,10 @@ void testFullLexicalSyntaxParsing() {
     for (auto node : nodes) {
         cout << fmt::format("{} ", grammar.symbolNames.at(node.id));
     }
+    logger.debug("abstract parsing tree:\n{}", syntaxParser.getAPTstr());
+
     cout << "\n";
-    syntaxParser.printAnnotatedParsingTree(cout);
+    syntaxParser.printAST(cout);
     cout << "\n";
 }
 

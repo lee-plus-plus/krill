@@ -82,8 +82,8 @@ void test1() {
     syntaxParser.clear();
     syntaxParser.parseAll(syntaxTokens);
 
-    // APTnode *root = syntaxParser.getAnnotatedParsingTree();
-    syntaxParser.printAnnotatedParsingTree(cerr);
+    // APTnode *root = syntaxParser.getAPT();
+    syntaxParser.printAPT(cerr);
 }
 
 // regex-like grammar (cannot deal with escape like "\+", "\?" well)
@@ -140,8 +140,8 @@ void test2() {
         syntaxParser.clear();
         syntaxParser.parseAll(syntaxTokens);
 
-        // APTnode *root = syntaxParser.getAnnotatedParsingTree();
-        syntaxParser.printAnnotatedParsingTree(cerr);
+        // APTnode *root = syntaxParser.getAPT();
+        syntaxParser.printAPT(cerr);
     }
 }
 
@@ -264,8 +264,8 @@ void test3() {
         syntaxParser.parseAll(syntaxTokens);
 
 
-        syntaxParser.printAnnotatedParsingTree(cerr);
-        APTnode *root        = syntaxParser.getAnnotatedParsingTree();
+        syntaxParser.printAPT(cerr);
+        APTnode *root        = syntaxParser.getAPT();
         auto     var_list    = root->attr.Get<map<string, double>>("var_list");
         auto     retval_list = root->attr.Get<vector<double>>("retval_list");
 

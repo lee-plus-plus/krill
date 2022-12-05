@@ -20,7 +20,7 @@ vector<Prod> getSymbolIdAssigned(const vector<vector<string>> &prodSymbolStrs,
                                  map<string, int> &            symbolIds) {
     vector<Prod> prods;
     int          symbolId =
-        apply_reduce(symbolIds, 258, [](int maxId, pair<string, int> elem) {
+        1 + apply_reduce(symbolIds, 258, [](int maxId, pair<string, int> elem) {
             return max(maxId, elem.second);
         });
 
@@ -52,7 +52,7 @@ vector<Prod> getSymbolIdAssigned(const vector<vector<string>> &prodSymbolStrs,
     }
     symbolIds["ζ"] = END_SYMBOL;
     symbolIds["ε"] = EMPTY_SYMBOL;
-
+    spdlog::debug("symbolId after: {}", ToString{}(symbolIds));
     return prods;
 }
 

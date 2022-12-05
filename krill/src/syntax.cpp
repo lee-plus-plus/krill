@@ -75,9 +75,11 @@ void SyntaxParser::parse() {
                 actionFunc_(nextNode.get()->attr, input.attr);
                 nodes_.push(nextNode);
 
+                // very stupid history stack, may be improved in the future
+                history_ += " ";
                 history_ += input.attr.Get<string>("lval");
-                if (history_.size() > 30) {
-                    history_ = history_.substr(history_.size() - 30);
+                if (history_.size() > 50) {
+                    history_ = history_.substr(history_.size() - 50);
                 }
 
                 offset_++;
@@ -122,7 +124,7 @@ void SyntaxParser::parse() {
                 logger.debug("  ACCEPT");
                 logger.info("syntax parsing complete successfully");
                 stringstream ss_ast;
-                printAnnotatedParsingTree(ss_ast);
+                printAPT(ss_ast);
                 logger.debug("Current AST: \n{}", ss_ast.str());
                 isAccepted_ = true;
                 break;
@@ -176,7 +178,7 @@ void SyntaxParser::parseAll(vector<APTnode> tokensWithAttr) {
     parse();
 }
 
-APTnode *SyntaxParser::getAnnotatedParsingTree() {
+APTnode *SyntaxParser::getAPT() {
     if (!isAccepted_) { return nullptr; }
     assert(nodes_.size() == 1);
 
@@ -185,10 +187,10 @@ APTnode *SyntaxParser::getAnnotatedParsingTree() {
 }
 
 void printAPT_(APTnode *node, ostream &oss, map<int, string> symbolNames,
-               bool forShort, vector<bool> isLast = {}) {
+               bool skipMid, bool skipAttr, vector<bool> isLast = {}) {
     // if (node == nullptr) { return; }
-    if (forShort && node->child.size() == 1) {
-        printAPT_(node->child[0].get(), oss, symbolNames, forShort, isLast);
+    if (skipMid && node->child.size() == 1) {
+        printAPT_(node->child[0].get(), oss, symbolNames, skipMid, skipAttr, isLast);
         return;
     }
     if (isLast.size() == 0) { oss << fmt::format(" "); }
@@ -202,30 +204,50 @@ void printAPT_(APTnode *node, ostream &oss, map<int, string> symbolNames,
     }
     if (node->child.size() == 0) {
         auto & attr     = node->attr;
-        string attr_str = attr.str();
+        string attr_str = skipAttr ? (attr.Has<string>("lval") ? attr.Get<string>("lval") : string()) : attr.str();
         // string attr_str = fmt::format(
         //     fmt::emphasis::underline, "\"{}\"",
         //     attr.Has<string>("lval") ? unescape(attr.Get<string>("lval")) :
         //     "");
-        oss << fmt::format("<{:s}> {}\n", symbolNames.at(node->id), attr_str);
+        oss << fmt::format("<{:s}>  {}\n", symbolNames.at(node->id), attr_str);
     } else {
         oss << fmt::format("<{:s}>\n", symbolNames.at(node->id));
     }
     isLast.push_back(false);
     for (auto it = node->child.begin(); it != node->child.end(); it++) {
         if (it + 1 == node->child.end()) { isLast.back() = true; }
-        printAPT_((*it).get(), oss, symbolNames, forShort, isLast);
+        printAPT_((*it).get(), oss, symbolNames, skipMid, skipAttr, isLast);
     }
 }
 
-void SyntaxParser::printAnnotatedParsingTree(ostream &oss) {
-    // if (!isAccepted_) { return; }
-    // APTnode *root     = getAnnotatedParsingTree();
-    bool                        forShort      = false;
+void SyntaxParser::printAPT(ostream &oss) {
+    bool skipMid = false;
+    bool skipAttr = false;
     vector<shared_ptr<APTnode>> unrootedNodes = to_vector(nodes_);
     for (auto node : unrootedNodes) {
-        printAPT_(node.get(), oss, grammar_.symbolNames, forShort);
+        printAPT_(node.get(), oss, grammar_.symbolNames, skipMid, skipAttr);
     }
+}
+
+void SyntaxParser::printAST(ostream &oss) {
+    bool skipMid = true;
+    bool skipAttr = true;
+    vector<shared_ptr<APTnode>> unrootedNodes = to_vector(nodes_);
+    for (auto node : unrootedNodes) {
+        printAPT_(node.get(), oss, grammar_.symbolNames, skipMid, skipAttr);
+    }
+}
+
+string SyntaxParser::getAPTstr() {
+    stringstream ss;
+    printAPT(ss);
+    return ss.str();
+}
+
+string SyntaxParser::getASTstr() {
+    stringstream ss;
+    printAST(ss);
+    return ss.str();
 }
 
 string SyntaxParser::getErrorMessage() {
@@ -237,10 +259,15 @@ string SyntaxParser::getErrorMessage() {
                     unescape(tokenWithAttr.attr.Get<string>("lval"))));
 
     logger.error("{}", errorMsg);
-    logger.error("Context: {}", unescape(history_));
+    logger.error("  history_: \"{}\"", history_);
+    logger.error("  look: {} \"{}\"", grammar_.symbolNames.at(tokenWithAttr.id), unescape(tokenWithAttr.attr.Get<string>("lval")));
+    logger.error(
+        "  symbols: [{}]",
+        fmt::join(apply_map(to_vector(symbols_), grammar_.symbolNames), ","));
+    logger.error("  states: [{}]", fmt::join(to_vector(states_), ","));
 
     stringstream ss_ast;
-    printAnnotatedParsingTree(ss_ast);
+    printAPT(ss_ast);
     logger.error("Current AST: \n{}", ss_ast.str());
 
     return errorMsg;

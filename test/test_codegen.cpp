@@ -147,7 +147,7 @@ void testSyntax() {
         tokens.push_back(END_TOKEN);
 
         syntaxParser.parseAll(tokens);
-        syntaxParser.printAnnotatedParsingTree(cerr);
+        syntaxParser.printAPT(cerr);
 
         cerr << "\n";
     }
@@ -261,6 +261,7 @@ Grammar parsingYacc(istream &input) {
 
     // summurize
     spdlog::info("parsing complete");
+    spdlog::debug("symbolId: {}", ToString{}(tokenIds));
     Grammar grammar(prodSymbolStrs, tokenIds, tokenPriority, tokenAssociate);
     return grammar;
 }

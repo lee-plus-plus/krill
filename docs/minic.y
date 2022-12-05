@@ -50,7 +50,6 @@ fun_decl
 
 FUNCTION_IDENT
     : IDENT
-
     ;  /*建立全局函数名变量*/
 
 params
@@ -88,7 +87,7 @@ expr_stmt
     : IDENT '=' expr ';'
     | IDENT '[' expr ']' '=' expr ';'
     | '$' expr '=' expr ';'
-    | IDENT '(' args ')' ';'
+    | IDENT '(' args_ ')' ';'
     ;  /*赋值语句*/
 
 while_stmt
@@ -148,7 +147,7 @@ expr
     | '(' expr ')'
     | IDENT
     | IDENT '[' expr ']'
-    | IDENT '(' args ')'  /* IDENT ( args )为函数调用*/
+    | IDENT '(' args_ ')'  /* IDENT ( args_ )为函数调用*/
     | int_literal  /*数值常量*/
     | expr '&' expr  /*按位与*/
     | expr '^' expr  /*按位异或*/
@@ -168,7 +167,7 @@ arg_list
     | expr
     ;
 
-args
+args_
     : arg_list
     |
     ;

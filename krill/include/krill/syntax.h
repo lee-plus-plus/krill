@@ -50,8 +50,11 @@ class SyntaxParser {
     void parseAll(vector<Token> tokens);
     void parseAll(vector<APTnode> tokensWithAttr);
 
-    APTnode *getAnnotatedParsingTree();
-    void printAnnotatedParsingTree(ostream &oss);
+    APTnode *getAPT();
+    void printAPT(ostream &oss);
+    void printAST(ostream &oss); // simplified
+    string getAPTstr();
+    string getASTstr(); // simplified
 
   private:
     Grammar       grammar_;
