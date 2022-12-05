@@ -4,6 +4,7 @@
 #include <map>
 #include <set>
 #include <vector>
+#include <string>
 using std::pair;
 using std::set, std::map, std::multimap, std::vector;
 
@@ -31,6 +32,8 @@ struct Edge {
     bool operator==(const Edge &e) const;
 };
 using EdgeTable = vector<Edge>;
+
+std::string to_string(const EdgeTable &tbl, const map<int, std::string> &symbolNames);
 
 } // namespace krill::type
 

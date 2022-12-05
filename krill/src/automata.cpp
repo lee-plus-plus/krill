@@ -2,7 +2,9 @@
 #include <algorithm>
 #include <queue>
 #include <tuple>
+#include <sstream>
 using std::max, std::min;
+using std::stringstream, std::string;
 
 namespace krill::type {
 
@@ -13,6 +15,17 @@ bool Edge::operator<(const Edge &e) const {
 bool Edge::operator==(const Edge &e) const {
     return std::tie(symbol, from, to) == std::tie(e.symbol, e.from, e.to);
 }
+
+string to_string(const EdgeTable &tbl, const map<int, string> &symbolNames) {
+    stringstream ss;
+    ss << fmt::format("EdgeTable (size={})\n", tbl.size());
+    for (const Edge &edge : tbl) {
+        ss << fmt::format("    s{:<2d} --> {:s} --> s{:<2d}\n", edge.from,
+                           symbolNames.at(edge.symbol), edge.to);
+    }
+    return ss.str();
+}
+
 
 } // namespace krill::type
 

@@ -11,7 +11,7 @@ message("Fetching Complete!")
 # Use SPDLOG for logging.
 message("Fetching SPDLOG")
 FetchContent_Declare(
-  spdlog URL https://github.com/gabime/spdlog/archive/refs/tags/v1.11.0.tar.gz
+  spdlog URL https://github.com/gabime/spdlog/archive/refs/tags/v1.10.0.tar.gz
 )
 # FetchContent_Declare(
 #   spdlog

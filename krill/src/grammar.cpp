@@ -10,6 +10,7 @@
 #include <sstream>
 #include <tuple>
 using namespace krill::utils;
+using krill::log::logger;
 using std::min, std::max;
 using std::stringstream;
 
@@ -37,7 +38,7 @@ vector<Prod> getSymbolIdAssigned(const vector<vector<string>> &prodSymbolStrs,
                     break;
                 } else if (symbolIds.count(word) == 0) {
                     // not previous defined
-                    spdlog::warn("token {} not previous defined, added", word);
+                    logger.warn("token {} not previous defined, added", word);
                     symbolIds[word] = symbolId++;
                 }
             }
@@ -144,9 +145,9 @@ Grammar::Grammar(set<int> ts, set<int> nts, vector<Prod> prods,
       prodsPriority(priors), prodsAssociate(assos) {
     // fill default priority and asscociate
     if (priors.size() == 0 && assos.size() == 0) {
-        auto [pirors_, assos_] = getDefaultPriorityAndAsscociate(prods.size());
-        this->prodsPriority = pirors_;
-        this->prodsAssociate = assos_;
+        auto[pirors_, assos_] = getDefaultPriorityAndAsscociate(prods.size());
+        this->prodsPriority   = pirors_;
+        this->prodsAssociate  = assos_;
     }
     // check
     assert(this->prods[0].right.size() == 1);
@@ -163,6 +164,7 @@ Grammar::Grammar(vector<vector<string>> prodSymbolStrs,
     auto[prodsPriors, prodsAssos] = getPriorityAndAsscociate(
         prodSymbolStrs, symbolPriority, symbolAssociate);
     new (this) Grammar(ts, nts, prods, symbolNames, prodsPriors, prodsAssos);
+    logger.info("Grammar generated:\n{}", this->str());
 }
 
 Grammar::Grammar(vector<string> prodStrs) {
@@ -180,6 +182,14 @@ string Grammar::str() const {
     stringstream  ss;
     static string assoName[] = {"", "Left", "Right"};
     ss << "Grammar: \n";
+    ss << "Terminal set:\n  ";
+    for (int s : this->terminalSet) {
+        ss << fmt::format("{} ", this->symbolNames.at(s));
+    }
+    ss << "\nNon-terminal set:\n  ";
+    for (int s : this->nonterminalSet) {
+        ss << fmt::format("{} ", this->symbolNames.at(s));
+    }
     ss << "\nProductions:\n  asso prior   idx  symbols\n";
     for (int i = 0; i < prods.size(); i++) {
         ss << fmt::format("{:>6s}{:-6d}{:>6s}  {}\n",
@@ -275,6 +285,18 @@ string ProdLR1Item::str(const map<int, string> &symbolNames) const {
         ss << fmt::format(" {}", symbolNames.at(this->right[i]));
     }
     ss << fmt::format("  ⎥⎥ {}", symbolNames.at(this->search), this->search);
+    return ss.str();
+}
+
+string LR1Automata::str(const map<int, string> &symbolNames) const {
+    stringstream ss;
+    ss << fmt::format("LR1 Automata (num_states={}, num_edges={})\n",
+                      this->states.size(), this->edgeTable.size());
+    int i = 0;
+    for (LR1State state : this->states) {
+        ss << fmt::format("{}): \n{}", i++, to_string(state, symbolNames));
+    }
+    ss << "\n" << to_string(this->edgeTable, symbolNames);
     return ss.str();
 }
 
@@ -388,7 +410,7 @@ map<int, set<int>> getFollowSets(Grammar            grammar,
 }
 
 LR1Automata getLR1Automata(Grammar grammar) {
-    spdlog::info("begin generating LR1 Automata");
+    logger.info("begin generating LR1 Automata");
     auto firstSets  = getFirstSets(grammar);
     auto followSets = getFollowSets(grammar, firstSets);
     // generate states
@@ -426,8 +448,12 @@ LR1Automata getLR1Automata(Grammar grammar) {
         }
     }
 
-    spdlog::info("complete generating LR1 Automata");
-    return LR1Automata({states, edgeTable});
+    LR1Automata lr1Automata({states, edgeTable});
+    logger.info(
+        "complete generating LR1 Automata (num_states={}, num_edges={})",
+        states.size(), edgeTable.size());
+    logger.debug("LR1 Automata: \n{}", lr1Automata.str(grammar.symbolNames));
+    return lr1Automata;
 }
 
 // expand the LR(1) state (epsilon-closure method)
@@ -499,7 +525,7 @@ string to_string(const LR1State &state, const map<int, string> &symbolNames) {
 }
 
 ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
-    spdlog::info("begin generating LR1 Action Table");
+    logger.info("begin generating LR1 Action Table");
     vector<LR1State> &states    = lr1Automata.states;
     EdgeTable &       edgeTable = lr1Automata.edgeTable;
 
@@ -514,10 +540,10 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
             // ACTION / ACTION confict
             Action theirAction = actionTable.at({from, search});
             Action ourAction   = {ACTION, to};
-            spdlog::critical(
+            logger.critical(
                 "lr1 conflit at state s{}, search {}: ours: {}, theirs: {}",
                 symbolNames.at(search), ourAction.str(), theirAction.str());
-            spdlog::info("summary of state s{}: \n{}", from,
+            logger.info("summary of state s{}: \n{}", from,
                          to_string(states[from], symbolNames));
         }
         if (grammar.terminalSet.count(search)) {
@@ -528,7 +554,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
             actionTable[{from, search}] = {GOTO, to};
         }
         if (isConflit) {
-            spdlog::critical("conflit resolved by FORCING overwrite, may not "
+            logger.critical("conflit resolved by FORCING overwrite, may not "
                              "be what you want");
         }
     }
@@ -560,7 +586,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                 // conflict
                 Action theirAction = actionTable.at({i, item.search});
                 Action ourAction   = {REDUCE, r};
-                spdlog::info(
+                logger.info(
                     "lr1 conflit at state s{}, search {}: ours: {}, theirs: {}",
                     i, symbolNames.at(item.search), ourAction.str(),
                     theirAction.str());
@@ -568,17 +594,17 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                 // REDUCE / REDUCE conflict
                 // (indicate that grammar is not lr(1) grammar)
                 if (theirAction.type == REDUCE) {
-                    spdlog::critical("REDUCE / REDUCE conflict: state s{}, "
+                    logger.critical("REDUCE / REDUCE conflict: state s{}, "
                                      "prod p{}, search {}:",
                                      i, r + 1, symbolNames.at(item.search));
                     int r2 = theirAction.tgt;
-                    spdlog::critical("prod1 p{}: {}", r + 1,
+                    logger.critical("prod1 p{}: {}", r + 1,
                                      item.str(symbolNames));
-                    spdlog::critical("prod2 p{}: {}", r2 + 1,
+                    logger.critical("prod2 p{}: {}", r2 + 1,
                                      prods[r2].str(symbolNames));
                     int p1 = grammar.prodsPriority[r];
                     int p2 = grammar.prodsPriority[r2];
-                    spdlog::critical("conflict resolved: use p{} "
+                    logger.critical("conflict resolved: use p{} "
                                      "(priority p1={}, p2={})",
                                      ((p1 <= p2) ? (r + 1) : (r2 + 1)), p1, p2);
                     actionTable[{i, item.search}] =
@@ -588,7 +614,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
 
                 // REDUCE / ACTION conflict
                 assert(theirAction.type == ACTION);
-                spdlog::info("item p{}: {}", r + 1, item.str(symbolNames));
+                logger.info("item p{}: {}", r + 1, item.str(symbolNames));
 
                 int a;
                 for (a = 0; a < prods.size(); a++) {
@@ -605,14 +631,14 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                     bool useOurs = (rPrior < aPrior);
                     actionTable[{i, item.search}] =
                         useOurs ? ourAction : theirAction;
-                    spdlog::info("conflict resolved: {} (priority r={}, a={})",
+                    logger.info("conflict resolved: {} (priority r={}, a={})",
                                  (useOurs ? "REDUCE" : "ACTION"), rPrior,
                                  aPrior);
                     if (min(rPrior, aPrior) >= 0) {
                         // resolved by default priority, dangerous!
-                        spdlog::critical("conflit resolved by default "
+                        logger.critical("conflit resolved by default "
                                          "priority, may not be what you want");
-                        spdlog::info("summary of state s{}: \n{}", i,
+                        logger.info("summary of state s{}: \n{}", i,
                                      to_string(states[i], symbolNames));
                     }
                 } else if (asso != Associate::kNone) {
@@ -620,29 +646,32 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                     bool useOurs = (asso == Associate::kLeft);
                     actionTable[{i, item.search}] =
                         useOurs ? ourAction : theirAction;
-                    spdlog::info("lr1 conflict resolved: {} ({} associate)",
+                    logger.info("lr1 conflict resolved: {} ({} associate)",
                                  (useOurs ? "REDUCE" : "ACTION"),
                                  (useOurs ? "Left" : "Right"));
                 } else {
                     // no associativity (resolve failed), FORCING reduce
                     // dangerous!
                     actionTable[{i, item.search}] = ourAction;
-                    spdlog::critical(
+                    logger.critical(
                         "failed to resolve by priority or associacity");
-                    spdlog::critical("conflit resolved by FORCING reduce, may "
+                    logger.critical("conflit resolved by FORCING reduce, may "
                                      "not be what you want");
-                    spdlog::info("summary of state s{}: \n{}", i,
+                    logger.info("summary of state s{}: \n{}", i,
                                  to_string(states[i], symbolNames));
                 }
             }
         }
     }
-    spdlog::info("complete generating LR1 Action Table");
+
+    logger.info("complete generating LR1 Action Table (size={})",
+                 actionTable.size());
+    logger.debug("LR1 ActionTable: \n{}", to_string(actionTable, grammar.symbolNames));
     return actionTable;
 }
 
 LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata) {
-    spdlog::info("begin transferring LR1 Automata to LALR1 Automata");
+    logger.info("begin transferring LR1 Automata to LALR1 Automata");
     vector<LR1State> &states    = lr1Automata.states;
     EdgeTable &       edgeTable = lr1Automata.edgeTable;
 
@@ -696,8 +725,13 @@ LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata) {
     }
     for (auto edge : resEdgeTable0) { resEdgeTable.push_back(edge); }
 
-    spdlog::info("complete transferring LR1 Automata to LALR1 Automata");
-    return LR1Automata({resStates, resEdgeTable});
+    LR1Automata lalr1Automata({resStates, resEdgeTable});
+    logger.info("complete transferring LR1 Automata to LALR1 Automata "
+                 "(num_states={} -> {}, num_edges={} -> {})",
+                 states.size(), resStates.size(), edgeTable.size(),
+                 resEdgeTable.size());
+    logger.debug("LALR1 Automata: \n{}", lalr1Automata.str(grammar.symbolNames));
+    return lalr1Automata;
 }
 
 } // krill::grammar::core

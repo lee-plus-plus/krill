@@ -265,51 +265,14 @@ Grammar parsingYacc(istream &input) {
     return grammar;
 }
 
-void printEdgeTable(EdgeTable edgeTable, const map<int, string> &symbolNames,
-                    ostream &oss) {
-    oss << "EdgeTable: \n";
-    for (const Edge &edge : edgeTable) {
-        oss << fmt::format("s{:<2d} --> {:s} --> s{:<2d}\n", edge.from,
-                           symbolNames.at(edge.symbol), edge.to);
-    }
-}
-
-void printLr1Automata(LR1Automata             lr1Automata,
-                      const map<int, string> &symbolNames, ostream &oss) {
-    int i = 0;
-    for (LR1State state : lr1Automata.states) {
-        cout << fmt::format("{}): \n", i++);
-        oss << to_string(state, symbolNames);
-    }
-    printEdgeTable(lr1Automata.edgeTable, symbolNames, oss);
-}
-
-void printActionTable(const ActionTable &     actionTable,
-                      const map<int, string> &symbolNames, ostream &oss) {
-    oss << fmt::format("Analysis Table (size={}): \n", actionTable.size());
-    string typeName[] = {"ACTION", "REDUCE", "GOTO  ", "ACCEPT"};
-    for (auto[key, action] : actionTable) {
-        oss << fmt::format("s{:<2d} --> {:s} --> {:<6s} ", key.first,
-                           symbolNames.at(key.second), typeName[action.type]);
-        if (action.type == ACTION || action.type == GOTO) {
-            oss << fmt::format("s{:<2d}", action.tgt);
-        } else if (action.type == REDUCE) {
-            oss << fmt::format("r{:<2d}", action.tgt);
-        }
-        oss << "\n";
-    }
-}
-
-
-
-void testAmbiguousSyntax() {
-    cerr << "input yacc definition of ambiguous lr1 grammar, end with empty "
+void testYaccSyntax() {
+    cerr << "input yacc definition of Ambiguous lr1 grammar, end with empty "
             "line\n";
+    cerr << "format: Token_Stmts %% Production_Stmts %% Else\n";
     vector<string> strs;
 
     cin.ignore();
     Grammar grammar = parsingYacc(cin);
-    cerr << "start generate Grammar ...\n";
 
     cout << grammar.str();
     cout << "\n";
@@ -317,12 +280,24 @@ void testAmbiguousSyntax() {
     cerr << "start generate Lr1 Automata ...\n";
     auto lr1Automata   = getLR1Automata(grammar);
     auto lalr1Automata = getLALR1fromLR1(grammar, lr1Automata);
-    printLr1Automata(lalr1Automata, grammar.symbolNames, cout);
+    cout << lalr1Automata.str(grammar.symbolNames);
 
     cerr << "start generate Lr1 ActionTable ...\n";
     auto actionTable = getLR1table(grammar, lalr1Automata);
-    printActionTable(actionTable, grammar.symbolNames, cout);
-    // SyntaxParser syntaxParser(grammar, actionTable);
+    cout << to_string(actionTable, grammar.symbolNames);
+}
+
+void genYaccSyntax() {
+    cerr << "input yacc definition of Ambiguous lr1 grammar, end with empty "
+            "line\n";
+    cerr << "format: Token_Stmts %% Production_Stmts %% Else\n";
+    vector<string> strs;
+
+    cin.ignore();
+    Grammar grammar = parsingYacc(cin);
+    
+    cerr << "start generate syntax parser ...\n";
+    genSyntaxParser(grammar, cout);
 }
 
 int main() {
@@ -330,7 +305,8 @@ int main() {
             "[2] lexical codegen\n"
             "[3] regex test\n"
             "[4] syntax test\n"
-            "[5] ambiguous syntax test\n"
+            "[5] yacc syntax test\n"
+            "[6] yacc syntax codegen\n"
             "> ";
     int i;
     cin >> i;
@@ -346,7 +322,9 @@ int main() {
     } else if (i == 4) {
         testSyntax();
     } else if (i == 5) {
-        testAmbiguousSyntax();
+        testYaccSyntax();
+    } else if (i == 5) {
+        genYaccSyntax();
     }
     return 0;
 }

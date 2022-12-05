@@ -3,8 +3,13 @@
 #include <map>
 #include <vector>
 
+#include "spdlog/spdlog.h"
+
 // clang-format off
 namespace krill {
+	namespace log {
+		extern spdlog::logger logger;
+	}
 	namespace type {
 		// automata
 		struct DFA;
