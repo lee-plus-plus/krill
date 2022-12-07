@@ -112,11 +112,12 @@ $ make test_minic
 
 ## TODO
 
-1. 增加测试用例 (`test/minic-testcase`), 确保Abstact Syntax Tree无误
-2. SDD支持表达式
-3. SDD支持类型表达式
-4. SDD支持数组
-5. SDD支持函数
+- 增加测试用例 (`test/minic-testcase`), 确保Abstact Syntax Tree无误 (done)
+- 提高lr1分析速度
+- lr1错误恢复
+- 中间代码生成
+- 中间代码优化
+- 机器代码生成
 
 借此生成三地址码 (中间表示)
 

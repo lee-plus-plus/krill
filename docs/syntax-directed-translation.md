@@ -1,94 +1,275 @@
 # 语法制导翻译 (Syntax-Directed Translation, SDT)
 
-参考: 紫龙书第5章, 第6章. 
+## 中间代码生成简介
 
-假设整个语法制导定义(SDD)都是综合属性 (Synthesized attribute)的, 即所有属性推导都是自底至上的, 或者说是对注释语法树进行后序遍历得到的. 
+以下述mini-c代码为例
 
-中间代码生成采用四元式表示, 并要求符合静态单赋值形式(SSA). 
+```c
+int func(int x, int y) {
+   int a;
+   a = x + y;
+   return a;
+}
 
-## Annotated Parsing Tree 设计
-
-采用如下约定
-
-- 分配新临时变量名: `assign_new_address()`
-- 生成三地址码: `gen_code(operator, a1_addr, a2_addr, r_addr)`
-- 
-
-
-### 表达式 (expression)
-
-- 必有属性: `.addr`
-- 可有属性: `.val` (表示值已知, 可能是常量表达式)
-
-```txt
-E1 <- E2 * E3
-	E1.addr = assign_new_address()
-	gen_code("*", E2.addr, E3.addr, E1.addr, )
+void main(void) {
+   int x;
+   int y;
+   x = 5;
+   y = 3;
+   x = func(x, y);
+   x = x + 3;
+   return;
+}
 ```
 
-以 `a * (4 - b)` 为例: 
-
-```txt
- E
- ├─ E .addr = t1       	0) E.addr <- get_symbol_address("a") = t1;
- ├─ '*'
- └─ E .addr = t4       	3) E.addr <- assign_new_address() = t4; gen_code("t4 <- t2 - t3")
-    ├─ E .addr = t2    	1) E.addr <- assign_new_address() = t2; gen_code("t2 <- 4");
-    ├─ '-'
-    └─ E .addr = t3    	2) E.addr <- assign_new_address() = t3; gen_code("t2 <- 4");
-```
-
-以`a[i][j]` 为例 (假设先前已有定义 `int a[4][6];`, `E_i.addr = t1`, `E_j.addr = t2`). 
-(关于数组的处理将在后面详细定义)
-
-```txt
- E						2) E.addr <- t6; gen_code("t5 <- t3 + t4"); gen_code("t6 <- a[t5]");
- └─ L					1) gen_code("t4 <- t2 * 4");
-    ├─ L 				0) gen_code("t3 <- t1 * 24");
-    │  ├─ "a"
-    │  ├─ '['
-    │  ├─ 2
-    │  └─ ']'
-    ├─ '['
-    ├─ 3
-    └─ ']'
-```
-
-### 类型表达式 (declarator)
-
-以`int a[2][3]`为例. 
-array_table 记录符号名, 数据宽度，类型，形状和对应栈区偏移地址(局部)或数据区偏移地址(全局)
-
-```txt
- D .type = INT, .symbol = "a" .shape = {2, 3}	2) push_array_table(.type, .symbol, .shape)
- ├─ INT
- └─ Decl .symbol = "a" .shape = {2, 3}			1) 
-    ├─ Decl .symbol = "a" .shape = {2}			0) 
-    │  ├─ "a"
-    │  ├─ '['
-    │  ├─ E .val = 2
-    │  │  └─ 2
-    │  └─ ']'
-    ├─ '['
-    ├─ E .val = 3
-    │  └─ 3
-    └─ ']'
-```
-
-### 控制流
-
-以`if (E) S1 else S2`为例. 
+旨在大致生成如下的中间代码 (不严谨)
 
 ```
- selection_statement
- ├─ IF .
- ├─ '('
- ├─ E
- ├─ ')'
- ├─ S1
- ├─ ELSE
- └─ S2
+func:
+    %x = pop
+    %y = pop
+    %t1 = add %x %y
+    %a = %t1
+    ret %a
 
+main:
+    %t1 = assign 5
+    %x = %t1
+    %t2 = assign 3
+    %y = %t2
+    push %y
+    push %x
+    %t3 = call func
+    %x2 = %t3
+    %t4 = assign 3
+    %t5 = add %x2 %t4
+    %x3 = %t5
+    halt
+```
+
+参考llvm的中间表示 (`$ clang -emit-llvm -S -c -fno-discard-value-names 06.c -o 06.ll`)
+
+```
+define dso_local i32 @func(i32 %x, i32 %y) #0 {
+entry:
+  %x.addr = alloca i32, align 4
+  %y.addr = alloca i32, align 4
+  %a = alloca i32, align 4
+  store i32 %x, i32* %x.addr, align 4
+  store i32 %y, i32* %y.addr, align 4
+  %0 = load i32, i32* %x.addr, align 4
+  %1 = load i32, i32* %y.addr, align 4
+  %add = add nsw i32 %0, %1
+  store i32 %add, i32* %a, align 4
+  %2 = load i32, i32* %a, align 4
+  ret i32 %2
+}
+
+; Function Attrs: noinline nounwind optnone uwtable
+define dso_local void @main() #0 {
+entry:
+  %x = alloca i32, align 4
+  %y = alloca i32, align 4
+  store i32 5, i32* %x, align 4
+  store i32 3, i32* %y, align 4
+  %0 = load i32, i32* %x, align 4
+  %1 = load i32, i32* %y, align 4
+  %call = call i32 @func(i32 %0, i32 %1)
+  store i32 %call, i32* %x, align 4
+  %2 = load i32, i32* %x, align 4
+  %add = add nsw i32 %2, 3
+  store i32 %add, i32* %x, align 4
+  ret void
+}
+```
+
+## 方案
+
+大部分属性是综合的(Synthetic, S-attribute), 但也有些是继承的(inHerited, H-attribute), 
+前者可以在lr1归约时同时完成处理(后序遍历), 后者必须先构造完语法分析树, 才能执行翻译(中序遍历). 
+
+## 约定
+
+采用四元式存储三地址码指令. 
+
+```c++
+struct QuadTuple {
+    using Label = uint32_t; // label of address, not memeory address
+    using Varname = uint32_t;
+    using ConstVal = uint32_t;
+    enum class Op {
+        kAssgin, // (var, val)
+        kCopy, // (var, src1)
+        kAdd, kMinus, kMult, kDiv, kMod, // (dest, src1, src2)
+        kAnd, kOr, kXor, kNor, // (dest, src1, src2)
+        kSll, kSrl, // (dest, src1, src2)
+        kEq, kNeq, kLeq, kLt, // (dest, src1, src2)
+        kAlloate, // (var_m, offset)
+        kLoad, kStore, // (var_m, addr, offset)
+        kPush, kPop, // (var)
+        kCall, // (var_j)
+        kJump, // (var_j)
+        kBranch, // (var_j, addr1, addr2) 
+        // type: var(varname)
+        kRet, // (var)
+        kHalt, // ()
+    };
+    Op  op;
+    union Data {
+        struct { Varname var;   ConstVal val; }; // assign
+        struct { Varname dest;  Varname src1; Varname src2; }; // calculate
+        struct { Varname var_m; Varname addr; ConstVal offset; }; // mem load/store
+        struct { Varname var_j; Label addr1;  ConstVal addr2; }; // jump, branch
+    } args;
+};
+```
+
+方便起见，约定变量 `%0` 为常数0. 
+
+不遵守单变量赋值约定(SSA), 懒得搞 $\phi$ 函数
+
+因为minic不支持传指针、取地址，我们可以约定所有的局部变量仅分配在寄存器上. 
+
+## 表达式
+
+考虑下述代码
+
+```c++
+    a = (3 + c) * d + e;
+```
+
+翻译成如下中间代码
+
+```
+    %t1 = assign 3
+    %t2 = %t1 add %c
+    %t3 = %t2 mult %d
+    %t4 = %t3 add %e
+    %a = %t4
+```
+
+## 数组
+
+一维数组的声明必然伴随着内存访问, 取数组元素的地址全程是变量运算, 不用到常数offset. 
+局部的一维数组在声明时由栈区分配空间，其变量名存放栈指针首地址. 
+
+```c++
+void main(void) {
+    int a[5];
+    a[2] = a[3];
+}
+```
+
+翻译如下
+
+```
+main:
+    %a = allocate 5
+    %t1 = assign 3
+    %t2 = assign 4 (size of int32_t)
+    %t3 = mult %t1 %t2
+    %t4 = add %a %t3 (address of a[3])
+    %t5 = load %t4 %0 (%t5 = a[3])
+    %t6 = assign 2
+    %t7 = assign 4 
+    %t8 = mult %t1 %t2
+    %t9 = add %a %t8 (address of a[2])
+    store %t9 %0 = %5
+```
+
+## 布尔表达式
+
+使用粗暴的布尔化技术, 完全不考虑短路特性, 对所有布尔算符的操作数作强制布尔类型转化, 考虑下述代码 
+
+```c++
+    a = (b && c) || (d > e);
+```
+
+翻译如下: 
+
+```
+    %t0 = %b neq %0 (等价于 t0 = bool(b))
+    %t1 = %c neq %0
+    %t2 = %t0 and %t1
+    %t3 = le %e %d
+    %t4 = %t2 neq %0
+    %t5 = %t3 neq %0
+    %t6 = %t4 or %t5
+    %a = %t6 (哈哈)
+```
+
+## 控制流
+
+使用粗暴的控制流翻译技术, 哪怕会产生一大堆冗余的标号 (哈哈, 我是笨比)
+
+```c++
+    if (a) {
+        b = 1;
+    } else {
+        if (b) {
+            c = 1;
+        } else {
+            d = 1;
+        }
+    }
+```
+
+翻译如下: 
+
+```
+    %t0 = %a neq %0
+    branch %t0, if1.true, if1.false
+if1.true:
+    assign %b = 1
+    jump if1.end
+if1.false:
+    %t1 = %b neq %0
+    branch %t0, if2.true, if2.false
+if2.true:
+    assign %c = 1
+if2.false:
+    assign %d = 1
+if2.end:
+if1.end:
+```
+
+## 过程调用
+
+约定所有参数都通过压栈传入, 调用方从后往前压入，函数内部从前向后取出. 
+
+```c++
+int func(int x, int y) {
+   int a;
+   a = x + y;
+   return a;
+}
+
+void main(void) {
+    int x;
+    x = func(3, 4);
+    return;
+}
+```
+
+翻译如下
+
+```
+func:
+    %x = pop
+    %y = pop
+    ret %x
+
+main:
+    assign %t1 = 4
+    push %t1
+    assign %t2 = 3
+    push %t2
+    %x = call func
+    halt
 ```
 
 
+
+
+
+## 附加
