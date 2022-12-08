@@ -383,16 +383,16 @@ LR1Automata getLR1automata(Grammar grammar) {
     logger.info("begin generating LR1 Automata");
     auto firstSets  = getFirstSets(grammar);
     auto followSets = getFollowSets(grammar, firstSets); // unused 
-    logger.info("first-sets: \n{}", to_string(firstSets, grammar));
-    logger.info("follow-sets: \n{}", to_string(followSets, grammar));
+    logger.debug("first-sets: \n{}", to_string(firstSets, grammar));
+    logger.debug("follow-sets: \n{}", to_string(followSets, grammar));
 
-    // return value optimization, really speed it up
-    map<LR1State, LR1State> closureRVO;
+    // cache, really speed it up
+    map<LR1State, LR1State> cache;
     auto                    closured = [&](LR1State &state) {
-        if (closureRVO.count(state) == 0) {
-            closureRVO[state] = getLR1StateExpanded(state, firstSets, grammar);
+        if (cache.count(state) == 0) {
+            cache[state] = getLR1StateExpanded(state, firstSets, grammar);
         }
-        state = closureRVO.at(state);
+        state = cache.at(state);
     };
 
     // generate states
