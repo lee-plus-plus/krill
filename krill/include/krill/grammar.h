@@ -99,8 +99,9 @@ struct LR1Automata {
 map<int, set<int>> getFirstSets(Grammar grammar);
 map<int, set<int>> getFollowSets(Grammar grammar, map<int, set<int>> firstSets);
 
-void setLR1StateExpanded(LR1State &states, const map<int, set<int>> &followSets,
-                         const Grammar &grammar);
+LR1State getLR1StateExpanded(const LR1State &          states,
+                             const map<int, set<int>> &followSets,
+                             const Grammar &           grammar);
 
 LR1Automata getLR1automata(Grammar grammar);
 ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata);

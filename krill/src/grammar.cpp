@@ -385,6 +385,7 @@ map<int, set<int>> getFollowSets(Grammar            grammar,
     return followSets;
 }
 
+// main part of lr(1) algorithm
 LR1Automata getLR1automata(Grammar grammar) {
     logger.info("begin generating LR1 Automata");
     auto firstSets  = getFirstSets(grammar);
@@ -392,17 +393,25 @@ LR1Automata getLR1automata(Grammar grammar) {
     logger.info("first-sets: \n{}", to_string(firstSets, grammar));
     logger.info("follow-sets: \n{}", to_string(followSets, grammar));
 
+    // return value optimization, really speed it up
+    map<LR1State, LR1State> closureRVO;
+    auto                    closured = [&](LR1State &state) {
+        if (closureRVO.count(state) == 0) {
+            closureRVO[state] = getLR1StateExpanded(state, firstSets, grammar);
+        }
+        state = closureRVO.at(state);
+    };
+
     // generate states
     vector<LR1State> states;
     LR1State         initStates = {{0, 0, END_SYMBOL}};
-    setLR1StateExpanded(initStates, firstSets, grammar);
+    initStates = getLR1StateExpanded(initStates, firstSets, grammar);
     states.push_back(initStates); // generate inital state
 
     const auto &prods = grammar.prods;
 
     // bfs, generate follow states
     EdgeTable edgeTable;
-    EdgeTable edgePriority;
     for (int i = 0; i < states.size(); i++) {
         logger.debug("  bfs visit lr1 state {} / {}", i, states.size());
         map<int, LR1State> nextStatess;
@@ -416,10 +425,12 @@ LR1Automata getLR1automata(Grammar grammar) {
                 nextStatess[c].insert({item.pidx, item.dot + 1, item.search});
             }
         }
-        // if nextStates if unique, generate it
-        // cost time!
+        // CLOSURE, cost time!
         for (auto & [ symbol, nextStates ] : nextStatess) {
-            setLR1StateExpanded(nextStates, firstSets, grammar);
+            closured(nextStates);
+        }
+        // add new states
+        for (const auto & [ symbol, nextStates ] : nextStatess) {
             int tgtIdx;
             for (tgtIdx = 0; tgtIdx < states.size(); tgtIdx++) {
                 if (nextStates == states[tgtIdx]) { break; }
@@ -439,9 +450,10 @@ LR1Automata getLR1automata(Grammar grammar) {
 }
 
 // expand the LR(1) state (epsilon-closure method)
-void setLR1StateExpanded(LR1State &state, const map<int, set<int>> &firstSets,
+LR1State getLR1StateExpanded(const LR1State &state, const map<int, set<int>> &firstSets,
                          const Grammar &grammar) {
     // given αβ...γ, return {c | c in first(αβ...γ) and c is terminals}
+    auto state_ = state;
     const auto firstSets_ = firstSets;
     const auto grammar_   = grammar;
     auto       getSeqFirstSetTerminals =
@@ -462,7 +474,7 @@ void setLR1StateExpanded(LR1State &state, const map<int, set<int>> &firstSets,
 
     const auto &            prods = grammar.prods;
     std::queue<ProdLR1Item> q;
-    for (ProdLR1Item item : state) { q.push(item); }
+    for (ProdLR1Item item : state_) { q.push(item); }
     while (q.size()) { // bfs
         ProdLR1Item item = q.front();
         q.pop();
@@ -488,13 +500,15 @@ void setLR1StateExpanded(LR1State &state, const map<int, set<int>> &firstSets,
             // state += (B -> ·γ, nextSet)
             for (int c : nextSet) {
                 ProdLR1Item nextItem({p, 0, c});
-                if (state.count(nextItem) == 0) {
-                    state.insert(nextItem);
+                if (state_.count(nextItem) == 0) {
+                    state_.insert(nextItem);
                     q.push(nextItem);
                 }
             }
         }
     }
+
+    return state_;
 }
 
 ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {

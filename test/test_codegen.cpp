@@ -282,11 +282,11 @@ void testYaccSyntax() {
     cerr << "start generate Lr1 Automata ...\n";
     auto lr1Automata   = getLR1automata(grammar);
     auto lalr1Automata = getLALR1fromLR1(grammar, lr1Automata);
-    cout << to_string(lalr1Automata, grammar);
+    // cout << to_string(lalr1Automata, grammar);
 
     cerr << "start generate Lr1 ActionTable ...\n";
     auto actionTable = getLR1table(grammar, lalr1Automata);
-    cout << to_string(actionTable, grammar);
+    // cout << to_string(actionTable, grammar);
 }
 
 void genYaccSyntax() {
