@@ -1,5 +1,6 @@
-#include "krill/AttrDict.h"
+#include "krill/attrDict.h"
 #include "krill/utils.h"
+#include "fmt/format.h"
 
 #define DECLARE_TYPE_REGISTERY(T)                                              \
     {                                                                          \
@@ -26,9 +27,19 @@ map<string, string> AttrDict::ToStrDict() const {
         auto tid = std::type_index(a.type());
         if (const auto it = type_registery.find(tid);
             it != type_registery.end()) {
-            retval.emplace(k, it->second(a));
+            // str => "str"
+            if (tid == std::type_index(typeid(std::string))) {
+                string s = "\"";
+                s += krill::utils::unescape(any_cast<string>(a));
+                s += "\"";
+                retval.emplace(k, s);
+            } else {
+                retval.emplace(k, it->second(a));
+            }
         } else {
-            retval.emplace(k, tid.name());
+            // unsupport type
+            // retval.emplace(k, tid.name());
+            retval.emplace(k, "?");
         }
     }
     return retval;
@@ -38,5 +49,12 @@ string AttrDict::str() const {
     return "AttrDict{" + utils::ToString{}(ToStrDict()) + "}";
 }
 
+string AttrDict::str2() const {
+    std::stringstream ss;
+    for (const auto &[k, a] : ToStrDict()) {
+        ss << fmt::format(".{}={} ", k, a);
+    }
+    return ss.str();
+}
 
 } // namespace krill::utils

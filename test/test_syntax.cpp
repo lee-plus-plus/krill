@@ -10,6 +10,7 @@
 #include <map>
 #include <sstream>
 #include <vector>
+#include <functional>
 using namespace std;
 using namespace krill::type;
 using krill::grammar::getLALR1table;
@@ -83,7 +84,7 @@ void test1() {
     syntaxParser.parseAll(syntaxTokens);
 
     // APTnode *root = syntaxParser.getAPT();
-    syntaxParser.printAPT(cerr);
+    cerr << syntaxParser.getAPTstr();
 }
 
 // regex-like grammar (cannot deal with escape like "\+", "\?" well)
@@ -112,7 +113,8 @@ void test2() {
     map<string, string> nameToRegex = {
         {"'|'", "\\|"}, {"'+'", "\\+"}, {"'*'", "\\*"},    {"'?'", "\\?"},
         {"'('", "\\("}, {"')'", "\\)"}, {"'['", "\\["},    {"']'", "\\]"},
-        {"'^'", "\\^"}, {"'-'", "\\-"}, {"Char", ".|\\+"},
+        {"'^'", "\\^"}, {"'-'", "\\-"}, 
+        {"Char", "[^\\|\\+\\*\\?\\(\\)\\[\\]\\^\\-]"},
     };
     ActionTable actionTable = getLALR1table(grammar);
 
@@ -122,10 +124,9 @@ void test2() {
         getToSyntaxIdMap(grammar.symbolNames, nameToRegex);
 
     // string src = "a =1 + 21; b=2*0/1; 1/1-1; ";
-    while (true) {
-        string s;
-        cerr << "> input regex: ";
-        cin >> s;
+    vector<string> src = {"abc", "ab+c*d", "a|bc+(ed+f)", "[^ab]"};
+    for (string s : src) {
+        cerr << "input regex: " << s << endl;
         stringstream input;
         input << s;
 
@@ -141,7 +142,7 @@ void test2() {
         syntaxParser.parseAll(syntaxTokens);
 
         // APTnode *root = syntaxParser.getAPT();
-        syntaxParser.printAPT(cerr);
+        // cerr << syntaxParser.getAPTstr();
     }
 }
 
@@ -174,68 +175,107 @@ void test3() {
     map<int, int> toSyntaxId =
         getToSyntaxIdMap(grammar.symbolNames, nameToRegex);
 
-    auto &rFunc = syntaxParser.reduceFunc_;
+    // syntax-directed-translation action
+    auto sdt_action = [&](shared_ptr<APTnode> &node, int dot) -> void {
+        // auto &id = node.get()->id; // unused
+        auto &pidx  = node.get()->pidx;
 
-    // Exp_    -> DefExps
-    rFunc[0] = [](AttrDict &next, deque<AttrDict> &child) { next = child[0]; };
-    // DefExps -> DefExps DefExp
-    rFunc[1] = [](AttrDict &next, deque<AttrDict> &child) {
-        next = child[0];
-        next.Ref<vector<double>>("retval_list")
-            .push_back(child[1].Get<double>("val"));
-    };
-    // DefExps -> DefExp
-    rFunc[2] = [](AttrDict &next, deque<AttrDict> &child) {
-        double value = child[0].Get<double>("val");
-        next.Set<vector<double>>("retval_list", {value});
-        next.Set<map<string, double>>(
-            "var_list", child[0].Get<map<string, double>>("var_list"));
-    };
-    // DefExp  -> varname '=' Exp ';'
-    rFunc[3] = [](AttrDict &next, deque<AttrDict> &child) {
-        string varname = child[0].Get<string>("lval");
-        double value   = child[2].Get<double>("val");
-        next.Set<map<string, double>>("var_list", {{varname, value}});
-        next.Set<double>("val", value);
-    };
-    // DefExp  -> Exp ';'
-    rFunc[4] = [](AttrDict &next, deque<AttrDict> &child) {
-        next.Set<double>("val", child[0].Get<double>("val"));
-        next.Set<map<string, double>>("var_list", {});
-    };
-    // Exp     -> Exp oprt num
-    rFunc[5] = [](AttrDict &next, deque<AttrDict> &child) {
-        double v1   = child[0].Get<double>("val");
-        double v2   = child[2].Get<double>("val");
-        string oprt = child[1].Get<string>("lval");
-        double value = 0.0;
-        if (oprt == "+") {
-            value = v1 + v2;
-        } else if (oprt == "-") {
-            value = v1 - v2;
-        } else if (oprt == "*") {
-            value = v1 * v2;
-        } else if (oprt == "/") {
-            value = v1 / v2;
+        AttrDict *next  = &node.get()->attr;
+        deque<AttrDict *> child;
+        for (auto &c : node.get()->child) {
+            child.push_back(&c.get()->attr);
         }
-        next.Set<double>("val", value);
+
+        using PairSD = pair<string, double>;
+
+        if (dot == grammar.prods[pidx].right.size()) {
+            switch (pidx) {
+                case 0: { // Exp_    -> DefExps
+                    *next = *child[0];
+                    break;
+                }
+                case 1: { // DefExps -> DefExps DefExp
+                    *next = *child[0];
+                    next->Ref<vector<double>>("retval_list")
+                        .push_back(child[1]->Get<double>("val"));
+                    next->Set<vector<PairSD>>(
+                        "var_list", child[0]->Get<vector<PairSD>>("var_list"));
+                    auto &list = next->Ref<vector<PairSD>>("var_list");
+                    auto &list2 = child[1]->Ref<vector<PairSD>>("var_list");
+                    list.insert(list.end(), list2.begin(), list2.end());
+                    break;
+                }
+                case 2: { // DefExps -> DefExp
+                    double value = child[0]->Get<double>("val");
+                    next->Set<vector<double>>("retval_list", {value});
+                    next->Set<vector<PairSD>>(
+                        "var_list", child[0]->Get<vector<PairSD>>("var_list"));
+                    break;
+                }
+                case 3: { // DefExp  -> varname '=' Exp ';'
+                    string varname = child[0]->Get<string>("lval");
+                    double value   = child[2]->Get<double>("val");
+                    next->Set<vector<PairSD>>("var_list",
+                                                  {{varname, value}});
+                    next->Set<double>("val", value);
+                    break;
+                }
+                case 4: { // DefExp  -> Exp ';'
+                    next->Set<double>("val", child[0]->Get<double>("val"));
+                    next->Set<vector<PairSD>>("var_list", {});
+                    break;
+                }
+                case 5: { // Exp     -> Exp oprt num
+                    double v1    = child[0]->Get<double>("val");
+                    double v2    = child[2]->Get<double>("val");
+                    string oprt  = child[1]->Get<string>("lval");
+                    double value = 0.0;
+                    if (oprt == "+") {
+                        value = v1 + v2;
+                    } else if (oprt == "-") {
+                        value = v1 - v2;
+                    } else if (oprt == "*") {
+                        value = v1 * v2;
+                    } else if (oprt == "/") {
+                        value = v1 / v2;
+                    }
+                    next->Set<double>("val", value);
+                    break;
+                }
+                case 6: { // Exp     -> num
+                    next->Set<double>("val", child[0]->Get<double>("val"));
+                    break;
+                }
+                case 7: { // num     -> int
+                    next->Set<double>(
+                        "val", atof(child[0]->Get<string>("lval").c_str()));
+                    break;
+                }
+                case 8: { // num     -> float
+                    next->Set<double>(
+                        "val", atof(child[0]->Get<string>("lval").c_str()));
+                    break;
+                }
+                default:
+                    assert(false);
+                    break;
+            }
+        }
     };
-    // Exp     -> num
-    rFunc[6] = [](AttrDict &next, deque<AttrDict> &child) {
-        next.Set<double>("val", child[0].Get<double>("val"));
-    };
-    // num     -> int
-    rFunc[7] = [](AttrDict &next, deque<AttrDict> &child) {
-        next.Set<double>("val", atof(child[0].Get<string>("lval").c_str()));
-    };
-    // num     -> float
-    rFunc[8] = [](AttrDict &next, deque<AttrDict> &child) {
-        next.Set<double>("val", atof(child[0].Get<string>("lval").c_str()));
+    // syntax-directed-translation: left-to-right visit on AST
+    std::function<void (shared_ptr<APTnode> &node)> sdt;
+    sdt = [&](shared_ptr<APTnode> &node) -> void {
+        int i;
+        for (i = 0; i < node.get()->child.size(); i++) {
+            sdt_action(node, i);
+            sdt(node.get()->child[i]);
+        }
+        sdt_action(node, i);
     };
 
     // string src = "a =1 + 21; b=2*0/1; 1/1-1; ";
     cerr << "a very simple interpreter: \n"
-            "please input codes like: \n"
+            "accept input codes like: \n"
             "\"a =1 + 21; b=2*0/1; 1 /1-1; \"\n";
     vector<string> inputs = {
         "a =1 + 21; b=2*0/1; 1 /1-1; ",
@@ -263,11 +303,16 @@ void test3() {
         syntaxParser.clear();
         syntaxParser.parseAll(syntaxTokens);
 
+        // syntax-directed translation
+        auto root = syntaxParser.getAPT();
+        sdt(root);
 
-        syntaxParser.printAPT(cerr);
-        APTnode *root        = syntaxParser.getAPT();
-        auto     var_list    = root->attr.Get<map<string, double>>("var_list");
-        auto     retval_list = root->attr.Get<vector<double>>("retval_list");
+        // print APT
+        cerr << getAPTstr(root, grammar);
+
+        // print translated result
+        auto var_list    = root.get()->attr.Get<vector<pair<string, double>>>("var_list");
+        auto retval_list = root.get()->attr.Get<vector<double>>("retval_list");
 
         cerr << "variables: {";
         for (auto[key, value] : var_list) {
@@ -280,7 +325,7 @@ void test3() {
 
 int main() {
     krill::log::sink_cerr->set_level(spdlog::level::debug);
-    vector<void (*)()> testFuncs = {test1, test3};
+    vector<void (*)()> testFuncs = {test1, test2, test3};
     for (int i = 0; i < testFuncs.size(); i++) {
         cerr << "#test " << (i + 1) << endl;
         testFuncs[i]();

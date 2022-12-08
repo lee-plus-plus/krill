@@ -147,7 +147,7 @@ void testSyntax() {
         tokens.push_back(END_TOKEN);
 
         syntaxParser.parseAll(tokens);
-        syntaxParser.printAPT(cerr);
+        cerr << syntaxParser.getAPTstr();
 
         cerr << "\n";
     }

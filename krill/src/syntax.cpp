@@ -20,28 +20,9 @@ namespace krill::runtime {
 
 // const int STATES_SIZE_MAX = 1000;
 
-void defaultReduceFunc(AttrDict &next, deque<AttrDict> &child) {
-    // pass
-}
-
-void defaultActionFunc(AttrDict &next, AttrDict &child) { next = child; }
-
 SyntaxParser::SyntaxParser(Grammar grammar, ActionTable actionTable)
     : grammar_(grammar), actionTable_(actionTable), states_({0}), offset_(0),
-      isAccepted_(false), history_("") {
-    actionFunc_ = defaultActionFunc;
-    for (int i = 0; i < grammar.prods.size(); i++) {
-        reduceFunc_.push_back(defaultReduceFunc);
-    }
-}
-
-SyntaxParser::SyntaxParser(Grammar grammar, ActionTable actionTable,
-                           Afunc actionFunc, vector<Rfunc> reduceFunc)
-    : actionFunc_(actionFunc), reduceFunc_(reduceFunc), grammar_(grammar),
-      actionTable_(actionTable), states_({0}), offset_(0), isAccepted_(false),
-      history_("") {
-    assert(reduceFunc_.size() == grammar.prods.size());
-}
+      isAccepted_(false), history_("") {}
 
 void SyntaxParser::parse() {
     auto &      prods_   = grammar_.prods;
@@ -72,7 +53,6 @@ void SyntaxParser::parse() {
 
                 shared_ptr<APTnode> nextNode(new APTnode(input));
                 // ACTION action
-                actionFunc_(nextNode.get()->attr, input.attr);
                 nodes_.push(nextNode);
 
                 // very stupid history stack, may be improved in the future
@@ -88,14 +68,12 @@ void SyntaxParser::parse() {
             case Action::Type::kReduce: {
                 Prod                       r = prods_[action.tgt];
                 deque<shared_ptr<APTnode>> childNodes;
-                deque<AttrDict>            childAttrs;
 
                 auto poped_states = get_top(states_, r.right.size());
                 for (int j = 0; (int) j < r.right.size(); j++) {
                     states_.pop();
                     symbols_.pop();
                     childNodes.push_front(nodes_.top());
-                    childAttrs.push_front(nodes_.top()->attr);
                     nodes_.pop();
                 }
 
@@ -109,13 +87,12 @@ void SyntaxParser::parse() {
                 logger.debug("  REDUCE r{} pop [{}] GOTO {}", action.tgt + 1,
                              fmt::join(poped_states, ","), action2.tgt);
 
-                shared_ptr<APTnode> nextNode(new APTnode(
-                    {.id = r.symbol, .attr = {}, .child = childNodes}));
+                shared_ptr<APTnode> nextNode(
+                    new APTnode({.id    = r.symbol,
+                                 .pidx  = action.tgt,
+                                 .attr  = {},
+                                 .child = childNodes}));
                 // REDUCE action
-                reduceFunc_[action.tgt](nextNode.get()->attr, childAttrs);
-                for (int j = 0; (int) j < r.right.size(); j++) {
-                    childNodes[j].get()->attr = childAttrs[j];
-                }
 
                 nodes_.push(nextNode);
                 break;
@@ -123,9 +100,7 @@ void SyntaxParser::parse() {
             case Action::Type::kAccept: {
                 logger.debug("  ACCEPT");
                 logger.info("syntax parsing complete successfully");
-                stringstream ss_ast;
-                printAPT(ss_ast);
-                logger.debug("Current AST: \n{}", ss_ast.str());
+                logger.debug("Current AST: \n{}", getASTstr());
                 isAccepted_ = true;
                 break;
             }
@@ -178,19 +153,21 @@ void SyntaxParser::parseAll(vector<APTnode> tokensWithAttr) {
     parse();
 }
 
-APTnode *SyntaxParser::getAPT() {
+shared_ptr<APTnode> SyntaxParser::getAPT() {
     if (!isAccepted_) { return nullptr; }
     assert(nodes_.size() == 1);
 
-    APTnode *root = nodes_.top().get();
+    shared_ptr<APTnode> root = nodes_.top();
     return root;
 }
 
-void printAPT_(APTnode *node, ostream &oss, map<int, string> symbolNames,
-               bool skipMid, bool skipAttr, vector<bool> isLast = {}) {
+void printAPT_(const APTnode *const node, ostream &oss,
+               const map<int, string> &symbolNames, bool skipMid, bool skipAttr,
+               vector<bool> isLast = {}) {
     // if (node == nullptr) { return; }
     if (skipMid && node->child.size() == 1) {
-        printAPT_(node->child[0].get(), oss, symbolNames, skipMid, skipAttr, isLast);
+        printAPT_(node->child[0].get(), oss, symbolNames, skipMid, skipAttr,
+                  isLast);
         return;
     }
     if (isLast.size() == 0) { oss << fmt::format(" "); }
@@ -199,20 +176,18 @@ void printAPT_(APTnode *node, ostream &oss, map<int, string> symbolNames,
         if (i + 1 == isLast.size()) {
             oss << fmt::format("{:s}", (isLast[i] ? " └ " : " ├ "));
         } else {
-            oss << fmt::format("{:s}", (isLast[i] ? "   " : " │ "));
+            oss << fmt::format("{:s}", (isLast[i] ? "  " : " │"));
         }
     }
-    if (node->child.size() == 0) {
-        auto & attr     = node->attr;
-        string attr_str = skipAttr ? (attr.Has<string>("lval") ? attr.Get<string>("lval") : string()) : attr.str();
-        // string attr_str = fmt::format(
-        //     fmt::emphasis::underline, "\"{}\"",
-        //     attr.Has<string>("lval") ? unescape(attr.Get<string>("lval")) :
-        //     "");
-        oss << fmt::format("<{:s}>  {}\n", symbolNames.at(node->id), attr_str);
-    } else {
-        oss << fmt::format("<{:s}>\n", symbolNames.at(node->id));
-    }
+    auto & attr = node->attr;
+    string attr_str =
+        skipAttr
+            ? (attr.Has<string>("lval") ? attr.Get<string>("lval") : string())
+            : attr.str2();
+    oss << fmt::format("{:16s}  {}\n",
+                       fmt::format("<{:s}>", symbolNames.at(node->id)),
+                       attr_str);
+
     isLast.push_back(false);
     for (auto it = node->child.begin(); it != node->child.end(); it++) {
         if (it + 1 == node->child.end()) { isLast.back() = true; }
@@ -220,33 +195,37 @@ void printAPT_(APTnode *node, ostream &oss, map<int, string> symbolNames,
     }
 }
 
-void SyntaxParser::printAPT(ostream &oss) {
-    bool skipMid = false;
-    bool skipAttr = false;
-    vector<shared_ptr<APTnode>> unrootedNodes = to_vector(nodes_);
-    for (auto node : unrootedNodes) {
-        printAPT_(node.get(), oss, grammar_.symbolNames, skipMid, skipAttr);
-    }
+string getAPTstr(const shared_ptr<APTnode> &root, const Grammar &grammar) {
+    bool         skipMid  = false;
+    bool         skipAttr = false;
+    stringstream ss;
+    printAPT_(root.get(), ss, grammar.symbolNames, skipMid, skipAttr);
+    return ss.str();
 }
 
-void SyntaxParser::printAST(ostream &oss) {
-    bool skipMid = true;
-    bool skipAttr = true;
-    vector<shared_ptr<APTnode>> unrootedNodes = to_vector(nodes_);
-    for (auto node : unrootedNodes) {
-        printAPT_(node.get(), oss, grammar_.symbolNames, skipMid, skipAttr);
-    }
+string getASTstr(const shared_ptr<APTnode> &root, const Grammar &grammar) {
+    bool         skipMid  = true;
+    bool         skipAttr = true;
+    stringstream ss;
+    printAPT_(root.get(), ss, grammar.symbolNames, skipMid, skipAttr);
+    return ss.str();
 }
 
 string SyntaxParser::getAPTstr() {
-    stringstream ss;
-    printAPT(ss);
+    vector<shared_ptr<APTnode>> unrootedNodes = to_vector(nodes_);
+    stringstream                ss;
+    for (const auto &node : unrootedNodes) {
+        ss << runtime::getAPTstr(node, grammar_);
+    }
     return ss.str();
 }
 
 string SyntaxParser::getASTstr() {
-    stringstream ss;
-    printAST(ss);
+    vector<shared_ptr<APTnode>> unrootedNodes = to_vector(nodes_);
+    stringstream                ss;
+    for (const auto &node : unrootedNodes) {
+        ss << runtime::getASTstr(node, grammar_);
+    }
     return ss.str();
 }
 
@@ -260,15 +239,13 @@ string SyntaxParser::getErrorMessage() {
 
     logger.error("{}", errorMsg);
     logger.error("  history_: \"{}\"", history_);
-    logger.error("  look: {} \"{}\"", grammar_.symbolNames.at(tokenWithAttr.id), unescape(tokenWithAttr.attr.Get<string>("lval")));
+    logger.error("  look: {} \"{}\"", grammar_.symbolNames.at(tokenWithAttr.id),
+                 unescape(tokenWithAttr.attr.Get<string>("lval")));
     logger.error(
         "  symbols: [{}]",
         fmt::join(apply_map(to_vector(symbols_), grammar_.symbolNames), ","));
     logger.error("  states: [{}]", fmt::join(to_vector(states_), ","));
-
-    stringstream ss_ast;
-    printAPT(ss_ast);
-    logger.error("Current AST: \n{}", ss_ast.str());
+    logger.error("Current AST: \n{}", getASTstr());
 
     return errorMsg;
 }

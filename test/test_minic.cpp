@@ -73,7 +73,7 @@ void testSyntaxParsing() {
         tokens.push_back(END_TOKEN);
 
         syntaxParser.parseAll(tokens);
-        syntaxParser.printAPT(cout);
+        cout << syntaxParser.getAPTstr();
 
         cout << "\n";
     }
@@ -138,7 +138,7 @@ void testFullLexicalSyntaxParsing() {
     logger.debug("abstract parsing tree:\n{}", syntaxParser.getAPTstr());
 
     cout << "\n";
-    syntaxParser.printAST(cout);
+    cout << syntaxParser.getAPTstr();
     cout << "\n";
 }
 

@@ -33,6 +33,7 @@ class AttrDict {
 
     map<string, string> ToStrDict() const;
     string str() const;
+    string str2() const;
 
   private:
     map<string, any> attr_dict_;
