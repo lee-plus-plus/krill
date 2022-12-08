@@ -268,8 +268,7 @@ Grammar parsingYacc(istream &input) {
 
 void testYaccSyntax() {
     krill::log::sink_cerr->set_level(spdlog::level::debug);
-    cerr << "input yacc definition of Ambiguous lr1 grammar, end with empty "
-            "line\n";
+    cerr << "input yacc definition of Ambiguous lr1 grammar, end with ^d\n";
     cerr << "format: Token_Stmts %% Production_Stmts %% Else\n";
     vector<string> strs;
 
@@ -290,8 +289,7 @@ void testYaccSyntax() {
 }
 
 void genYaccSyntax() {
-    cerr << "input yacc definition of Ambiguous lr1 grammar, end with empty "
-            "line\n";
+    cerr << "input yacc definition of Ambiguous lr1 grammar, end with ^d\n";
     cerr << "format: Token_Stmts %% Production_Stmts %% Else\n";
     vector<string> strs;
 

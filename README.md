@@ -1,13 +1,17 @@
 # Krill: a frontEnd Compiler
 
-## 怎么运行
+## 运行环境要求
 
-使用Cmake. 我是在linux上运行的, 用的是gcc 9.4.0, 需要C++ 17的特性的支持. 
+- Cmake 3.16 above
+- g++9.0 / clang++9.0 above
+- std=c++17 above
+
+## 怎么运行
 
 ```bash
 $ cd build
 $ cmake ..
-$ make
+$ make -j4
 ````
 
 可以跑一下这几个样例试试正不正常
@@ -20,7 +24,6 @@ $ ./test/test_lexical
 $ ./test/test_syntax
 ````
 
-
 ## 简介
 
 命名空间做了一定的划分: 
@@ -30,6 +33,7 @@ $ ./test/test_syntax
 - `krill::regex`: 正则表达式解析器
 - `krill::runtime`: 提供了`LexicalParser`和`SyntaxParser`
 - `krill::minic`: mini-C的词法/ 语法解析器
+- `krill::log`: 日志
 
 该工程测试样例很全, 见`./test/test_*.cpp`. 
 每一个都可以单独运行. 
@@ -46,6 +50,8 @@ $ ./test/test_syntax
 2. 词法解析器-代码生成
 3. 正则表达式-立即测试
 4. 语法解析器-立即测试
+5. yacc文件解析-词法解析器-立即测试
+6. yacc文件解析-词法解析器-代码生成
 
 ```bash
 $ make test_codegen
@@ -59,7 +65,7 @@ $ make test_codegen
 ![test_codegen - syntax test](README/README0.png)
 
 你甚至可以直接把miniC的文法的正则表达式丢进去(见`docs/c99.l.in`, `docs/c99.y.in`), 它会需要一点
-时间编译, 但不会太久(不超过5分钟)! 
+时间编译, 但不会太久(不超过30s)! 
 
 代码生成功能运行你输入多条正则表达式/文法规则后, 输出词法/语法解析器的代码(半成品). 
 它们并不是独立的(standalone), 需要依赖`krill`的其他代码才能正常工作, 不过说真的, 它们的核心部分
@@ -88,7 +94,8 @@ $ make test_minic
 
 ## 设计思路
 
-编译器前端有两种思路, 要么像lex和yacc那样旨在生成standalone的解析器, 要么像seuLexYacc那样生成strongly-dependent的解析器. krill试图在二者之间寻找一个平衡: 
+编译器前端有两种思路, 要么像lex和yacc那样旨在生成standalone的解析器, 
+要么像seuLexYacc那样生成strongly-dependent的解析器. krill试图在二者之间寻找一个平衡: 
 
 1. 最核心的DFA, ActionTable是standalone的 ()
 2. 上层的LexicalParser, SyntaxParser是dependent的 (但也是可替换的)
@@ -109,20 +116,33 @@ $ make test_minic
 
 美中不足的地方是: 报错提示不够友好. 不过好处是: 修改SyntaxParser的代码, 所有它的实例都能受益. 
 
+### 语法制导翻译 (Syntax-Directed-Translation)
+
+由于mini-c的语法制导定义里面不仅包含S-属性(synthesis), 也包含H-属性(inHerited) 
+(例如, `continue`和`break`), 语法制导翻译至少要等文件扫描结束/ 抽象语法树(AST)建立完毕后才能完成. 
+因此, 我们选择如下翻译方案: 
+
+1. 先不执行任何翻译动作, 建立抽象语法树AST
+2. 在AST上执行**中序遍历**, 将抽象语法树AST转为注释解析树APT, 副作用产生中间代码
+
+暂时打算先生成最粗制滥造的中间代码, 再考虑改进. 
+
+### 中间代码优化
+
+暂时忽略
+
+### 机器代码生成
+
+未考虑
 
 ## TODO
 
-- 增加测试用例 (`test/minic-testcase`), 确保Abstact Syntax Tree无误 (done)
-- 提高lr1分析速度
-- lr1错误恢复
-- 中间代码生成
-- 中间代码优化
-- 机器代码生成
-
-借此生成三地址码 (中间表示)
-
-然后再由三地址生成汇编代码 (指令相关)
-
+1. - [x] 增加测试用例, 确保AST无误 
+2. - [x] 提高lr1分析速度
+3. - [ ] lr1错误恢复
+4. - [ ] 中间代码生成
+5. - [ ] 中间代码优化
+6. - [ ] 机器代码生成
 
 
 
