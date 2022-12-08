@@ -3,7 +3,6 @@
     "IndentWidth": 4,
     "AlignAfterOpenBracket": true,
     "AlignConsecutiveAssignments": true,
-    //# 连续声明时，对齐所有声明的变量名
     "AlignConsecutiveDeclarations": true,
     "MaxEmptyLinesToKeep": 4,
     "BreakBeforeBraces": "Attach",
@@ -35,7 +34,7 @@
         "IndentBraces":           false,
         "SplitEmptyFunction":     true,
         "SplitEmptyRecord":       true,
-        "SplitEmptyNamespace":    true
+        "SplitEmptyNamespace":    true, 
     },
     "Cpp11BracedListStyle": true,
     "ColumnLimit": 80,

@@ -267,6 +267,7 @@ Grammar parsingYacc(istream &input) {
 }
 
 void testYaccSyntax() {
+    krill::log::sink_cerr->set_level(spdlog::level::debug);
     cerr << "input yacc definition of Ambiguous lr1 grammar, end with empty "
             "line\n";
     cerr << "format: Token_Stmts %% Production_Stmts %% Else\n";
@@ -279,13 +280,13 @@ void testYaccSyntax() {
     cout << "\n";
 
     cerr << "start generate Lr1 Automata ...\n";
-    auto lr1Automata   = getLR1Automata(grammar);
+    auto lr1Automata   = getLR1automata(grammar);
     auto lalr1Automata = getLALR1fromLR1(grammar, lr1Automata);
-    cout << lalr1Automata.str(grammar.symbolNames);
+    cout << to_string(lalr1Automata, grammar);
 
     cerr << "start generate Lr1 ActionTable ...\n";
     auto actionTable = getLR1table(grammar, lalr1Automata);
-    cout << to_string(actionTable, grammar.symbolNames);
+    cout << to_string(actionTable, grammar);
 }
 
 void genYaccSyntax() {
