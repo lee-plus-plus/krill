@@ -192,9 +192,8 @@ string Grammar::str() const {
 }
 
 string Action::str() const {
-    static string typeName[] = {"ACTION", "REDUCE", "GOTO", "ACCEPT"};
     stringstream  ss;
-    ss << fmt::format("{} ", typeName[static_cast<int>(type)]);
+    ss << fmt::format("{} ", enum_name(type));
     if (type == Action::Type::kAction || type == Action::Type::kGoto) {
         ss << fmt::format("s{:<2d}", tgt);
     } else if (type == Action::Type::kReduce) {
@@ -232,12 +231,6 @@ string to_string(const ActionTable &tbl, const Grammar &grammar) {
     }
     return ss.str();
 }
-
-string to_string(const Associate &associate) {
-    static string assoName[] = {"None", "Left", "Right"};
-    return assoName[static_cast<int>(associate)];
-}
-
 
 } // namespace krill::type
 

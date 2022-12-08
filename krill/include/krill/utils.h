@@ -13,8 +13,11 @@
 #include <type_traits>
 #include <numeric>
 #include <algorithm>
+#include "magic_enum.hpp"
 
 namespace krill::utils {
+
+using magic_enum::enum_name;
 
 template <typename T> inline std::string to_string(const T &v) {
     std::stringstream ss;
