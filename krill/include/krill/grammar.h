@@ -64,7 +64,6 @@ using ActionTable = map<pair<int, int>, Action>;
 string to_string(const Prod &prod, const Grammar &grammar);
 string to_string(const EdgeTable &tbl, const Grammar &grammar);
 string to_string(const ActionTable &tbl, const Grammar &grammar);
-string to_string(const Associate &associate);
 
 }; // namespace krill::type
 

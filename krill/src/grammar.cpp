@@ -192,9 +192,8 @@ string Grammar::str() const {
 }
 
 string Action::str() const {
-    static string typeName[] = {"ACTION", "REDUCE", "GOTO", "ACCEPT"};
     stringstream  ss;
-    ss << fmt::format("{} ", typeName[static_cast<int>(type)]);
+    ss << fmt::format("{} ", enum_name(type));
     if (type == Action::Type::kAction || type == Action::Type::kGoto) {
         ss << fmt::format("s{:<2d}", tgt);
     } else if (type == Action::Type::kReduce) {
@@ -232,12 +231,6 @@ string to_string(const ActionTable &tbl, const Grammar &grammar) {
     }
     return ss.str();
 }
-
-string to_string(const Associate &associate) {
-    static string assoName[] = {"None", "Left", "Right"};
-    return assoName[static_cast<int>(associate)];
-}
-
 
 } // namespace krill::type
 
@@ -390,16 +383,16 @@ LR1Automata getLR1automata(Grammar grammar) {
     logger.info("begin generating LR1 Automata");
     auto firstSets  = getFirstSets(grammar);
     auto followSets = getFollowSets(grammar, firstSets); // unused 
-    logger.info("first-sets: \n{}", to_string(firstSets, grammar));
-    logger.info("follow-sets: \n{}", to_string(followSets, grammar));
+    logger.debug("first-sets: \n{}", to_string(firstSets, grammar));
+    logger.debug("follow-sets: \n{}", to_string(followSets, grammar));
 
-    // return value optimization, really speed it up
-    map<LR1State, LR1State> closureRVO;
+    // cache, really speed it up
+    map<LR1State, LR1State> cache;
     auto                    closured = [&](LR1State &state) {
-        if (closureRVO.count(state) == 0) {
-            closureRVO[state] = getLR1StateExpanded(state, firstSets, grammar);
+        if (cache.count(state) == 0) {
+            cache[state] = getLR1StateExpanded(state, firstSets, grammar);
         }
-        state = closureRVO.at(state);
+        state = cache.at(state);
     };
 
     // generate states
