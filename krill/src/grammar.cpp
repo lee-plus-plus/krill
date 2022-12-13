@@ -238,14 +238,6 @@ string to_string(const ActionTable &tbl, const Grammar &grammar) {
 
 namespace krill::grammar {
 
-// Production Item (P -> A·b)
-struct ProdItem {
-    int  pidx;
-    int  dot;
-    bool operator<(const ProdItem &p) const;
-    bool operator==(const ProdItem &p) const;
-};
-
 // LR(1) action table
 ActionTable getLR1table(Grammar grammar) {
     auto lr1Automata = getLR1automata(grammar);
@@ -721,6 +713,21 @@ string to_string(const map<int, set<int>> firstSets, const Grammar &grammar) {
         for (auto s : nextSymbols) { nextNames.push_back(names.at(s)); }
         ss << fmt::format("  {} : {{{}}}\n", names.at(symbol),
                           fmt::join(nextNames, ", "));
+    }
+    return ss.str();
+}
+
+string to_string(const ProdItem &item, const Grammar &grammar) {
+    const auto & names = grammar.symbolNames;
+    const auto & prod  = grammar.prods[item.pidx];
+    stringstream ss;
+    ss << fmt::format("  {} ->", names.at(prod.symbol));
+    for (int i = 0; i < item.dot; i++) {
+        ss << fmt::format(" {}", names.at(prod.right[i]));
+    }
+    ss << " ●";
+    for (int i = item.dot; i < prod.right.size(); i++) {
+        ss << fmt::format(" {}", names.at(prod.right[i]));
     }
     return ss.str();
 }

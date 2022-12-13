@@ -183,6 +183,12 @@ struct pair_hash
     }
 };
 
+template<class> inline constexpr bool is_vector = false;
+template<class T, class A> inline constexpr bool is_vector<std::vector<T, A>> = true;
+
+template<class> inline constexpr bool is_set = false;
+template<class T, class A> inline constexpr bool is_set<std::set<T, A>> = true;
+
 // Jerry Yang's magic,
 // don't touch!
 struct ToString {

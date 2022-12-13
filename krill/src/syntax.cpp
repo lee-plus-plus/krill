@@ -52,6 +52,7 @@ void SyntaxParser::parse() {
                 symbols_.push(input.id);
 
                 shared_ptr<APTnode> nextNode(new APTnode(input));
+                nextNode.get()->pidx = -1;
                 // ACTION action
                 nodes_.push(nextNode);
 

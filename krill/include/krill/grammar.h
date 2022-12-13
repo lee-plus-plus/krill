@@ -75,6 +75,14 @@ using namespace krill::type;
 ActionTable getLR1table(Grammar grammar);
 ActionTable getLALR1table(Grammar grammar);
 
+// Production Item (P -> A·b)
+struct ProdItem {
+    int  pidx;
+    int  dot;
+    bool operator<(const ProdItem &p) const;
+    bool operator==(const ProdItem &p) const;
+};
+
 // LR1 Production Item (P -> A·b, a)
 struct ProdLR1Item {
     int pidx;   // production idx
@@ -107,6 +115,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata);
 LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata);
 
 string to_string(const map<int, set<int>> firstSets, const Grammar &grammar);
+string to_string(const ProdItem &item, const Grammar &grammar);
 string to_string(const ProdLR1Item &item, const Grammar &grammar);
 string to_string(const LR1State &state, const Grammar &grammar);
 string to_string(const LR1Automata &lr1Automata, const Grammar &grammar);

@@ -23,53 +23,53 @@ extern int           getMinicSyntaxId(Token token);
 namespace krill::minic::syntax {
 
 // Grammar
-#define ζ -1
-#define IDENT 258
-#define VOID 259
-#define INT 260
-#define WHILE 261
-#define IF 262
-#define ELSE 263
-#define RETURN 264
-#define EQ 265
-#define NE 266
-#define LE 267
-#define GE 268
-#define AND 269
-#define OR 270
-#define DECNUM 271
-#define CONTINUE 272
-#define BREAK 273
-#define HEXNUM 274
-#define LSHIFT 275
-#define RSHIFT 276
-#define program 277
-#define decl_list 278
-#define decl 279
-#define var_decl 280
-#define fun_decl 281
-#define type_spec 282
-#define int_literal 283
-#define FUNCTION_IDENT 284
-#define params 285
-#define compound_stmt 286
-#define param_list 287
-#define param 288
-#define stmt_list 289
-#define stmt 290
-#define expr_stmt 291
-#define block_stmt 292
-#define if_stmt 293
-#define while_stmt 294
-#define return_stmt 295
-#define continue_stmt 296
-#define break_stmt 297
-#define expr 298
-#define args_ 299
-#define WHILE_IDENT 300
-#define local_decls 301
-#define local_decl 302
-#define arg_list 303
+constexpr int ζ = -1;
+constexpr int IDENT = 258;
+constexpr int VOID = 259;
+constexpr int INT = 260;
+constexpr int WHILE = 261;
+constexpr int IF = 262;
+constexpr int ELSE = 263;
+constexpr int RETURN = 264;
+constexpr int EQ = 265;
+constexpr int NE = 266;
+constexpr int LE = 267;
+constexpr int GE = 268;
+constexpr int AND = 269;
+constexpr int OR = 270;
+constexpr int DECNUM = 271;
+constexpr int CONTINUE = 272;
+constexpr int BREAK = 273;
+constexpr int HEXNUM = 274;
+constexpr int LSHIFT = 275;
+constexpr int RSHIFT = 276;
+constexpr int program = 277;
+constexpr int decl_list = 278;
+constexpr int decl = 279;
+constexpr int var_decl = 280;
+constexpr int fun_decl = 281;
+constexpr int type_spec = 282;
+constexpr int int_literal = 283;
+constexpr int FUNCTION_IDENT = 284;
+constexpr int params = 285;
+constexpr int compound_stmt = 286;
+constexpr int param_list = 287;
+constexpr int param = 288;
+constexpr int stmt_list = 289;
+constexpr int stmt = 290;
+constexpr int expr_stmt = 291;
+constexpr int block_stmt = 292;
+constexpr int if_stmt = 293;
+constexpr int while_stmt = 294;
+constexpr int return_stmt = 295;
+constexpr int continue_stmt = 296;
+constexpr int break_stmt = 297;
+constexpr int expr = 298;
+constexpr int args_ = 299;
+constexpr int WHILE_IDENT = 300;
+constexpr int local_decls = 301;
+constexpr int local_decl = 302;
+constexpr int arg_list = 303;
 
 } // namespace krill::minic::syntax
 

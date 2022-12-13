@@ -1,11 +1,11 @@
 #include "fmt/format.h"
 #include "krill/minic.h"
 #include "krill/utils.h"
+#include <cstring>
 #include <fmt/color.h>
 #include <iostream>
 #include <map>
 #include <sstream>
-#include <cstring>
 #include <vector>
 using krill::log::logger;
 using namespace std;
@@ -16,6 +16,8 @@ using namespace krill::minic;
 
 extern APTnode tokenToNode(Token token, istream &input, bool &drop);
 extern void    initSyntaxParser();
+extern void    syntax_directed_translation(shared_ptr<APTnode> &node);
+extern string  get_ir_str();
 
 void testLexicalParsing() {
     auto &lexicalParser = minicLexicalParser;
@@ -110,8 +112,8 @@ void testFullLexicalParsing() {
 }
 
 void testFullLexicalSyntaxParsing() {
-    auto &   lexicalParser = minicLexicalParser;
-    auto &syntaxParser = minicSyntaxParser;
+    auto &lexicalParser = minicLexicalParser;
+    auto &syntaxParser  = minicSyntaxParser;
     auto &grammar       = minicGrammar;
     cerr << "input characters (end with ^d): \n"
             "e.g., int main() {\\n} \n";
@@ -135,18 +137,63 @@ void testFullLexicalSyntaxParsing() {
     for (auto node : nodes) {
         cout << fmt::format("{} ", grammar.symbolNames.at(node.id));
     }
-    logger.debug("abstract parsing tree:\n{}", syntaxParser.getAPTstr());
+    logger.debug("annotated parsing tree:\n{}", syntaxParser.getAPTstr());
+
+    cout << "\n";
+    cout << syntaxParser.getASTstr();
+    cout << "\n";
+}
+
+void testIRgeneration() {
+    auto &lexicalParser = minicLexicalParser;
+    auto &syntaxParser  = minicSyntaxParser;
+    auto &grammar       = minicGrammar;
+    cerr << "input characters (end with ^d): \n"
+            "e.g., int main() {\\n} \n";
+
+    vector<APTnode> nodes;
+    while (true) {
+        Token   token;
+        APTnode node;
+        bool    drop;
+
+        token = lexicalParser.parseStep(cin);
+        node  = tokenToNode(token, cin, drop);
+        if (drop) { continue; }
+
+        nodes.push_back(node);
+        syntaxParser.parseStep(node);
+
+        if (token == END_TOKEN) { break; }
+    }
+
+    for (auto node : nodes) {
+        cout << fmt::format("{} ", grammar.symbolNames.at(node.id));
+    }
+    logger.debug("annotated parsing tree:\n{}", syntaxParser.getAPTstr());
 
     cout << "\n";
     cout << syntaxParser.getAPTstr();
     cout << "\n";
+
+    krill::log::sink_cerr->set_level(spdlog::level::debug);
+
+    // syntax-directed translation
+    auto root = syntaxParser.getAPT();
+    syntax_directed_translation(root);
+
+    // show result
+    cout << get_ir_str();
+    cout << getAPTstr(root, minicGrammar);
+
 }
 
 const char usage[] = "usage: test_minic {-l|-L|-s}\n"
                      "        -l    lexical parsing test\n"
                      "        -L    lexical parsing test (full)\n"
                      "        -s    syntax parsing test\n"
-                     "        -Ls   lexical & syntax parsing test\n";
+                     "        -Ls   lexical & syntax parsing test\n"
+                     "        -I    intermediate code generation\n";
 
 int main(int argc, char **argv) {
     if (argc != 2) {
@@ -166,6 +213,9 @@ int main(int argc, char **argv) {
         cerr << "done!\n";
     } else if (strcmp(argv[1], "-Ls") == 0) {
         testFullLexicalSyntaxParsing();
+        cerr << "done!\n";
+    } else if (strcmp(argv[1], "-I") == 0) {
+        testIRgeneration();
         cerr << "done!\n";
     } else {
         cerr << usage;

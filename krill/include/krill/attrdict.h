@@ -24,6 +24,7 @@ class AttrDict {
   public:
     template <typename T> T        Get(const std::string &attr_name) const;
     template <typename T> T &      Ref(const std::string &attr_name);
+    template <typename T> T &      RefN(const std::string &attr_name);
     template <typename T> const T &CRef(const std::string &attr_name) const;
     template <typename T> bool     Has(const std::string &attr_name) const;
     template <typename T> void Emplace(const string &attr_name, T &&attr_value);
@@ -35,7 +36,7 @@ class AttrDict {
     string str() const;
     string str2() const;
 
-  private:
+  // private:
     map<string, any> attr_dict_;
 };
 
@@ -111,6 +112,18 @@ template <typename T> T &AttrDict::Ref(const string &attr_name) {
         throw runtime_error("this attribute " + attr_name +
                             " doesn't Has value.");
 
+    T &retval = any_cast<T &>(v);
+    return retval;
+}
+
+template <typename T> T &AttrDict::RefN(const string &attr_name) {
+    // check attr_name available:
+    auto i = attr_dict_.find(attr_name);
+    if (i != attr_dict_.end())
+        throw runtime_error("already have attribute[[" + attr_name + "]].");
+        
+    attr_dict_.insert({attr_name, make_any<T>(T{})});
+    auto &v = attr_dict_.at(attr_name);
     T &retval = any_cast<T &>(v);
     return retval;
 }
