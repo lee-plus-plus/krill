@@ -183,8 +183,8 @@ void testIRgeneration() {
     syntax_directed_translation(root);
 
     // show result
-    cout << get_ir_str();
-    cout << getAPTstr(root, minicGrammar);
+    cout << getAPTstr(root, minicGrammar) << "\n";
+    cout << get_ir_str() << "\n";
 
 }
 

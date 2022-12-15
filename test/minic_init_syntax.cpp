@@ -46,40 +46,33 @@ struct QuadTuple {
         bool operator==(const Var &v) const { return data == v.data; };
     };
     struct CVal {
-        int data;
+        uint32_t data;
         CVal() = default;
         CVal(int data) : data(data){};
         operator int() const { return data; };
     };
+    // clang-format off
     enum class Op {
-        kAssign, /* (var, val) */
+        kNop, 
+        kAssign, /* (var, cval) */
         kCopy,   /* (var, src1) */
-        kAdd,
-        kMinus,
-        kMult,
-        kDiv,
-        kMod, /* (dest, src1, src2) */
-        kAnd,
-        kOr,
-        kXor,
-        kNor, /* (dest, src1, src2) */
-        kLShift,
-        kRShift, /* (dest, src1, src2) */
-        kEq,
-        kNeq,
-        kLeq,
-        kLt,      /* (dest, src1, src2) */
-        kAlloate, /* (var_m, offset) */
-        kLoad,
-        kStore, /* (var_m, addr, offset) */
-        kPush,
-        kPop,    /* (var) */
-        kCall,   /* (var_j) */
-        kGoto,   /* (var_j) */
+        kAdd, kMinus, kMult, kDiv, kMod,/* (dest, src1, src2) */
+        kAnd, kOr, kXor, kNor,          /* (dest, src1, src2) */
+        kLShift, kRShift,               /* (dest, src1, src2) */
+        kEq, kNeq, kLeq, kLt,           /* (dest, src1, src2) */
+        kAlloate,  kGlobal,     /* (var_a, width, len) */
+        kLoad, kStore,  /* (var_m, addr_m) */
+        kParamPut,  /* (var_r, argc) */ 
+        kParamGet,  /* (var_r, argc) */ 
+        kCall,   /* (func, argc, var_r) */
+        kLabel,  /* (addr1) */
+        kGoto,   /* (addr1) */
         kBranch, /* (var_j, addr1, addr2) */
-        kRet,    /* (var) */
-        kHalt,   /* () */
+        kRet,    /* (argc, var_r) */
+        kFuncBegin, /* (addr1) */
+        kFuncEnd, 
     };
+    // clang-format on
     Op op;
     union Data {
         struct {
@@ -87,51 +80,43 @@ struct QuadTuple {
             CVal cval;
         }; // assign
         struct {
+            Var var_a;
+            int width;
+            int len; /* len > 0: is array */
+        };           // alloate,  global
+        struct {
             Var dest;
             Var src1;
             Var src2;
-        }; // calculate
+        }; // 2-op / 1-op calculate
         struct {
-            Var  var_m;
-            Var  addr;
-            CVal offset;
+            Var var_m;
+            Var addr_m;
         }; // mem load/store
         struct {
             Var var_j;
             Lbl addr1;
             Lbl addr2;
         }; // jump, branch
+        struct {
+            Lbl func;
+            int argc;
+            Var var_r;
+        };
     } args;
 };
 
-using Op       = QuadTuple::Op;
-using Lbl      = QuadTuple::Lbl;
-using Var      = QuadTuple::Var;
-using CVal     = QuadTuple::CVal;
-using Lbls     = set<Lbl>;
-using LblTable = map<Lbl, int>;
-using Code     = vector<QuadTuple>;
+using Op   = QuadTuple::Op;
+using Lbl  = QuadTuple::Lbl;  // label in TEXT section
+using Var  = QuadTuple::Var;  // register / local / global
+using CVal = QuadTuple::CVal; // const value in asm, uint32_t
 
-enum class TypeSpec {
-    kVoid,
-    kInt,
-};
+using Lbls = set<Lbl>;
+using Code = vector<QuadTuple>;
 
-struct VarDecl {
-    TypeSpec    type;
-    vector<int> shape; // int -> {}, int[10] -> {10}, int[10][20] -> {10, 20}
-};
-
-struct FuncDecl {
-    vector<string>  paramsName;
-    vector<VarDecl> paramsDecl;
-    vector<Var>     paramsVar; // for creating varnameTbl (domain)
-    VarDecl         ret;
-    Code            code;
-};
-
-const Var v_zero    = 0;
-const Lbl lbl_empty = -1;
+const Var var_zero  = 0;
+const Var var_empty = {};
+const Lbl lbl_empty = {};
 
 Var newVarId = 1;
 Lbl newLblId = 1;
@@ -139,38 +124,82 @@ Lbl newLblId = 1;
 Var assign_new_varible() { return newVarId++; }
 Lbl assign_new_label() { return newLblId++; }
 
-using FuncTbl    = map<Var, FuncDecl>; // global func decls
-using VarTbl     = map<Var, VarDecl>;
+enum class TypeSpec { kVoid, kInt };
+struct TypeDecl {
+    TypeSpec    basetype;
+    vector<int> shape;
+    bool        operator==(const TypeDecl &ts) const {
+        return std::tie(basetype, shape) == std::tie(ts.basetype, ts.shape);
+    }
+    bool operator!=(const TypeDecl &ts) const {
+        return std::tie(basetype, shape) != std::tie(ts.basetype, ts.shape);
+    }
+};
+struct VarDecl {
+    TypeDecl type;
+    string   varname;
+    Var      var;
+};
+
+struct FuncDecl {
+    // TODO: add type-only attribute for supporting overlode
+    // (locating a func-decl by its name together with its params type)
+    // vector<TypeDecl> paramsType;
+    // TypeDecl         retType;
+    Lbl             lbl;
+    vector<VarDecl> params;
+    vector<VarDecl> localVars;
+    VarDecl         ret;
+    string          funcname;
+    Code            code;
+};
+
+using VarTbl     = map<Var, TypeDecl>;
 using VarnameTbl = map<string, Var>;
 
-map<Lbl, int>      lineNoTbl;
-FuncTbl            funcTbl;
-VarTbl             varTbl;
-vector<VarnameTbl> varnameTblStack; // stack: {global, local1, local2, ...}
+vector<FuncDecl> globalFuncDecls;
+vector<VarDecl>  globalVarDecls;
 
-void set_label_with_lineNO(Lbl lbl, int lineNO) { lineNoTbl[lbl] = lineNO; }
-int  get_label_with_lineNO(Lbl lbl) { return lineNoTbl.at(lbl); }
-void set_label_with_offset(Lbl lbl, int offset) { lineNoTbl.at(lbl) += offset; }
-void regesiter_varname_in_domain(const string &varname, const Var &var) {
-    varnameTblStack.back()[varname] = var;
-}
+// stack for variable declaration domain (for runtime)
+vector<vector<VarDecl> *> varDeclsDomains;
+// TODO: support aux info stack
+// stack for auxiliary information (for compile time)
+// e.g., label for "continue", "break", "return"
+// vector<AttrDict>
 
-Var get_varible_by_name(const string &varname) {
-    for (int i = varnameTblStack.size() - 1; i >= 0; i--) {
-        const auto &varnameTbl = varnameTblStack[i];
-        if (varnameTbl.count(varname) != 0) { return varnameTbl.at(varname); }
+VarDecl &get_varible_by_name(const string &varname) {
+    for (int i = varDeclsDomains.size() - 1; i >= 0; i--) {
+        auto &domain = *varDeclsDomains[i];
+        for (VarDecl &decl : domain) {
+            if (decl.varname == varname) { return decl; }
+        }
     }
     assert(false);
 }
 
-Var get_varible_by_name_safe(const string &varname) {
-    for (int i = varnameTblStack.size() - 1; i >= 0; i--) {
-        const auto &varnameTbl = varnameTblStack[i];
-        if (varnameTbl.count(varname) != 0) { return varnameTbl.at(varname); }
+bool has_varible_by_name(const string &varname) {
+    for (int i = varDeclsDomains.size() - 1; i >= 0; i--) {
+        auto &domain = *varDeclsDomains[i];
+        for (VarDecl &decl : domain) {
+            if (decl.varname == varname) { return true; }
+        }
     }
-    return assign_new_varible();
+    return false;
 }
 
+FuncDecl &get_function_by_name(const string &funcname) {
+    for (FuncDecl &decl : globalFuncDecls) {
+        if (decl.funcname == funcname) { return decl; }
+    }
+    assert(false);
+}
+
+bool has_function_by_name(const string &funcname) {
+    for (FuncDecl &decl : globalFuncDecls) {
+        if (decl.funcname == funcname) { return true; }
+    }
+    return false;
+}
 
 template <typename T> class Appender {
   public:
@@ -187,6 +216,55 @@ template <typename T> class Appender {
         return *this;
     }
 };
+
+void backpatching(Code &code, const Lbls &src, const Lbl &tgt) {
+    for (auto &q : code) {
+        if (q.op == Op::kGoto && src.count(q.args.addr1) > 0) {
+            q.args.addr1 = tgt;
+        }
+    }
+}
+
+FuncDecl createFuncDecl(const string &          func_name,
+                        const vector<TypeDecl> &params_type,
+                        const TypeSpec &        ret_basetype) {
+    auto f_params = vector<VarDecl>{};
+    for (int i = 0; i < params_type.size(); i++) {
+        f_params.push_back(
+            {.type = params_type[i], .varname = "", .var = var_empty});
+    }
+    auto f_ret =
+        VarDecl{.type    = TypeDecl{.basetype = ret_basetype, .shape = {}},
+                .varname = "retval",
+                .var     = var_empty};
+    auto f_decl = FuncDecl{
+        .lbl       = lbl_empty,
+        .params    = f_params,
+        .localVars = {},
+        .ret       = f_ret,
+        .funcname  = func_name,
+        .code      = {},
+    };
+    return f_decl;
+}
+
+bool isFuncDeclTypeEqual(const FuncDecl &fd1, const FuncDecl &fd2) {
+    if (fd1.params.size() != fd2.params.size()) { return false; };
+    if (fd1.ret.type != fd2.ret.type) { return false; }
+    for (int i = 0; i < fd1.params.size(); i++) {
+        if (fd1.params[i].type != fd2.params[i].type) { return false; };
+    }
+    return true;
+}
+
+QuadTuple gen_allocate_code(const VarDecl &decl, const Op &op) {
+    assert(op == Op::kAlloate || op == Op::kGlobal);
+    int len = 1;
+    for (auto s : decl.type.shape) { len *= s; }
+    if (decl.type.shape.size() == 0) { len = 0; }
+    return QuadTuple{op, {.var_a = decl.var, .width = 4, .len = len}};
+};
+
 
 // expr <- expr OR expr | expr EQ expr | ...
 void sdt_expr_action(AttrDict *parent, AttrDict *child[], int pidx) {
@@ -223,71 +301,54 @@ void sdt_expr_action(AttrDict *parent, AttrDict *child[], int pidx) {
             b_rhs        = assign_new_varible();
             QuadTuple q1 = {
                 .op   = Op::kNeq,
-                .args = {.dest = b_lhs, .src1 = v_lhs, .src2 = v_zero}};
+                .args = {.dest = b_lhs, .src1 = v_lhs, .src2 = var_zero}};
             QuadTuple q2 = {
                 .op   = Op::kNeq,
-                .args = {.dest = b_rhs, .src1 = v_rhs, .src2 = v_zero}};
+                .args = {.dest = b_rhs, .src1 = v_rhs, .src2 = var_zero}};
             code_0.push_back(q1);
             code_0.push_back(q2);
         }
 
         QuadTuple q;
         if (pidx == 43) { // expr <- expr OR expr
-            q = {.op   = Op::kOr,
-                 .args = {.dest = v_0, .src1 = b_lhs, .src2 = b_rhs}};
+            q = {Op::kOr, {.dest = v_0, .src1 = b_lhs, .src2 = b_rhs}};
         } else if (pidx == 44) { // expr <- expr EQ expr
-            q = {.op   = Op::kEq,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kEq, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 45) { // expr <- expr NE expr
-            q = {.op   = Op::kNeq,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kNeq, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 46) { // expr <- expr LE expr
-            q = {.op   = Op::kEq,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kEq, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 47) { // expr <- expr '<' expr
-            q = {.op   = Op::kLt,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kLt, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 48) { // expr <- expr GE expr
-            q = {.op   = Op::kEq,
-                 .args = {.dest = v_0, .src1 = v_rhs, .src2 = v_lhs}};
+            q = {Op::kEq, {.dest = v_0, .src1 = v_rhs, .src2 = v_lhs}};
         } else if (pidx == 49) { // expr <- expr '>' expr
-            q = {.op   = Op::kLt,
-                 .args = {.dest = v_0, .src1 = v_rhs, .src2 = v_lhs}};
+            q = {Op::kLt, {.dest = v_0, .src1 = v_rhs, .src2 = v_lhs}};
         } else if (pidx == 50) { // expr <- expr AND expr
-            q = {.op   = Op::kAnd,
-                 .args = {.dest = v_0, .src1 = b_lhs, .src2 = b_rhs}};
+            q = {Op::kAnd, {.dest = v_0, .src1 = b_lhs, .src2 = b_rhs}};
         } else if (pidx == 51) { // expr <- expr '+' expr
-            q = {.op   = Op::kAdd,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kAdd, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 52) { // expr <- expr '-' expr
-            q = {.op   = Op::kMinus,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kMinus, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 53) { // expr '*' expr
-            q = {.op   = Op::kMult,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kMult, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 54) { // expr '/' expr
-            q = {.op   = Op::kDiv,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kDiv, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 55) { // expr '%' expr
-            q = {.op   = Op::kMod,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kMod, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 65) { // expr '&'' expr
-            q = {.op   = Op::kAnd,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kAnd, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 66) { // expr '^' expr
-            q = {.op   = Op::kXor,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kXor, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 68) { // expr LSHIFT expr
-            q = {.op   = Op::kLShift,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kLShift, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 69) { // expr RSHIFT expr
-            q = {.op   = Op::kRShift,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kRShift, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 66) { // expr '|'' expr
-            q = {.op   = Op::kOr,
-                 .args = {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
+            q = {Op::kOr, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         }
         Appender{code_0}.append(code_lhs).append(code_rhs).append({q});
+
     } else if (isUnaryOprt) { // expr <- '!' expr | ...
         auto &v_src    = _2.Ref<Var>("var");
         auto &code_src = _2.Ref<Code>("code");
@@ -297,50 +358,79 @@ void sdt_expr_action(AttrDict *parent, AttrDict *child[], int pidx) {
         QuadTuple q;
         if (pidx == 56) { // expr <- '!' expr
             q = {.op   = Op::kNeq,
-                 .args = {.dest = v_0, .src1 = v_src, .src2 = v_zero}};
+                 .args = {.dest = v_0, .src1 = v_src, .src2 = var_zero}};
         } else if (pidx == 57) { // expr <- '-' expr
             q = {.op   = Op::kMinus,
-                 .args = {.dest = v_0, .src1 = v_zero, .src2 = v_src}};
+                 .args = {.dest = v_0, .src1 = var_zero, .src2 = v_src}};
         } else if (pidx == 58) { // expr <- '+' expr
             q = {.op   = Op::kAdd,
-                 .args = {.dest = v_0, .src1 = v_zero, .src2 = v_src}};
+                 .args = {.dest = v_0, .src1 = var_zero, .src2 = v_src}};
         } else if (pidx == 59) { // expr <- '$' expr
-            q = {.op   = Op::kLoad,
-                 .args = {.var_m = v_0, .addr = v_src, .offset = 0}};
+            q = {.op = Op::kLoad, .args = {.var_m = v_0, .addr_m = v_src}};
         } else if (pidx == 67) { // expr <- '~' expr
             q = {.op   = Op::kXor,
-                 .args = {.dest = v_0, .src1 = v_zero, .src2 = v_src}};
+                 .args = {.dest = v_0, .src1 = var_zero, .src2 = v_src}};
         }
         Appender{code_0}.append(code_src).append({q});
+
     } else if (pidx == 60) { // expr <- '(' expr ')'
         v_0    = _2.Ref<Var>("var");
         code_0 = _2.Ref<Code>("code");
+
     } else if (pidx == 61) { // expr <- IDENT
-        Var v_src = get_varible_by_name(_1.Ref<string>("lval"));
-        v_0       = v_src;
+        auto varname = _1.Ref<string>("lval");
+
+        VarDecl &decl = get_varible_by_name(varname);
+        assert(decl.type.basetype != TypeSpec::kVoid);
+        assert(decl.type.shape.size() == 0);
+        auto v_m = decl.var;
+
+        v_0    = assign_new_varible();
+        auto q = QuadTuple{Op::kLoad, {.var_m = v_0, .addr_m = v_m}};
+        Appender{code_0}.append({q});
+
     } else if (pidx == 62) { // expr <- IDENT '[' expr ']'
-        Code code_idx    = _3.Ref<Code>("code");
-        Var  v_src       = get_varible_by_name(_1.Ref<string>("lval"));
-        Var  v_idx       = _3.Ref<Var>("var");
+        auto  varname  = _1.Ref<string>("lval");
+        auto  v_idx    = _3.Ref<Var>("var");
+        auto &code_idx = _3.Ref<Code>("code");
+
+        VarDecl &decl = get_varible_by_name(varname);
+        assert(decl.type.basetype != TypeSpec::kVoid);
+        assert(decl.type.shape.size() == 1);
+        auto v_m = decl.var;
+
         Var  v_width     = assign_new_varible();
         Var  v_offset    = assign_new_varible();
         Var  v_addr      = assign_new_varible();
-        Code code_assign = {
+        Code code_offset = {
             {Op::kAssign, {.var = v_width, .cval = 4}},
             {Op::kMult, {.dest = v_offset, .src1 = v_idx, .src2 = v_width}},
-            {Op::kAdd, {.dest = v_addr, .src1 = v_src, .src2 = v_offset}},
+            {Op::kAdd, {.dest = v_addr, .src1 = v_m, .src2 = v_offset}},
         };
-        Appender{code_0}.append(code_idx).append(code_assign);
-        v_0 = v_addr;
+
+        v_0    = assign_new_varible();
+        auto q = QuadTuple{Op::kLoad, {.var_m = v_0, .addr_m = v_addr}};
+        Appender{code_0}.append(code_idx).append(code_offset).append({q});
+
     } else if (pidx == 63) { // expr <- IDENT '(' args_ ')'
-        auto &args   = _3.Ref<vector<Var>>("args");
-        auto  v_func = get_varible_by_name(_1.Ref<string>("lval"));
-        auto  v_ret  = assign_new_varible();
-        for (int i = args.size() - 1; i >= 0; i--) {
-            code_0.push_back({.op = Op::kPush, .args = {.var = args[i]}});
+        auto &args = _3.Ref<vector<Var>>("args");
+
+        auto  funcname = _1.Ref<string>("lval");
+        auto &decl     = get_function_by_name(funcname);
+        assert(decl.params.size() == args.size());
+        assert(decl.ret.type.basetype != TypeSpec::kVoid);
+        auto lbl_f = decl.lbl;
+
+        v_0 = assign_new_varible();
+        // for (auto arg : args) {
+        for (int i = 0; i < args.size(); i++) {
+            code_0.push_back(
+                {.op = Op::kParamPut, .args = {.var_r = args[i], .argc = i}});
         }
-        code_0.push_back({.op = Op::kCall, .args = {.var_j = v_func}});
-        code_0.push_back({.op = Op::kPop, .args = {.var = v_ret}});
+        code_0.push_back({Op::kCall,
+                          {.func  = lbl_f,
+                           .argc  = static_cast<int>(args.size()),
+                           .var_r = v_0}});
 
     } else if (pidx == 64) { // expr <- int_literal
         auto &cval = _1.Ref<CVal>("cval");
@@ -366,54 +456,70 @@ void sdt_expr_stmt_action(AttrDict *parent, AttrDict *child[], int pidx) {
     // auto &lbls = _0.Ref<Lbls>("lbls");
 
     if (pidx == 27) { // expr_stmt <- IDENT '=' expr ';'
-        auto &code_exp = _3.Ref<Code>("code");
-        auto  v_dest   = get_varible_by_name(_1.Ref<string>("lval"));
-        auto &v_src    = _3.Ref<Var>("var");
-        auto  q        = QuadTuple{Op::kCopy, {.dest = v_dest, .src1 = v_src}};
-        Appender{code}.append(code_exp).append({q});
+        auto &code_expr = _3.Ref<Code>("code");
+        auto  varname   = _1.Ref<string>("lval");
+        auto  v_expr    = _3.Ref<Var>("var");
 
-    } else if (pidx == 28) { // IDENT '[' expr ']' '=' expr ';
-        Var   v_dest     = get_varible_by_name(_1.Ref<string>("lval"));
-        Var & v_idx      = _3.Ref<Var>("var");
-        Var & v_exp      = _6.Ref<Var>("var");
-        Var   v_width    = assign_new_varible();
-        Var   v_offset   = assign_new_varible();
-        Var   v_addr     = assign_new_varible();
-        Code &code_idx   = _3.Ref<Code>("code");
-        Code &code_exp   = _6.Ref<Code>("code");
-        Code  code_array = {
-            {.op = Op::kAssign, .args = {.var = v_width, .cval = 4}},
-            {.op   = Op::kMult,
-             .args = {.dest = v_offset, .src1 = v_idx, .src2 = v_width}},
-            {.op   = Op::kAdd,
-             .args = {.dest = v_addr, .src1 = v_dest, .src2 = v_offset}},
+        VarDecl &decl = get_varible_by_name(varname);
+        assert(decl.type.basetype != TypeSpec::kVoid);
+        assert(decl.type.shape.size() == 0);
+        auto v_m = decl.var;
+
+        auto q = QuadTuple{Op::kStore, {.var_m = v_expr, .addr_m = v_m}};
+        Appender{code}.append(code_expr).append({q});
+
+    } else if (pidx == 28) { // expr_stmt <- IDENT '[' expr ']' '=' expr ';
+        auto  varname   = _1.Ref<string>("lval");
+        auto  v_idx     = _3.Ref<Var>("var");
+        auto  v_expr    = _6.Ref<Var>("var");
+        auto &code_idx  = _3.Ref<Code>("code");
+        auto &code_expr = _6.Ref<Code>("code");
+
+        VarDecl &decl = get_varible_by_name(varname);
+        assert(decl.type.basetype != TypeSpec::kVoid);
+        assert(decl.type.shape.size() == 1);
+        auto v_m = decl.var;
+
+        Var  v_width     = assign_new_varible();
+        Var  v_offset    = assign_new_varible();
+        Var  v_addr      = assign_new_varible();
+        Code code_offset = {
+            {Op::kAssign, {.var = v_width, .cval = 4}},
+            {Op::kMult, {.dest = v_offset, .src1 = v_idx, .src2 = v_width}},
+            {Op::kAdd, {.dest = v_addr, .src1 = v_m, .src2 = v_offset}},
         };
-        auto q = QuadTuple{Op::kStore,
-                           {.var_m = v_exp, .addr = v_addr, .offset = 0}};
+
+        auto q = QuadTuple{Op::kStore, {.var_m = v_expr, .addr_m = v_addr}};
         Appender{code}
-            .append(code_exp)
+            .append(code_expr)
             .append(code_idx)
-            .append(code_array)
+            .append(code_offset)
             .append({q});
 
     } else if (pidx == 29) { // expr_stmt <- '$' expr '=' expr ';'
-        Code &code_addr = _2.Ref<Code>("code");
-        Code &code_exp  = _4.Ref<Code>("code");
-        Var & v_addr    = _2.Ref<Var>("var");
-        Var & v_exp     = _4.Ref<Var>("var");
-        auto  q =
-            QuadTuple{.op   = Op::kStore,
-                      .args = {.var_m = v_exp, .addr = v_addr, .offset = 0}};
-        Appender{code}.append(code_addr).append(code_exp).append({q});
+        auto  v_addr    = _2.Ref<Var>("var");
+        auto  v_expr    = _4.Ref<Var>("var");
+        auto &code_addr = _2.Ref<Code>("code");
+        auto &code_expr = _4.Ref<Code>("code");
+
+        auto q = QuadTuple{Op::kStore, {.var_m = v_expr, .addr_m = v_addr}};
+        Appender{code}.append(code_addr).append(code_expr).append({q});
 
     } else if (pidx == 30) { // expr_stmt <- IDENT '(' args_ ')' ';'
-        auto &args   = _3.Ref<vector<Var>>("args");
-        auto  v_func = get_varible_by_name(_1.Ref<string>("lval"));
-        for (int i = args.size() - 1; i >= 0; i--) {
-            code.push_back({.op = Op::kPush, .args = {.var = args[i]}});
+        auto &args = _3.Ref<vector<Var>>("args");
+
+        auto  funcname = _1.Ref<string>("lval");
+        auto &decl     = get_function_by_name(funcname);
+        assert(decl.params.size() != args.size());
+        // assert(decl.ret.type.basetype != TypeSpec::kVoid); // no check
+        auto lbl_f = decl.lbl;
+
+        for (auto arg : args) {
+            code.push_back({.op = Op::kParamPut, .args = {.var = arg}});
         }
-        // require re-fill correct label
-        code.push_back({.op = Op::kCall, .args = {.var_j = v_func}});
+        code.push_back(
+            {Op::kCall,
+             {.func = lbl_f, .argc = static_cast<int>(args.size())}});
     }
 }
 
@@ -431,105 +537,164 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
     // auto &_8 = *child[7];
 
     // program <- decl_list
-    if (pidx == 0) {}
+    if (pidx == 0) { _0 = _1; }
     // decl_list <- decl_list decl | decl
-    if (pidx == 1 || pidx == 2) {}
+    if (pidx == 1 || pidx == 2) {
+        auto &text_code = _0.RefN<Code>("text_code");
+        auto &data_code = _0.RefN<Code>("data_code");
+
+        if (pidx == 1) {
+            auto &text_code_1 = _1.Ref<Code>("text_code");
+            auto &text_code_2 = _2.Ref<Code>("text_code");
+            Appender{text_code}.append(text_code_1).append(text_code_2);
+            auto &data_code_1 = _1.Ref<Code>("data_code");
+            auto &data_code_2 = _2.Ref<Code>("data_code");
+            Appender{data_code}.append(data_code_1).append(data_code_2);
+        } else {
+            auto &text_code_1 = _1.Ref<Code>("text_code");
+            Appender{text_code}.append(text_code_1);
+            auto &data_code_1 = _1.Ref<Code>("data_code");
+            Appender{data_code}.append(data_code_1);
+        }
+    }
 
     // decl <- var_decl | fun_decl
     if (pidx == 3 || pidx == 4) {
+        auto &text_code = _0.RefN<Code>("text_code");
+        auto &data_code = _0.RefN<Code>("data_code");
 
         if (pidx == 3) {
             // push into global varaible domain
-            auto &varname = _2.Ref<string>("varname");
-            auto &var     = _2.Ref<Var>("var");
-            regesiter_varname_in_domain(varname, var);
+            auto &var_decl = _1.Ref<VarDecl>("var_decl");
+            assert(!has_varible_by_name(var_decl.varname));
+            globalVarDecls.push_back(var_decl);
+            auto q    = gen_allocate_code(var_decl, Op::kGlobal);
+            data_code = {q};
         } else if (pidx == 4) {
             // already pushed into global function domain
-            // pass
+            auto &func_name = _1.Ref<string>("func_name");
+            text_code       = get_function_by_name(func_name).code;
         }
     }
 
     // var_decl <- type_spec IDENT ';' | ...
     if (pidx == 5 || pidx == 6) {
-        auto &varname = _0.RefN<string>("varname");
-        auto &var     = _0.RefN<Var>("var");
+        auto &var_decl = _0.RefN<VarDecl>("var_decl");
 
-        varname    = _2.Ref<string>("lval");
-        var        = assign_new_varible();
-        auto type  = _1.Ref<TypeSpec>("type");
-        auto shape = vector<int>{};
+        auto varname  = _2.Ref<string>("lval");
+        auto var      = assign_new_varible();
+        auto basetype = _1.Ref<TypeSpec>("basetype");
+        auto shape    = vector<int>{};
 
         if (pidx == 6) {
             int size = _4.Ref<CVal>("cval");
             shape    = vector<int>{size};
         }
-        varTbl[var] = VarDecl{.type = type, .shape = shape};
+        auto type = TypeDecl{.basetype = basetype, .shape = shape};
+        var_decl  = VarDecl{.type = type, .varname = varname, .var = var};
     }
 
     // type_spec <- VOID | INT
     if (pidx == 7 || pidx == 8) {
-        auto &type = _0.RefN<TypeSpec>("type");
+        auto &basetype = _0.RefN<TypeSpec>("basetype");
 
         if (pidx == 7) {
-            type = TypeSpec::kVoid;
+            basetype = TypeSpec::kVoid;
         } else if (pidx == 8) {
-            type = TypeSpec::kInt;
+            basetype = TypeSpec::kInt;
         }
     }
 
-    // func_decl <- type_spec FUNCTION_IDENT '(' params ')' compound_stmt ●
+    // func_decl <- type_spec FUNCTION_IDENT '(' params ')'
+    // compound_stmt ●
     if (pidx == 9) {
-        // auto &f_name = _0.Ref<string>("func_name");
-        auto &f_var = _0.Ref<Var>("func_var");
+        auto &f_name = _2.Ref<string>("lval");
 
         /* please check sdt_action when pidx == 9 and dot == 5 */
-        
-        auto &f = funcTbl.at(f_var);
+
+        auto &f = get_function_by_name(f_name);
+
+        // head code: declare retval, params, local vars, and initialize them
+        auto head_code = Code{};
+
+        // allocate stack space for retval, params, local parameters
+        if (f.ret.type.basetype == TypeSpec::kInt) {
+            head_code.push_back(gen_allocate_code(f.ret, Op::kAlloate));
+        }
+        for (const auto &decl : f.params) {
+            head_code.push_back(gen_allocate_code(decl, Op::kAlloate));
+        }
+        for (const auto &decl : f.localVars) {
+            head_code.push_back(gen_allocate_code(decl, Op::kAlloate));
+        }
+        // initialize retval, params
+        if (f.ret.type.basetype == TypeSpec::kInt) {
+            head_code.push_back(
+                {Op::kStore, {.var_m = var_zero, .addr_m = f.ret.var}});
+        }
+        for (int i = 0; i < f.params.size(); i++) {
+            head_code.push_back(
+                {Op::kParamGet, {.var_r = f.params[i].var, .argc = i}});
+        }
+
+        // body code:
+        auto &body_code   = _6.Ref<Code>("code");
+        auto &return_lbls = _6.Ref<Lbls>("return_lbls");
+        auto  lbl_ret     = assign_new_label();
+
+        // backpatching, eliminate return
+        for (int i = 0; i < body_code.size(); i++) {
+            auto &q = body_code[i];
+            if (q.op == Op::kGoto && return_lbls.count(q.args.addr1) > 0) {
+                q.args.addr1 = lbl_ret;
+                if (f.ret.type.basetype != TypeSpec::kVoid) {
+                    assert(body_code[i - 1].op == Op::kStore);
+                    body_code[i - 1].args.addr_m = f.ret.var;
+                }
+            }
+        }
+
+        // tail code: generating the only return block
+        auto tail_code = Code{};
+        Appender{tail_code}.append({{Op::kLabel, {.addr1 = lbl_ret}}});
+        if (f.ret.type.basetype == TypeSpec::kVoid) {
+            Appender{tail_code}.append({{Op::kRet, {.argc = 0}}});
+        } else {
+            auto v_ret = assign_new_varible();
+            Appender{tail_code}
+                .append({{Op::kLoad, {.var_m = v_ret, .addr_m = f.ret.var}}})
+                .append({{Op::kRet, {.argc = 1, .var_r = v_ret}}});
+        }
 
         // amend code
-        auto  body_code = _6.Ref<Code>("code");
-        auto  head_code = Code{};
-        for (int i = 0; i < f.paramsVar.size(); i++) {
-            auto var = f.paramsVar[i];
-            auto q = QuadTuple{Op::kPop, {.var = var}};
-            head_code.push_back(q);
-        }
-        Appender{f.code}.append(head_code).append(body_code);
+        auto q_func_begin = QuadTuple{Op::kFuncBegin, {.addr1 = f.lbl}};
+        auto q_func_end   = QuadTuple{Op::kFuncEnd};
+        Appender{f.code}
+            .append({q_func_begin})
+            .append(head_code)
+            .append(body_code)
+            .append(tail_code)
+            .append({q_func_end});
 
-        // offset labels
-        auto  body_lbls = _6.Ref<Lbls>("lbls");
-        for (auto lbl : body_lbls) {
-            set_label_with_offset(lbl, head_code.size());
-        }
-
-        // pop function domain
-        varnameTblStack.pop_back();
+        // pop domain
+        varDeclsDomains.pop_back(); // pop local_decls
+        varDeclsDomains.pop_back(); // pop params_decls
     }
 
     // func_decl <- type_spec FUNCTION_IDENT '(' params ')' ';' ●
     if (pidx == 10) {
         auto &f_name = _0.RefN<string>("func_name");
-        auto &f_var  = _0.RefN<Var>("func_var");
 
-        // push to global domain
-        auto f_params_name = _4.Ref<vector<string>>("params_name");
-        auto f_params_decl = _4.Ref<vector<VarDecl>>("params_decl");
-        auto f_ret_type    = _1.Ref<TypeSpec>("type");
-        auto f_ret         = VarDecl{.type = f_ret_type, .shape = {}};
-        auto f_code        = Code{};
+        // add the type-decl of function into global
+        // no name information nor variable is assigned
+        auto f_params_type  = _4.Ref<vector<TypeDecl>>("params_type");
+        auto f_ret_basetype = _1.Ref<TypeSpec>("basetype");
 
-        auto f_decl = FuncDecl{
-            .paramsName = f_params_name,
-            .paramsDecl = f_params_decl,
-            .ret        = f_ret,
-            .code       = f_code,
-        };
+        auto f_decl = createFuncDecl(f_name, f_params_type, f_ret_basetype);
+        assert(has_function_by_name(f_name) == false);
 
-        // TODO: add function re-definition check later
-        f_name         = _2.Ref<string>("lval");
-        f_var          = get_varible_by_name_safe(f_name);
-        funcTbl[f_var] = f_decl;
-        regesiter_varname_in_domain(f_name, f_var);
+        f_decl.lbl = assign_new_label(); // make it Referenceable
+        globalFuncDecls.push_back(f_decl);
     }
 
     // FUNCTION_IDENT <- IDENT
@@ -538,63 +703,61 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
     // params <- param_list | VOID
     if (pidx == 12 || pidx == 13) {
         auto &params_name = _0.RefN<vector<string>>("params_name");
-        auto &params_decl = _0.RefN<vector<VarDecl>>("params_decl");
+        auto &params_type = _0.RefN<vector<TypeDecl>>("params_type");
 
         if (pidx == 12) {
             params_name = _1.Ref<vector<string>>("params_name");
-            params_decl = _1.Ref<vector<VarDecl>>("params_decl");
+            params_type = _1.Ref<vector<TypeDecl>>("params_type");
         }
     }
 
     // params_list <- param_list ',' param | param
     if (pidx == 14 || pidx == 15) {
         auto &params_name = _0.RefN<vector<string>>("params_name");
-        auto &params_decl = _0.RefN<vector<VarDecl>>("params_decl");
+        auto &params_type = _0.RefN<vector<TypeDecl>>("params_type");
 
         if (pidx == 14) {
             Appender{params_name}
                 .append(_1.Ref<vector<string>>("params_name"))
                 .append({_3.Ref<string>("param_name")});
-            Appender{params_decl}
-                .append(_1.Ref<vector<VarDecl>>("params_decl"))
-                .append({_3.Ref<VarDecl>("param_decl")});
+            Appender{params_type}
+                .append(_1.Ref<vector<TypeDecl>>("params_type"))
+                .append({_3.Ref<TypeDecl>("param_type")});
         } else if (pidx == 15) {
             Appender{params_name}.append({_1.Ref<string>("param_name")});
-            Appender{params_decl}.append({_1.Ref<VarDecl>("param_decl")});
+            Appender{params_type}.append({_1.Ref<TypeDecl>("param_type")});
         }
     }
 
     // param <- type_spec IDENT | type_spec IDENT '[' int_literal ']'
     if (pidx == 16 || pidx == 17) {
         auto &param_name = _0.RefN<string>("param_name");
-        auto &param_decl = _0.RefN<VarDecl>("param_decl");
+        auto &param_type = _0.RefN<TypeDecl>("param_type");
 
         param_name = _2.Ref<string>("lval");
 
-        auto type  = _1.Ref<TypeSpec>("type");
-        auto shape = vector<int>{};
+        auto basetype = _1.Ref<TypeSpec>("basetype");
+        auto shape    = vector<int>{};
         if (pidx == 17) {
             int size = _4.Ref<CVal>("cval");
             shape    = {size};
         }
-        param_decl = {.type = type, .shape = shape};
+        param_type = {.basetype = basetype, .shape = shape};
     }
 
     // stmt_list <- stmt_list stmt |
     if (pidx == 18 || pidx == 19) {
-        auto &code = _0.RefN<Code>("code");
-        auto &lbls = _0.RefN<Lbls>("lbls"); // labels assigned with lineNo
+        auto &code          = _0.RefN<Code>("code");
         auto &continue_lbls = _0.RefN<Lbls>("continue_lbls"); // from "continue"
         auto &break_lbls    = _0.RefN<Lbls>("break_lbls");    // from "break"
+        auto &return_lbls   = _0.RefN<Lbls>("return_lbls");   // from "return"
+
+        logger.debug("return_lbls={{{}}}", fmt::join(to_vector(return_lbls), ","));
 
         if (pidx == 18) {
             auto &code_1 = _1.Ref<Code>("code");
             auto &code_2 = _2.Ref<Code>("code");
             Appender{code}.append(code_1).append(code_2);
-
-            auto &lbls_1 = _1.Ref<Lbls>("lbls");
-            auto &lbls_2 = _2.Ref<Lbls>("lbls");
-            Appender{lbls}.append(lbls_1).append(lbls_2);
 
             auto &continue_lbls1 = _1.Ref<Lbls>("continue_lbls");
             auto &continue_lbls2 = _2.Ref<Lbls>("continue_lbls");
@@ -605,92 +768,73 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
             auto &break_lbls1 = _1.Ref<Lbls>("break_lbls");
             auto &break_lbls2 = _2.Ref<Lbls>("break_lbls");
             Appender{break_lbls}.append(break_lbls1).append(break_lbls2);
+
+            auto &return_lbls1 = _1.Ref<Lbls>("return_lbls");
+            auto &return_lbls2 = _2.Ref<Lbls>("return_lbls");
+            Appender{return_lbls}.append(return_lbls1).append(return_lbls2);
         }
     }
 
     // stmt <- expr_stmt | block_stmt | if_stmt | while_stmt | ...
     if (20 <= pidx && pidx <= 26) {
-        auto &code = _0.RefN<Code>("code");
-        auto &lbls = _0.RefN<Lbls>("lbls"); // labels assigned with lineNo
+        auto &code          = _0.RefN<Code>("code");
         auto &continue_lbls = _0.RefN<Lbls>("continue_lbls"); // from "continue"
         auto &break_lbls    = _0.RefN<Lbls>("break_lbls");    // from "break"
+        auto &return_lbls   = _0.RefN<Lbls>("return_lbls");   // from "return"
 
         code = _1.Ref<Code>("code");
-        if (_1.Has<Lbls>("lbls")) { lbls = _1.Ref<Lbls>("lbls"); }
         if (_1.Has<Lbls>("continue_lbls")) {
             continue_lbls = _1.Ref<Lbls>("continue_lbls");
         }
         if (_1.Has<Lbls>("break_lbls")) {
             break_lbls = _1.Ref<Lbls>("break_lbls");
         }
+        if (_1.Has<Lbls>("return_lbls")) {
+            return_lbls = _1.Ref<Lbls>("return_lbls");
+        }
     }
 
     // expr_stmt <- IDENT '=' expr ';' | ...
     if (27 <= pidx && pidx <= 30) {
         auto &code = _0.RefN<Code>("code");
-        auto &lbls = _0.RefN<Lbls>("lbls"); // labels assigned with lineNo
         code       = {};
-        lbls       = {};
 
         sdt_expr_stmt_action(parent, child, pidx);
     }
 
     // while_stmt <- WHILE_IDENT '(' expr ')' stmt
     if (pidx == 31) {
-        auto &code = _0.RefN<Code>("code");
-        auto &lbls = _0.RefN<Lbls>("lbls"); // labels assigned with lineNo
+        auto &code        = _0.RefN<Code>("code");
+        auto &return_lbls = _0.RefN<Lbls>("return_lbls"); // from "return"
 
-        auto code_expr = _3.Ref<Code>("code");
-        auto code_stmt = _5.Ref<Code>("code");
-        auto v_cond    = _3.Ref<Var>("var");
+        return_lbls = _5.Ref<Lbls>("return_lbls");
 
-        // amend code
-        auto cond_lbl         = assign_new_label();
-        auto begin_lbl        = assign_new_label();
-        auto end_lbl          = assign_new_label();
-        int  cond_lbl_lineNO  = 0;
-        int  begin_lbl_lineNO = code_expr.size() + 1;
-        int  end_lbl_lineNO   = code_expr.size() + code_stmt.size() + 2;
-        set_label_with_lineNO(cond_lbl, cond_lbl_lineNO);
-        set_label_with_lineNO(begin_lbl, begin_lbl_lineNO);
-        set_label_with_lineNO(end_lbl, end_lbl_lineNO);
+        auto &code_expr = _3.Ref<Code>("code");
+        auto &code_stmt = _5.Ref<Code>("code");
+        auto  v_expr    = _3.Ref<Var>("var");
 
-        auto q_cond = QuadTuple{
-            .op   = Op::kBranch,
-            .args = {.var_j = v_cond, .addr1 = begin_lbl, .addr2 = end_lbl}};
-        auto q_back = QuadTuple{.op = Op::kGoto, .args = {.addr1 = cond_lbl}};
-
-        Appender{code}
-            .append(code_expr)
-            .append({q_cond})
-            .append(code_stmt)
-            .append({q_back});
-
-        // offset labels
-        auto lbls_expr = _3.Ref<Lbls>("lbls");
-        auto lbls_stmt = _5.Ref<Lbls>("lbls");
-        for (auto lbl : lbls_expr) { set_label_with_offset(lbl, 0); }
-        for (auto lbl : lbls_stmt) {
-            set_label_with_offset(lbl, code_expr.size() + 1);
-        }
-        Appender{lbls}.append(lbls_expr).append(lbls_stmt);
+        auto cond_lbl = assign_new_label();
+        auto body_lbl = assign_new_label();
+        auto end_lbl  = assign_new_label();
 
         // backpatching
         auto continue_lbls = _5.Ref<Lbls>("continue_lbls"); // from "continue"
         auto break_lbls    = _5.Ref<Lbls>("break_lbls");    // from "break"
-        for (auto lbl : continue_lbls) {
-            auto &q = code[get_label_with_lineNO(lbl)];
-            assert(q.op == Op::kGoto);
-            q = {Op::kGoto, {.addr1 = cond_lbl}};
-            lbls.erase(lbl);
-        }
-        for (auto lbl : break_lbls) {
-            auto &q = code[get_label_with_lineNO(lbl)];
-            assert(q.op == Op::kGoto);
-            q = {Op::kGoto, {.addr1 = end_lbl}};
-            lbls.erase(lbl);
-        }
+        backpatching(code_stmt, continue_lbls, cond_lbl);
+        backpatching(code_stmt, break_lbls, end_lbl);
 
+        // amend code
+        Appender{code}
+            .append({{Op::kLabel, {.addr1 = cond_lbl}}})
+            .append(code_expr)
+            .append({{.op   = Op::kBranch,
+                      .args = {.var_j = v_expr,
+                               .addr1 = body_lbl,
+                               .addr2 = end_lbl}}})
+            .append({{Op::kLabel, {.addr1 = body_lbl}}})
+            .append(code_stmt)
+            .append({{.op = Op::kGoto, .args = {.addr1 = cond_lbl}}})
+            .append({{Op::kLabel, {.addr1 = end_lbl}}});
     }
 
     // WHILE_IDENT <- WHILE
@@ -701,116 +845,134 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
 
     // compound_stmt <- '{' local_decls stmt_list '}'
     if (pidx == 34) {
-        auto &code       = _0.RefN<Code>("code");
-        auto &lbls       = _0.RefN<Lbls>("lbls"); // labels assigned with lineNo
-        auto &continue_lbls = _0.RefN<Lbls>("continue_lbls"); // from "continue"
-        auto &break_lbls   = _0.RefN<Lbls>("break_lbls");   // from "break"
+        auto &var_decls   = _0.RefN<vector<VarDecl>>("var_decls");
+        auto &code        = _0.RefN<Code>("code");
+        auto &return_lbls = _0.RefN<Lbls>("return_lbls"); // from "return"
 
-        // pop local-decls domain
-        varnameTblStack.pop_back();
+        return_lbls = _3.Ref<Lbls>("return_lbls");
 
-        // amend code
-        auto code_stmts = _3.Ref<Code>("code");
-        code            = code_stmts;
-
-        // amend labels
-        lbls       = _3.Ref<Lbls>("lbls");
-        continue_lbls = _3.Ref<Lbls>("continue_lbls");
-        break_lbls   = _3.Ref<Lbls>("break_lbls");
+        auto &var_decls_local = _2.Ref<vector<VarDecl>>("var_decls");
+        auto &code_stmts      = _3.Ref<Code>("code");
+        var_decls             = var_decls_local;
+        code                  = code_stmts;
     }
 
     // local_decls <- local_decls local_decl |
     if (pidx == 35 || pidx == 36) {
+        auto &var_decls = _0.RefN<vector<VarDecl>>("var_decls");
 
         if (pidx == 35) {
-            auto &varnameTbl    = varnameTblStack.back();
-            auto &varname       = _2.Ref<string>("varname");
-            auto &var           = _2.Ref<Var>("var");
-            varnameTbl[varname] = var;
-        } else {
-            varnameTblStack.push_back({});
-            // auto &varnameTbl = varnameTblStack.back();
+            var_decls = _1.Ref<vector<VarDecl>>("var_decls");
+            var_decls.push_back(_2.Ref<VarDecl>("var_decl"));
         }
     }
 
     // local_decl <- type_spec IDENT ';' | type_spec IDENT '[' int_literal ']'
     // ';'
     if (pidx == 37 || pidx == 38) {
-        auto &varname = _0.RefN<string>("varname");
-        auto &var     = _0.RefN<Var>("var");
+        auto &var_decl = _0.RefN<VarDecl>("var_decl");
 
-        varname    = _2.Ref<string>("lval");
-        var        = assign_new_varible();
-        auto type  = _1.Ref<TypeSpec>("type");
-        auto shape = vector<int>{};
+        auto basetype = _1.Ref<TypeSpec>("basetype");
+        auto varname  = _2.Ref<string>("lval");
+        auto shape    = vector<int>{};
+        auto var      = assign_new_varible();
 
         if (pidx == 38) {
             int size = _4.Ref<CVal>("cval");
             shape    = vector<int>{size};
         }
-        varTbl[var] = VarDecl{.type = type, .shape = shape};
+        var_decl =
+            VarDecl{.type    = TypeDecl{.basetype = basetype, .shape = shape},
+                    .varname = varname,
+                    .var     = var};
+        varDeclsDomains.back()->push_back(var_decl);
     }
 
-    // if_stmt -> IF '(' expr ')' stmt | | IF '(' expr ')' stmt ELSE stmt
+    // if_stmt -> IF '(' expr ')' stmt | IF '(' expr ')' stmt ELSE stmt
     if (pidx == 39 || pidx == 40) {
-        auto &code = _0.RefN<Code>("code");
-        auto &lbls = _0.RefN<Lbls>("lbls"); // labels assigned with lineNo
-
-        // amend code
-        auto v_expr         = _3.Ref<Var>("var");
-        auto code_expr      = _3.Ref<Code>("code");
-        auto code_true_stmt = _5.Ref<Code>("code");
-
-        auto true_lbl  = assign_new_label();
-        auto false_lbl = assign_new_label();
-        auto end_lbl   = assign_new_label();
-
-        int true_lbl_lineNO  = 1;
-        int false_lbl_lineNO = code_expr.size() + code_true_stmt.size() + 1;
-        set_label_with_lineNO(true_lbl, true_lbl_lineNO);
-        set_label_with_lineNO(false_lbl, false_lbl_lineNO);
-
-        auto q =
-            QuadTuple{Op::kBranch,
-                      {.var_j = v_expr, .addr1 = true_lbl, .addr2 = end_lbl}};
-        Appender{code}.append(code_expr).append({q}).append(code_true_stmt);
+        auto &code          = _0.RefN<Code>("code");
+        auto &continue_lbls = _0.RefN<Lbls>("continue_lbls"); // from "continue"
+        auto &break_lbls    = _0.RefN<Lbls>("break_lbls");    // from "break"
+        auto &return_lbls   = _0.RefN<Lbls>("return_lbls");   // from "return"
 
         if (pidx == 39) {
-            int end_lbl_lineNO = false_lbl_lineNO;
-            set_label_with_lineNO(end_lbl, end_lbl_lineNO);
-            auto q2 = QuadTuple{Op::kGoto, {.addr1 = end_lbl}};
-            Appender{code}.append({q2});
-        } else if (pidx == 40) {
-            auto code_false_stmt = _7.Ref<Code>("code");
-            int  end_lbl_lineNO = false_lbl_lineNO + code_false_stmt.size() + 1;
-            set_label_with_lineNO(end_lbl, end_lbl_lineNO);
-            auto q2 = QuadTuple{Op::kGoto, {.addr1 = end_lbl}};
-            Appender{code}.append({q2}).append(code_false_stmt).append({q2});
-        }
+            auto  v_expr         = _3.Ref<Var>("var");
+            auto &code_expr      = _3.Ref<Code>("code");
+            auto &code_then_stmt = _5.Ref<Code>("code");
 
-        // amend labels
-        auto lbls_true_stmt  = _5.Ref<Lbls>("lbls");
-        auto lbls_false_stmt = _7.Ref<Lbls>("lbls");
-        Appender{lbls}.append(lbls_true_stmt).append(lbls_false_stmt);
+            auto then_lbl = assign_new_label();
+            auto end_lbl  = assign_new_label();
+
+            Appender{code}
+                .append(code_expr)
+                .append(
+                    {{Op::kBranch,
+                      {.var_j = v_expr, .addr1 = then_lbl, .addr2 = end_lbl}}})
+                .append({{Op::kLabel, {.addr1 = then_lbl}}})
+                .append(code_then_stmt)
+                .append({{Op::kGoto, {.addr1 = end_lbl}}})
+                .append({{Op::kLabel, {.addr1 = end_lbl}}});
+
+            auto &c1_lbls = _5.Ref<Lbls>("continue_lbls");
+            auto &b1_lbls = _5.Ref<Lbls>("break_lbls");
+            auto &r1_lbls = _5.Ref<Lbls>("return_lbls");
+            Appender{continue_lbls}.append(c1_lbls);
+            Appender{break_lbls}.append(b1_lbls);
+            Appender{return_lbls}.append(r1_lbls);
+
+        } else if (pidx == 40) {
+            auto  v_expr         = _3.Ref<Var>("var");
+            auto &code_expr      = _3.Ref<Code>("code");
+            auto &code_then_stmt = _5.Ref<Code>("code");
+            auto &code_else_stmt = _7.Ref<Code>("code");
+
+            auto then_lbl = assign_new_label();
+            auto else_lbl = assign_new_label();
+            auto end_lbl  = assign_new_label();
+
+            Appender{code}
+                .append(code_expr)
+                .append(
+                    {{Op::kBranch,
+                      {.var_j = v_expr, .addr1 = then_lbl, .addr2 = end_lbl}}})
+                .append({{Op::kLabel, {.addr1 = then_lbl}}})
+                .append(code_then_stmt)
+                .append({{Op::kGoto, {.addr1 = end_lbl}}})
+                .append({{Op::kLabel, {.addr1 = else_lbl}}})
+                .append(code_else_stmt)
+                .append({{Op::kGoto, {.addr1 = end_lbl}}})
+                .append({{Op::kLabel, {.addr1 = end_lbl}}});
+
+            auto &c1_lbls = _5.Ref<Lbls>("continue_lbls");
+            auto &c2_lbls = _7.Ref<Lbls>("continue_lbls");
+            auto &b1_lbls = _5.Ref<Lbls>("break_lbls");
+            auto &b2_lbls = _7.Ref<Lbls>("break_lbls");
+            auto &r1_lbls = _5.Ref<Lbls>("return_lbls");
+            auto &r2_lbls = _7.Ref<Lbls>("return_lbls");
+            Appender{continue_lbls}.append(c1_lbls).append(c2_lbls);
+            Appender{break_lbls}.append(b1_lbls).append(b2_lbls);
+            Appender{return_lbls}.append(r1_lbls).append(r2_lbls);
+        }
     }
 
     // return_stmt <- RETURN ';' | RETURN expr ';'
     if (pidx == 41 || pidx == 42) {
-        auto &code = _0.RefN<Code>("code");
-        auto &lbls = _0.RefN<Lbls>("lbls");
+        auto &code       = _0.RefN<Code>("code");
+        auto &return_lbls = _0.RefN<Lbls>("return_lbls"); // from "return"
 
-        code = {};
-        lbls = {};
-
-        QuadTuple q;
+        auto return_lbl = assign_new_label();
+        return_lbls = {return_lbl};
         if (pidx == 41) {
-            q = {.op = Op::kRet};
+            auto q = QuadTuple{Op::kGoto, {.addr1 = return_lbl}};
             Appender{code}.append({q});
         } else {
-            auto code_expr = _2.Ref<Code>("code");
-            auto lbls_expr = _2.Ref<Lbls>("lbls");
-            q = {.op = Op::kRet, .args = {.var_j = _2.Ref<Var>("var")}};
-            Appender{code}.append(code_expr).append({q});
+            auto  v_expr    = _2.Ref<Var>("var");
+            auto &code_expr = _2.Ref<Code>("code");
+            // wait for backpatching
+            auto q1 =
+                QuadTuple{Op::kStore, {.var_m = v_expr, .addr_m = var_empty}};
+            auto q2 = QuadTuple{Op::kGoto, {.addr1 = return_lbl}};
+            Appender{code}.append(code_expr).append({q1, q2});
         }
     }
 
@@ -818,11 +980,9 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
     if (43 <= pidx && pidx <= 70) {
         auto &var  = _0.RefN<Var>("var");
         auto &code = _0.RefN<Code>("code");
-        auto &lbls = _0.RefN<Lbls>("lbls");
 
-        var  = v_zero;
+        var  = var_empty;
         code = {};
-        lbls = {};
 
         sdt_expr_action(parent, child, pidx);
     }
@@ -858,33 +1018,25 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
         if (pidx == 75) { args = _1.Ref<vector<Var>>("args"); }
     }
 
-    // continue <- CONTINUE ';'
+    // continue_stmt <- CONTINUE ';'
     if (pidx == 77) {
-        auto &code = _0.RefN<Code>("code");
-        auto &lbls = _0.RefN<Lbls>("lbls"); // labels assigned with lineNo
-        auto &continue_lbl = _0.RefN<Lbl>("continue_lbl"); // from "continue"
+        auto &code         = _0.RefN<Code>("code");
+        auto &continue_lbls = _0.RefN<Lbls>("continue_lbls");
 
-        continue_lbl = assign_new_label();
-        set_label_with_lineNO(continue_lbl, 0);
-        code = {};
-        lbls = {continue_lbl};
-
-        QuadTuple q = {.op = Op::kGoto, .args = {.addr1 = continue_lbl}};
+        auto continue_lbl = assign_new_label();
+        continue_lbls = {continue_lbl};
+        auto q = QuadTuple{.op = Op::kGoto, .args = {.addr1 = continue_lbl}};
         code.push_back(q);
     }
 
     // break_stmt <- : BREAK ';'
     if (pidx == 78) {
         auto &code      = _0.RefN<Code>("code");
-        auto &lbls      = _0.RefN<Lbls>("lbls"); // labels assigned with lineNo
-        auto &break_lbl = _0.RefN<Lbl>("break_lbl"); // from "break"
+        auto &break_lbls = _0.RefN<Lbls>("break_lbls");
 
-        break_lbl = assign_new_label();
-        set_label_with_lineNO(break_lbl, 0);
-        code = {};
-        lbls = {break_lbl};
-
-        QuadTuple q = {.op = Op::kGoto, .args = {.addr1 = lbl_empty}};
+        auto break_lbl = assign_new_label();
+        break_lbls = {break_lbl};
+        auto q    = QuadTuple{.op = Op::kGoto, .args = {.addr1 = break_lbl}};
         code.push_back(q);
     }
 }
@@ -901,47 +1053,43 @@ void sdt_inherited_action(AttrDict *parent, AttrDict *child[], int pidx,
     // auto &_7 = *child[6];
     // auto &_8 = *child[7];
 
-    // func_decl <- type_spec FUNCTION_IDENT '(' params ')' ● compound_stmt
+    // func_decl <- type_spec FUNCTION_IDENT '(' params ')' ●
+    // compound_stmt
     if (pidx == 9 && dot == 5) {
         auto &f_name = _0.RefN<string>("func_name");
-        auto &f_var  = _0.RefN<Var>("func_var");
 
+        f_name = _2.Ref<string>("lval");
         // push to global domain
-        auto f_params_name = _4.Ref<vector<string>>("params_name");
-        auto f_params_decl = _4.Ref<vector<VarDecl>>("params_decl");
-        auto f_ret_type    = _1.Ref<TypeSpec>("type");
-        auto f_ret         = VarDecl{.type = f_ret_type, .shape = {}};
-        auto f_code        = Code{};
+        // notice: the assignment of params, retvar, will be delayed until
+        // the definition of function occur (pidx=9, dot=5)
+        auto f_params_name  = _4.Ref<vector<string>>("params_name");
+        auto f_params_type  = _4.Ref<vector<TypeDecl>>("params_type");
+        auto f_ret_basetype = _1.Ref<TypeSpec>("basetype");
 
-        // assign Var for parameters
-        auto f_params_var = vector<Var>(f_params_name.size());
-        for (auto &v : f_params_var) { v = assign_new_varible(); }
 
-        auto f_decl = FuncDecl{
-            .paramsName = f_params_name,
-            .paramsDecl = f_params_decl,
-            .paramsVar  = f_params_var,
-            .ret        = f_ret,
-            .code       = f_code,
-        };
-
-        // add function re-definition check later
-        f_name         = _2.Ref<string>("lval");
-        f_var          = get_varible_by_name_safe(f_name);
-        funcTbl[f_var] = f_decl;
-        regesiter_varname_in_domain(f_name, f_var);
-
-        // push function domain
-        VarnameTbl domain;
-        for (int i = 0; i < f_params_name.size(); i++) {
-            auto &p_name = f_params_name[i];
-            auto &p_decl = f_params_decl[i];
-            auto &p_var  = f_params_var[i];
-
-            domain[p_name] = p_var;
-            varTbl[p_var]  = p_decl;
+        // create definition only by type
+        // check re-definition
+        auto f_decl0 = createFuncDecl(f_name, f_params_type, f_ret_basetype);
+        if (has_function_by_name(f_name)) {
+            auto &f_decl_prev = get_function_by_name(f_name);
+            assert(isFuncDeclTypeEqual(f_decl_prev, f_decl0));
+        } else {
+            f_decl0.lbl = assign_new_label(); // make it Referenceable
+            globalFuncDecls.push_back(f_decl0);
         }
-        varnameTblStack.push_back(domain);
+
+        // make its params, return stmt, Referenceable
+        auto &f_decl = get_function_by_name(f_name);
+        f_decl.ret.var = assign_new_varible();
+        for (int i = 0; i < f_params_name.size(); i++) {
+            f_decl.params[i].var     = assign_new_varible();
+            f_decl.params[i].varname = f_params_name[i];
+        }
+
+        // push into domain
+        // control its lifetime so that it's only open for its definition
+        varDeclsDomains.push_back(&f_decl.params);
+        varDeclsDomains.push_back(&f_decl.localVars);
     }
 }
 
@@ -979,13 +1127,32 @@ void sdt_visit(shared_ptr<APTnode> &node) {
 };
 
 void syntax_directed_translation(shared_ptr<APTnode> &node) {
-    varnameTblStack.push_back({}); // global domain
+    varDeclsDomains.push_back(&globalVarDecls); // global domain
     sdt_visit(node);
+}
+
+string to_string(const TypeDecl &type) {
+    stringstream ss;
+    if (type.shape.size() == 0) {
+        ss << enum_name(type.basetype);
+    } else {
+        ss << fmt::format("[{} x {}]", fmt::join(type.shape, " x "),
+                          enum_name(type.basetype));
+    }
+    return ss.str();
+}
+
+string to_string(const VarDecl &var) {
+    stringstream ss;
+    ss << to_string(var.type) << " %" << var.var;
+    return ss.str();
 }
 
 string to_string(const QuadTuple &q) {
     stringstream ss;
     switch (q.op) {
+        case Op::kNop:
+            ss << fmt::format("{:s}", enum_name(q.op));
         case Op::kAssign:
             ss << fmt::format("%{:d} = {:s} {:d}", int(q.args.var),
                               enum_name(q.op), int(q.args.cval));
@@ -1014,26 +1181,39 @@ string to_string(const QuadTuple &q) {
                               int(q.args.src2));
             break;
         case Op::kAlloate:
-            ss << fmt::format("%{:d} = {:s} {:d}", int(q.args.var_m),
-                              enum_name(q.op), int(q.args.offset));
+        case Op::kGlobal:
+            ss << fmt::format("%{:d} = {:s}", int(q.args.var_a),
+                              enum_name(q.op));
+            if (q.args.len == 0) {
+                ss << fmt::format(" {:d}", int(q.args.width));
+            } else {
+                ss << fmt::format(" [{:d} x {:d}]", int(q.args.len),
+                                  int(q.args.width));
+            }
             break;
         case Op::kLoad:
-            ss << fmt::format("%{:d} = {:s} {:d} (%{:d})", int(q.args.var_m),
-                              enum_name(q.op), int(q.args.offset),
-                              int(q.args.addr));
+            ss << fmt::format("%{:d} = {:s} (%{:d})", int(q.args.var_m),
+                              enum_name(q.op), int(q.args.addr_m));
             break;
         case Op::kStore:
-            ss << fmt::format("{:d} (%{:d}) = {:s} %{:d}", int(q.args.offset),
-                              int(q.args.addr), enum_name(q.op),
-                              int(q.args.var_m));
+            ss << fmt::format("(%{:d}) = {:s} %{:d}", int(q.args.addr_m),
+                              enum_name(q.op), int(q.args.var_m));
             break;
-        case Op::kPush:
-        case Op::kPop:
-            ss << fmt::format("{:s} %{:d}", enum_name(q.op), int(q.args.var));
+        case Op::kParamPut:
+            ss << fmt::format("{:s} <{:d}> %{:d} ", enum_name(q.op),
+                              int(q.args.argc), int(q.args.var_r));
+            break;
+        case Op::kParamGet:
+            ss << fmt::format("%{:d} = {:s} <{:d}>", int(q.args.var_r),
+                              enum_name(q.op), int(q.args.argc));
             break;
         case Op::kCall:
             ss << fmt::format("{:s} func %{:d}", enum_name(q.op),
                               int(q.args.var));
+            break;
+        case Op::kLabel:
+            ss << fmt::format("@{:d}:", int(q.args.addr1));
+            break;
         case Op::kGoto:
             ss << fmt::format("{:s} @{:d}", enum_name(q.op), int(q.args.addr1));
             break;
@@ -1043,10 +1223,18 @@ string to_string(const QuadTuple &q) {
                               int(q.args.addr2));
             break;
         case Op::kRet:
-            ss << fmt::format("{:s} %{:d}", enum_name(q.op), int(q.args.var));
+            if (q.args.argc == 0) {
+                ss << fmt::format("{:s}", enum_name(q.op));
+            } else {
+                ss << fmt::format("{:s} %{:d}", enum_name(q.op),
+                                  int(q.args.var_r));
+            }
             break;
-        case Op::kHalt:
-            ss << fmt::format("{:s}", enum_name(q.op));
+        case Op::kFuncBegin:
+            ss << fmt::format("func @{:s} {{", q.args.addr1);
+            break;
+        case Op::kFuncEnd:
+            ss << fmt::format("}}");
             break;
         default:
             assert(false);
@@ -1055,11 +1243,54 @@ string to_string(const QuadTuple &q) {
 }
 
 string get_ir_str() {
+    // auxiliary information for debugging
+    // map<Var, string> global_varnames;
+    // map<Var, string> local_varnames;
+    // map<Lbl, string> lblnames;
+
+    // for (const auto &var_decl : globalVarDecls) {
+    //     const auto &var = var_decl.var;
+    //     const auto &varname = var_decl.varname;
+    //     assert(varnames.count(var) == 0);
+    //     varnames[var] = varname;
+    // }
+
     stringstream ss;
-    for (auto & [ func_var, func_decl ] : funcTbl) {
-        ss << fmt::format("func %{:d}:\n", int(func_var));
-        for (const auto &q : func_decl.code) {
-            ss << "\t" << to_string(q) << "\n";
+
+    auto getFuncDeclByLbl = [&](Lbl lbl) -> FuncDecl & {
+        for (auto &f : globalFuncDecls) {
+            if (f.lbl == lbl) { return f; }
+        }
+        assert(false);
+    };
+    auto getFuncDeclStr = [&](const FuncDecl &f) -> string {
+        stringstream ss;
+        // func myfunc @32 int(int, int[10]) {
+        auto retval_str = to_string(f.ret.type);
+        auto params_str =
+            apply_map(f.params, [](VarDecl v) { return to_string(v); });
+        ss << fmt::format("func {} {} @{}({})", f.funcname, retval_str,
+                          int(f.lbl), fmt::join(params_str, ", "));
+        return ss.str();
+    };
+
+    // print global variables declaration
+    for (const auto &var_decl : globalVarDecls) {
+        ss << to_string(gen_allocate_code(var_decl, Op::kGlobal)) << "\n";
+    }
+    ss << "\n";
+
+    // print global functions declaration
+    for (const auto &f : globalFuncDecls) {
+        for (const auto &q : f.code) {
+            if (q.op == Op::kLabel || q.op == Op::kFuncEnd) {
+                ss << to_string(q) << "\n";
+            } else if (q.op == Op::kFuncBegin) {
+                auto &func = getFuncDeclByLbl(q.args.addr1);
+                ss << fmt::format("{} {{\n", getFuncDeclStr(func));
+            } else {
+                ss << "\t" << to_string(q) << "\n";
+            }
         }
     }
     return ss.str();
