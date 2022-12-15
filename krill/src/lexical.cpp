@@ -13,6 +13,7 @@ using namespace krill::type;
 using namespace std;
 using krill::automata::getDFAintegrated;
 using krill::regex::getDFAfromRegex;
+using krill::utils::unescape;
 
 
 namespace krill::type {
@@ -65,11 +66,11 @@ Token LexicalParser::parseStep(istream &input) {
 
             // assert(dfa_.finality.at(state_) != 0); // failed
             if (dfa_.finality.at(state_) == 0) {
-                logger.error("Lexical Error: unmatched \"{}\" in \"{}\"\n",
-                                buffer.str() + c, history_ + c);
+                logger.error("lexical error: unmatched \"{}\" in \"{}\"\n",
+                                buffer.str() + c, unescape(history_ + c));
                 throw runtime_error(
-                    fmt::format("Lexical Error: unmatched \"{}\" in \"{}\"\n",
-                                buffer.str() + c, history_ + c));
+                    fmt::format("lexical error: unmatched \"{}\" in \"{}\"\n",
+                                buffer.str() + c, unescape(history_ + c)));
             }
             int    tokenId       = dfa_.finality.at(state_) - 1;
             string tokenLexValue = buffer.str();
