@@ -1,6 +1,6 @@
 
 void test1(int a);
-int test1(int a, int b, int c);
+int test2(int a, int b, int c);
 
 void test1(int a) {
 	if (a) a=1; else a=2;
@@ -29,5 +29,5 @@ int main(void) {
 	int a;
 	int b;
 	test1(a);
-	test2(b);
+	test2(b, b, b);
 }

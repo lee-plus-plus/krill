@@ -172,18 +172,14 @@ void testIRgeneration() {
     }
     logger.debug("annotated parsing tree:\n{}", syntaxParser.getAPTstr());
 
-    cout << "\n";
-    cout << syntaxParser.getAPTstr();
-    cout << "\n";
-
-    krill::log::sink_cerr->set_level(spdlog::level::debug);
+    // krill::log::sink_cerr->set_level(spdlog::level::debug);
 
     // syntax-directed translation
     auto root = syntaxParser.getAPT();
     syntax_directed_translation(root);
 
     // show result
-    cout << getAPTstr(root, minicGrammar) << "\n";
+    // cout << getAPTstr(root, minicGrammar) << "\n";
     cout << get_ir_str() << "\n";
 
 }
