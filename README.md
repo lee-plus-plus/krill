@@ -83,7 +83,7 @@ $ make test_codegen
 
 ```bash
 $ make test_minic
-./test/test_minic
+./test/test_minic -Ls < ../test/minic-testcase/01.c
 ```
 
 如果我准备的正则表达式和文法没有问题, 它应该能很好地解析mini-C的代码. 

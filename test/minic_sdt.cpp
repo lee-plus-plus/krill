@@ -18,7 +18,7 @@ using krill::grammar::ProdItem;
 using krill::log::logger;
 
 // intermediate code (quad-tuple)
-struct QuadTuple {
+extern struct QuadTuple {
     // using Lbl = uint32_t; // label of address, not memeory address
     // using Varname = uint32_t;
     // using CVal = uint32_t;
@@ -58,7 +58,7 @@ struct QuadTuple {
         kAnd, kOr, kXor, kNor,          /* (dest, src1, src2) */
         kLShift, kRShift,               /* (dest, src1, src2) */
         kEq, kNeq, kLeq, kLt,           /* (dest, src1, src2) */
-        kAlloate,  kGlobal,     /* (var_a, width, len) */
+        kAllocate,  kGlobal,     /* (var_a, width, len) */
         kLoad, kStore,  /* (var_m, addr_m) */
         kParamPut,  /* (var_r, argc) */ 
         kParamGet,  /* (var_r, argc) */ 
@@ -110,9 +110,9 @@ using Var  = QuadTuple::Var;  // register / local / global
 using CVal = QuadTuple::CVal; // const value in asm, uint32_t
 using Code = vector<QuadTuple>;
 
-constexpr Var var_zero  = {0};
-constexpr Var var_empty = {};
-constexpr Lbl lbl_empty = {};
+extern constexpr Var var_zero  = {0};
+extern constexpr Var var_empty = {};
+extern constexpr Lbl lbl_empty = {};
 
 // label for backpatching
 constexpr Lbl continue_bp_lbl = {-5};
@@ -133,9 +133,9 @@ int assign_new_name_idx(const string &name) {
     return idx++;
 }
 
-enum class TypeSpec { kVoid, kInt32 };
-enum class VarDomain { kLocal, kGlobal };
-struct TypeDecl {
+extern enum class TypeSpec { kVoid, kInt32 };
+extern enum class VarDomain { kLocal, kGlobal };
+extern struct TypeDecl {
     TypeSpec    basetype;
     vector<int> shape;
 
@@ -146,17 +146,17 @@ struct TypeDecl {
         return std::tie(basetype, shape) != std::tie(ts.basetype, ts.shape);
     }
 };
-struct VarDecl {
+extern struct VarDecl {
     VarDomain domain;
     TypeDecl  type;
     string    varname;
     Var       var;
 };
-struct LblDecl {
+extern struct LblDecl {
     string lblname;
     Lbl    lbl;
 };
-struct FuncDecl {
+extern struct FuncDecl {
     // TODO: add type-only attribute for supporting overlode
     // (locating a func-decl by its name together with its params type)
     // vector<TypeDecl> paramsType;
@@ -172,8 +172,16 @@ struct FuncDecl {
 
 // everything storaged here
 // only pass these to the next stage
-vector<FuncDecl> globalFuncDecls;
-vector<VarDecl>  globalVarDecls;
+extern vector<FuncDecl> globalFuncDecls;
+extern vector<VarDecl>  globalVarDecls;
+
+// intermediate represetation
+// extern struct MidRep {
+//     vector<FuncDecl> globalFuncDecls;
+//     vector<VarDecl>  globalVarDecls;
+// };
+
+// TODO: transform OOD to OOD (put global states into class)
 
 // domain stack, make it easier in sdt
 vector<vector<VarDecl> *> varDeclsDomains;
@@ -269,7 +277,7 @@ bool isFuncDeclTypeEqual(const FuncDecl &fd1, const FuncDecl &fd2) {
 }
 
 QuadTuple gen_allocate_code(const VarDecl &decl, const Op &op) {
-    assert(op == Op::kAlloate || op == Op::kGlobal);
+    assert(op == Op::kAllocate || op == Op::kGlobal);
     int len = 1;
     for (auto s : decl.type.shape) { len *= s; }
     if (decl.type.shape.size() == 0) { len = 0; }
@@ -639,13 +647,13 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
 
         // allocate stack space for retval, params, local parameters
         if (f.ret.type.basetype == TypeSpec::kInt32) {
-            head_code.push_back(gen_allocate_code(f.ret, Op::kAlloate));
+            head_code.push_back(gen_allocate_code(f.ret, Op::kAllocate));
         }
         for (const auto &decl : f.params) {
-            head_code.push_back(gen_allocate_code(decl, Op::kAlloate));
+            head_code.push_back(gen_allocate_code(decl, Op::kAllocate));
         }
         for (const auto &decl : f.localVars) {
-            head_code.push_back(gen_allocate_code(decl, Op::kAlloate));
+            head_code.push_back(gen_allocate_code(decl, Op::kAllocate));
         }
         // initialize retval, params
         if (f.ret.type.basetype == TypeSpec::kInt32) {
@@ -1225,7 +1233,7 @@ string to_string(const QuadTuple &q) {
                               enum_name(q.op), var_name(q.args.src1),
                               var_name(q.args.src2));
             break;
-        case Op::kAlloate:
+        case Op::kAllocate:
         case Op::kGlobal:
             ss << fmt::format("{} = {:s}", var_name(q.args.var_a),
                               enum_name(q.op));
