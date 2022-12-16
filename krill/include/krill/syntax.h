@@ -30,8 +30,15 @@ struct APTnode {
 
 namespace krill::runtime {
 
+using AptNodeFunc = std::function<void(APTnode &node)>;
+inline AptNodeFunc defaultAptNodeFunc = [](APTnode &node) {};
+
 class SyntaxParser {
   public:
+    AptNodeFunc actionFunc_ = defaultAptNodeFunc;
+    AptNodeFunc reduceFunc_ = defaultAptNodeFunc;
+    AptNodeFunc errorFunc_ = defaultAptNodeFunc;
+
     SyntaxParser() = default;
     SyntaxParser(Grammar grammar, ActionTable actionTable);
 

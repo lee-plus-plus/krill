@@ -18,8 +18,6 @@ using namespace std;
 
 namespace krill::runtime {
 
-// const int STATES_SIZE_MAX = 1000;
-
 SyntaxParser::SyntaxParser(Grammar grammar, ActionTable actionTable)
     : grammar_(grammar), actionTable_(actionTable), states_({0}), offset_(0),
       isAccepted_(false), history_("") {}
@@ -39,7 +37,10 @@ void SyntaxParser::parse() {
 
         assert(states_.size() > 0);
         if (actionTable_.count({states_.top(), input.id}) == 0) {
-            throw runtime_error(getErrorMessage());
+            string error_message = getErrorMessage();
+            // ERROR action
+            errorFunc_(input);
+            throw runtime_error(error_message);
         }
 
         assert(actionTable_.count({states_.top(), input.id}) != 0);
@@ -54,6 +55,8 @@ void SyntaxParser::parse() {
                 shared_ptr<APTnode> nextNode(new APTnode(input));
                 nextNode.get()->pidx = -1;
                 // ACTION action
+                actionFunc_(*nextNode.get());
+                
                 nodes_.push(nextNode);
 
                 // very stupid history stack, may be improved in the future
@@ -94,6 +97,7 @@ void SyntaxParser::parse() {
                                  .attr  = {},
                                  .child = childNodes}));
                 // REDUCE action
+                reduceFunc_(*nextNode.get());
 
                 nodes_.push(nextNode);
                 break;
@@ -233,10 +237,9 @@ string SyntaxParser::getASTstr() {
 string SyntaxParser::getErrorMessage() {
     auto & tokenWithAttr = inputs_.at(offset_);
     string errorMsg      = fmt::format(
-        "Syntax Parsing Error: unexpected token <{} \"{}\">",
+        "syntax parsing error: unexpected token <{} \"{}\">",
         grammar_.symbolNames.at(tokenWithAttr.id),
-        fmt::format(fmt::emphasis::underline, "{}",
-                    unescape(tokenWithAttr.attr.Get<string>("lval"))));
+        unescape(tokenWithAttr.attr.Get<string>("lval")));
 
     logger.error("{}", errorMsg);
     logger.error("  history_: \"{}\"", history_);

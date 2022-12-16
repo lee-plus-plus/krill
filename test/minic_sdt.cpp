@@ -1115,7 +1115,6 @@ void sdt_inherited_action(AttrDict *parent, AttrDict *child[], int pidx,
     }
 }
 
-
 void sdt_action(AttrDict *parent, AttrDict *child[], int pidx, int dot) {
     logger.debug("sdt_action pidx={}, dot={} {}", pidx, dot,
                  to_string(ProdItem{.pidx = pidx, .dot = dot}, minicGrammar));
@@ -1336,9 +1335,4 @@ string get_ir_str() {
     }
     logger.info("intermediate code generation complete successfully");
     return ss.str();
-}
-
-// entry
-extern void initSyntaxParser() {
-    // pass
 }
