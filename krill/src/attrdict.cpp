@@ -1,4 +1,4 @@
-#include "krill/attrDict.h"
+#include "krill/attrdict.h"
 #include "krill/utils.h"
 #include "fmt/format.h"
 
