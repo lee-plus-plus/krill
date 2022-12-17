@@ -1,19 +1,19 @@
 #ifndef UTILS_H
 #define UTILS_H
+#include "magic_enum.hpp"
+#include <algorithm>
 #include <cstring>
 #include <functional>
 #include <map>
+#include <numeric>
 #include <ostream>
 #include <set>
 #include <sstream>
 #include <stack>
 #include <string>
 #include <tuple>
-#include <vector>
 #include <type_traits>
-#include <numeric>
-#include <algorithm>
-#include "magic_enum.hpp"
+#include <vector>
 
 namespace krill::utils {
 
@@ -67,7 +67,8 @@ inline void trim(std::string &str, const std::string &val = " \r\n\0") {
     rtrim(str, val);
 }
 
-inline std::string trimmed(std::string str, const std::string &val = " \r\n\0") {
+inline std::string trimmed(std::string        str,
+                           const std::string &val = " \r\n\0") {
     trim(str, val);
     return str;
 }
@@ -85,6 +86,10 @@ template <typename T> inline std::vector<T> to_vector(std::set<T> s) {
     std::vector<T> v;
     v.assign(s.begin(), s.end());
     return v;
+}
+
+template <typename T> inline std::set<T> to_set(std::vector<T> v) {
+    return std::set<T>(v.begin(), v.end());
 }
 
 template <typename T1, typename T2>
@@ -142,8 +147,7 @@ inline std::string slice(const std::string &s, int st, int ed) {
     }
 }
 
-template <typename T>
-inline T slice(const T &s, int st) {
+template <typename T> inline T slice(const T &s, int st) {
     return slice(s, st, s.size());
 }
 
@@ -154,15 +158,13 @@ inline std::map<T2, T1> reverse(std::map<T1, T2> m) {
     return m_reversed;
 }
 
-template <typename T>
-inline std::vector<T> reverse(std::vector<T> m) {
+template <typename T> inline std::vector<T> reverse(std::vector<T> m) {
     std::vector<T> m_reversed;
     std::reverse_copy(m.begin, m.end, back_inserter(m_reversed));
     return m_reversed;
 }
 
-template <typename T>
-inline std::vector<T> get_top(std::stack<T> s, int size) {
+template <typename T> inline std::vector<T> get_top(std::stack<T> s, int size) {
     assert(size >= 0);
     std::vector<T> v(size);
     for (int i = 0; i < size; i++) {
@@ -172,22 +174,67 @@ inline std::vector<T> get_top(std::stack<T> s, int size) {
     return v;
 }
 
-struct pair_hash
-{
+struct pair_hash {
     template <class T1, class T2>
-    size_t operator () (std::pair<T1, T2> const &p) const
-    {
+    size_t operator()(std::pair<T1, T2> const &p) const {
         size_t h1 = std::hash<T1>()(p.first);
         size_t h2 = std::hash<T2>()(p.second);
         return h1 ^ (h2 << 1);
     }
 };
 
-template<class> inline constexpr bool is_vector = false;
-template<class T, class A> inline constexpr bool is_vector<std::vector<T, A>> = true;
+template <class> inline constexpr bool is_vector = false;
+template <class T, class A>
+inline constexpr bool is_vector<std::vector<T, A>> = true;
 
-template<class> inline constexpr bool is_set = false;
-template<class T, class A> inline constexpr bool is_set<std::set<T, A>> = true;
+template <class> inline constexpr bool            is_set = false;
+template <class T, class A> inline constexpr bool is_set<std::set<T, A>> = true;
+
+template <typename T> class Appender {
+  public:
+    T &v_;
+    Appender(T &v) : v_(v) {
+        static_assert(is_vector<T> || is_set<T>, "not support yet");
+    }
+    inline Appender &append(const T &v) {
+        if constexpr (is_vector<T>) {
+            v_.insert(v_.end(), v.begin(), v.end());
+        } else if constexpr (is_set<T>) {
+            v_.insert(v.begin(), v.end());
+        }
+        return *this;
+    }
+};
+
+template <typename T> class SetOprter {
+  public:
+    T s_;
+    inline SetOprter(const T &s = {}) : s_(s) {
+        static_assert(is_set<T>, "must be std::set");
+    }
+    inline SetOprter operator|(const T &s) {
+        T r;
+        set_union(s_.begin(), s_.end(), s.begin(), s.end(),
+                  inserter(r, r.begin()));
+        s_ = std::move(r);
+        return *this;
+    }
+    inline SetOprter operator&(const T &s) {
+        T r;
+        set_intersection(s_.begin(), s_.end(), s.begin(), s.end(),
+                         inserter(r, r.begin()));
+        s_ = std::move(r);
+        return *this;
+    }
+    inline SetOprter operator-(const T &s) {
+        T r;
+        set_difference(s_.begin(), s_.end(), s.begin(), s.end(),
+                       inserter(r, r.begin()));
+        s_ = std::move(r);
+        return *this;
+    }
+    inline operator T() const { return s_; }
+};
 
 // Jerry Yang's magic,
 // don't touch!

@@ -17,103 +17,6 @@ using krill::grammar::ProdItem;
 
 using krill::log::logger;
 
-// intermediate code (quad-tuple)
-extern struct QuadTuple {
-    // using Lbl = uint32_t; // label of address, not memeory address
-    // using Varname = uint32_t;
-    // using CVal = uint32_t;
-    struct Lbl {
-        int data_;
-        Lbl() = default;
-        constexpr Lbl(int data) : data_(data){};
-             operator int() const { return data_; };
-        Lbl &operator++(int) {
-            data_++;
-            return *this;
-        };
-    };
-    struct Var {
-        int data_;
-        Var() = default;
-        constexpr Var(int data) : data_(data){};
-             operator int() const { return data_; };
-        Var &operator++(int) {
-            data_++;
-            return *this;
-        };
-    };
-    struct CVal {
-        uint32_t data_;
-        CVal() = default;
-        constexpr CVal(int data) : data_(data){};
-        operator int() const { return data_; };
-    };
-    // clang-format off
-    enum class Op {
-        kNop, 
-        kBackPatch, /* (func, argc) */
-        kAssign, /* (var, cval) */
-        kCopy,   /* (var, src1) */
-        kAdd, kMinus, kMult, kDiv, kMod,/* (dest, src1, src2) */
-        kAnd, kOr, kXor, kNor,          /* (dest, src1, src2) */
-        kLShift, kRShift,               /* (dest, src1, src2) */
-        kEq, kNeq, kLeq, kLt,           /* (dest, src1, src2) */
-        kAllocate,  kGlobal,     /* (var_a, width, len) */
-        kLoad, kStore,  /* (var_m, addr_m) */
-        kParamPut,  /* (var_r, argc) */ 
-        kParamGet,  /* (var_r, argc) */ 
-        kCall,   /* (func, argc, var_r) */
-        kLabel,  /* (addr1) */
-        kGoto,   /* (addr1) */
-        kBranch, /* (var_j, addr1, addr2) */
-        kRet,    /* (argc, var_r) */
-        kFuncBegin, /* (addr1) */
-        kFuncEnd, 
-    };
-    // clang-format on
-    Op op;
-    union Data {
-        struct {
-            Var  var;
-            CVal cval;
-        }; // assign
-        struct {
-            Var var_a;
-            int width;
-            int len; /* len > 0: is array */
-        };           // alloate,  global
-        struct {
-            Var dest;
-            Var src1;
-            Var src2;
-        }; // 2-op / 1-op calculate
-        struct {
-            Var var_m;
-            Var addr_m;
-        }; // mem load/store
-        struct {
-            Var var_j;
-            Lbl addr1;
-            Lbl addr2;
-        }; // jump, branch
-        struct {
-            Lbl func;
-            int argc;
-            Var var_r;
-        };
-    } args;
-};
-
-using Op   = QuadTuple::Op;
-using Lbl  = QuadTuple::Lbl;  // label in TEXT section
-using Var  = QuadTuple::Var;  // register / local / global
-using CVal = QuadTuple::CVal; // const value in asm, uint32_t
-using Code = vector<QuadTuple>;
-
-extern constexpr Var var_zero  = {0};
-extern constexpr Var var_empty = {};
-extern constexpr Lbl lbl_empty = {};
-
 // label for backpatching
 constexpr Lbl continue_bp_lbl = {-5};
 constexpr Lbl break_bp_lbl    = {-6};
@@ -133,53 +36,11 @@ int assign_new_name_idx(const string &name) {
     return idx++;
 }
 
-extern enum class TypeSpec { kVoid, kInt32 };
-extern enum class VarDomain { kLocal, kGlobal };
-extern struct TypeDecl {
-    TypeSpec    basetype;
-    vector<int> shape;
-
-    bool operator==(const TypeDecl &ts) const {
-        return std::tie(basetype, shape) == std::tie(ts.basetype, ts.shape);
-    }
-    bool operator!=(const TypeDecl &ts) const {
-        return std::tie(basetype, shape) != std::tie(ts.basetype, ts.shape);
-    }
-};
-extern struct VarDecl {
-    VarDomain domain;
-    TypeDecl  type;
-    string    varname;
-    Var       var;
-};
-extern struct LblDecl {
-    string lblname;
-    Lbl    lbl;
-};
-extern struct FuncDecl {
-    // TODO: add type-only attribute for supporting overlode
-    // (locating a func-decl by its name together with its params type)
-    // vector<TypeDecl> paramsType;
-    // TypeDecl         retType;
-    LblDecl         funcLbl;
-    vector<VarDecl> params;
-    vector<VarDecl> localVars;
-    vector<LblDecl> localLbls;
-    VarDecl         ret;
-    string          funcName;
-    Code            code;
-};
-
 // everything storaged here
 // only pass these to the next stage
-extern vector<FuncDecl> globalFuncDecls;
-extern vector<VarDecl>  globalVarDecls;
+vector<FuncDecl> globalFuncDecls;
+vector<VarDecl>  globalVarDecls;
 
-// intermediate represetation
-// extern struct MidRep {
-//     vector<FuncDecl> globalFuncDecls;
-//     vector<VarDecl>  globalVarDecls;
-// };
 
 // TODO: transform OOD to OOD (put global states into class)
 
@@ -225,22 +86,6 @@ bool has_function_by_name(const string &funcname) {
     }
     return false;
 }
-
-template <typename T> class Appender {
-  public:
-    T &v_;
-    Appender(T &v) : v_(v) {}
-    inline Appender &append(const T &v) {
-        static_assert(is_vector<T> || is_set<T>, "not support yet");
-
-        if constexpr (is_vector<T>) {
-            v_.insert(v_.end(), v.begin(), v.end());
-        } else if constexpr (is_set<T>) {
-            v_.insert(v.begin(), v.end());
-        }
-        return *this;
-    }
-};
 
 FuncDecl createFuncDecl(const string &          func_name,
                         const vector<TypeDecl> &params_type,
@@ -516,9 +361,9 @@ void sdt_expr_stmt_action(AttrDict *parent, AttrDict *child[], int pidx) {
 
         auto q = QuadTuple{Op::kStore, {.var_m = v_expr, .addr_m = v_addr}};
         Appender{code}
-            .append(code_expr)
             .append(code_idx)
             .append(code_offset)
+            .append(code_expr)
             .append({q});
 
     } else if (pidx == 29) { // expr_stmt <- '$' expr '=' expr ';'
@@ -669,8 +514,9 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
         auto &body_code = _6.Ref<Code>("code");
 
         // assign return label
-        auto lbl_ret =
-            LblDecl{.lblname = string{"ret"}, .lbl = assign_new_label()};
+        int return_idx = assign_new_name_idx("return");
+        auto lbl_ret = LblDecl{.lblname = "ret." + to_string(return_idx),
+                               .lbl     = assign_new_label()};
         lblDeclsDomains.back()->push_back(lbl_ret);
 
         // backpatching, eliminate "return"
