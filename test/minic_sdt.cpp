@@ -13,6 +13,7 @@ using namespace krill::type;
 using namespace krill::utils;
 using namespace krill::runtime;
 using namespace krill::minic;
+using namespace krill::minic::ir;
 using krill::grammar::ProdItem;
 
 using krill::log::logger;
@@ -87,6 +88,19 @@ bool has_function_by_name(const string &funcname) {
     return false;
 }
 
+int get_type_size(TypeSpec basetype, vector<int> shape = {}) {
+    int size;
+    if (basetype == TypeSpec::kInt32) {
+        size = 4;
+    } else if (basetype == TypeSpec::kVoid) {
+        size = 0;
+    } else {
+        assert(false);
+    }
+    for (auto len : shape) { size *= len; }
+    return size;
+}
+
 FuncDecl createFuncDecl(const string &          func_name,
                         const vector<TypeDecl> &params_type,
                         const TypeSpec &        ret_basetype) {
@@ -95,11 +109,17 @@ FuncDecl createFuncDecl(const string &          func_name,
         f_params.push_back(
             {.type = params_type[i], .varname = "", .var = var_empty});
     }
-    auto f_ret =
-        VarDecl{.domain  = VarDomain::kLocal,
-                .type    = TypeDecl{.basetype = ret_basetype, .shape = {}},
-                .varname = "retval",
-                .var     = var_empty};
+    auto f_ret = vector<VarDecl>{};
+    if (ret_basetype != TypeSpec::kVoid) {
+        auto type       = TypeDecl{.basetype = ret_basetype,
+                             .shape    = {},
+                             .size     = get_type_size(ret_basetype, {})};
+        auto f_ret_elem = VarDecl{.domain  = VarDomain::kLocal,
+                                  .type    = type,
+                                  .varname = ".retval",
+                                  .var     = var_empty};
+        f_ret           = {f_ret_elem};
+    }
     auto f_decl = FuncDecl{
         .funcLbl   = {},
         .params    = f_params,
@@ -114,7 +134,7 @@ FuncDecl createFuncDecl(const string &          func_name,
 
 bool isFuncDeclTypeEqual(const FuncDecl &fd1, const FuncDecl &fd2) {
     if (fd1.params.size() != fd2.params.size()) { return false; };
-    if (fd1.ret.type != fd2.ret.type) { return false; }
+    if (fd1.ret.size() != fd2.ret.size()) { return false; }
     for (int i = 0; i < fd1.params.size(); i++) {
         if (fd1.params[i].type != fd2.params[i].type) { return false; };
     }
@@ -129,6 +149,27 @@ QuadTuple gen_allocate_code(const VarDecl &decl, const Op &op) {
     return QuadTuple{op, {.var_a = decl.var, .width = 4, .len = len}};
 };
 
+string lbl_name(const Lbl &lbl) {
+    if (lblDecls.count(lbl) == 0) {
+        return string{"@"} + to_string(static_cast<int>(lbl));
+    } else {
+        return string{"@"} + lblDecls.at(lbl)->lblname;
+    }
+};
+string var_name(const Var &var) {
+    if (varDecls.count(var) == 0) {
+        return string{"%"} + to_string(static_cast<int>(var));
+    } else {
+        const auto &var_decl = *varDecls.at(var);
+        if (var_decl.domain == VarDomain::kLocal) {
+            return string{"%"} + var_decl.varname;
+        } else if (var_decl.domain == VarDomain::kGlobal) {
+            return string{"@"} + var_decl.varname;
+        } else {
+            assert(false);
+        }
+    }
+};
 
 // expr <- expr OR expr | expr EQ expr | ...
 void sdt_expr_action(AttrDict *parent, AttrDict *child[], int pidx) {
@@ -289,8 +330,10 @@ void sdt_expr_action(AttrDict *parent, AttrDict *child[], int pidx) {
         auto  funcname = _1.Ref<string>("lval");
         auto &decl     = get_function_by_name(funcname);
         assert(decl.params.size() == args.size());
-        assert(decl.ret.type.basetype != TypeSpec::kVoid);
+        assert(decl.ret.size() == 1);
         auto lbl_f = decl.funcLbl.lbl;
+
+        Appender{code_0}.append(_3.Ref<Code>("code"));
 
         v_0 = assign_new_varible();
         // for (auto arg : args) {
@@ -298,10 +341,11 @@ void sdt_expr_action(AttrDict *parent, AttrDict *child[], int pidx) {
             code_0.push_back(
                 {.op = Op::kParamPut, .args = {.var_r = args[i], .argc = i}});
         }
-        code_0.push_back({Op::kCall,
-                          {.func  = lbl_f,
-                           .argc  = static_cast<int>(args.size()),
-                           .var_r = v_0}});
+        Appender{code_0}
+            .append({{Op::kCall,
+                     {.func = lbl_f, .argc = static_cast<int>(args.size())}}})
+            .append({{Op::kRetGet, {.var_r = v_0, .argc = 0}}});
+
 
     } else if (pidx == 64) { // expr <- int_literal
         auto &cval = _1.Ref<CVal>("cval");
@@ -384,6 +428,8 @@ void sdt_expr_stmt_action(AttrDict *parent, AttrDict *child[], int pidx) {
         // assert(decl.ret.type.basetype != TypeSpec::kVoid); // no check
         auto lbl_f = decl.funcLbl.lbl;
 
+        Appender{code}.append(_3.Ref<Code>("code"));
+
         for (auto arg : args) {
             code.push_back({.op = Op::kParamPut, .args = {.var = arg}});
         }
@@ -457,11 +503,14 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
         auto shape    = vector<int>{};
 
         if (pidx == 6) {
-            int size = _4.Ref<CVal>("cval");
-            shape    = vector<int>{size};
+            int arraySize = _4.Ref<CVal>("cval");
+            shape         = vector<int>{arraySize};
         }
-        auto type = TypeDecl{.basetype = basetype, .shape = shape};
-        var_decl  = VarDecl{.domain  = VarDomain::kGlobal,
+
+        auto size = get_type_size(basetype, shape);
+        auto type =
+            TypeDecl{.basetype = basetype, .shape = shape, .size = size};
+        var_decl = VarDecl{.domain  = VarDomain::kGlobal,
                            .type    = type,
                            .varname = varname,
                            .var     = var};
@@ -490,9 +539,14 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
         // head code: declare retval, params, local vars, and initialize them
         auto head_code = Code{};
 
+        int  entry_idx = assign_new_name_idx("entry");
+        auto lbl_entry = LblDecl{.lblname = "entry." + to_string(entry_idx),
+                                 .lbl     = assign_new_label()};
+        lblDeclsDomains.back()->push_back(lbl_entry);
+
         // allocate stack space for retval, params, local parameters
-        if (f.ret.type.basetype == TypeSpec::kInt32) {
-            head_code.push_back(gen_allocate_code(f.ret, Op::kAllocate));
+        for (const auto &decl : f.ret) {
+            head_code.push_back(gen_allocate_code(decl, Op::kAllocate));
         }
         for (const auto &decl : f.params) {
             head_code.push_back(gen_allocate_code(decl, Op::kAllocate));
@@ -501,42 +555,45 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
             head_code.push_back(gen_allocate_code(decl, Op::kAllocate));
         }
         // initialize retval, params
-        if (f.ret.type.basetype == TypeSpec::kInt32) {
+        for (const auto &decl : f.ret) {
             head_code.push_back(
-                {Op::kStore, {.var_m = var_zero, .addr_m = f.ret.var}});
+                {Op::kStore, {.var_m = var_zero, .addr_m = decl.var}});
         }
         for (int i = 0; i < f.params.size(); i++) {
+            int v_temp = assign_new_varible();
             head_code.push_back(
-                {Op::kParamGet, {.var_r = f.params[i].var, .argc = i}});
+                {Op::kParamGet, {.var_r = v_temp, .argc = i}});
+            head_code.push_back(
+                {Op::kStore, {.var_m = v_temp, .addr_m = f.params[i].var}});
         }
 
         // body code:
         auto &body_code = _6.Ref<Code>("code");
 
         // assign return label
-        int return_idx = assign_new_name_idx("return");
-        auto lbl_ret = LblDecl{.lblname = "ret." + to_string(return_idx),
+        int  return_idx = assign_new_name_idx("return");
+        auto lbl_ret    = LblDecl{.lblname = "ret." + to_string(return_idx),
                                .lbl     = assign_new_label()};
         lblDeclsDomains.back()->push_back(lbl_ret);
 
         // backpatching, eliminate "return"
-        int num_ret = static_cast<int>(f.ret.type.basetype != TypeSpec::kVoid);
         for (int i = 0; i < body_code.size(); i++) {
             auto &q = body_code[i];
             if (q.op == Op::kBackPatch && q.args.func == return_bp_lbl) {
-                if (q.args.argc != num_ret) {
+                if (q.args.argc != f.ret.size()) {
                     logger.error("syntax error: unmatched return value count "
                                  "in function {}(), expected {}, got {}",
-                                 f.funcName, num_ret, q.args.argc);
+                                 f.funcName, f.ret.size(), q.args.argc);
                     throw std::runtime_error(fmt::format(
                         "syntax error: unmatched return value count "
                         "in function {}(), expected {}, got {}",
-                        f.funcName, num_ret, q.args.argc));
+                        f.funcName, f.ret.size(), q.args.argc));
                 }
                 q = {Op::kGoto, {.addr1 = lbl_ret.lbl}};
-                if (num_ret) {
-                    assert(body_code[i - 1].op == Op::kStore);
-                    body_code[i - 1].args.addr_m = f.ret.var;
+                for (int j = 1; j <= f.ret.size(); j++) {
+                    assert(i - j >= 0);
+                    assert(body_code[i - j].op == Op::kStore);
+                    body_code[i - 1].args.addr_m = f.ret[f.ret.size() - j].var;
                 }
             }
         }
@@ -544,21 +601,22 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
         // tail code: generating the only return block
         auto tail_code = Code{};
         Appender{tail_code}.append({{Op::kLabel, {.addr1 = lbl_ret.lbl}}});
-        if (f.ret.type.basetype == TypeSpec::kVoid) {
-            Appender{tail_code}.append({{Op::kRet, {.argc = 0}}});
-        } else {
+        for (int i = 0; i < f.ret.size(); i++) {
             auto v_ret = assign_new_varible();
             Appender{tail_code}
-                .append({{Op::kLoad, {.var_m = v_ret, .addr_m = f.ret.var}}})
-                .append({{Op::kRet, {.argc = 1, .var_r = v_ret}}});
+                .append({{Op::kLoad, {.var_m = v_ret, .addr_m = f.ret[i].var}}})
+                .append({{Op::kRetPut, {.var_r = v_ret, .argc = i}}});
         }
+        Appender{tail_code}.append({{Op::kRet, {.argc = int(f.ret.size())}}});
 
         // amend code
-        auto q_func_begin = QuadTuple{Op::kFuncBegin, {.addr1 = f.funcLbl.lbl}};
+        auto q_func_begin = QuadTuple{Op::kFuncBegin, {.func = f.funcLbl.lbl}};
         auto q_func_end   = QuadTuple{Op::kFuncEnd};
+        auto q_entry      = QuadTuple{Op::kLabel, {.addr1 = lbl_entry.lbl}};
         Appender{f.code}
             .append({q_func_begin})
             .append(head_code)
+            .append({q_entry})
             .append(body_code)
             .append(tail_code)
             .append({q_func_end});
@@ -632,7 +690,9 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
             int size = _4.Ref<CVal>("cval");
             shape    = {size};
         }
-        param_type = {.basetype = basetype, .shape = shape};
+        param_type = {.basetype = basetype,
+                      .shape    = shape,
+                      .size     = get_type_size(basetype, shape)};
     }
 
     // stmt_list <- stmt_list stmt |
@@ -742,14 +802,17 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
         auto var      = assign_new_varible();
 
         if (pidx == 38) {
-            int size = _4.Ref<CVal>("cval");
-            shape    = vector<int>{size};
+            int arraySize = _4.Ref<CVal>("cval");
+            shape         = vector<int>{arraySize};
         }
-        var_decl =
-            VarDecl{.domain  = VarDomain::kLocal,
-                    .type    = TypeDecl{.basetype = basetype, .shape = shape},
-                    .varname = varname,
-                    .var     = var};
+        int size = get_type_size(basetype, shape);
+
+        var_decl = VarDecl{
+            .domain = VarDomain::kLocal,
+            .type =
+                TypeDecl{.basetype = basetype, .shape = shape, .size = size},
+            .varname = varname,
+            .var     = var};
         varDeclsDomains.back()->push_back(var_decl);
     }
 
@@ -860,20 +923,28 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
     // arg_list -> arg_list ',' expr | expr
     if (pidx == 73 || pidx == 74) {
         auto &args = _0.RefN<vector<Var>>("args");
+        auto &code = _0.RefN<Code>("code");
 
         if (pidx == 73) {
             args = _1.Ref<vector<Var>>("args");
+            code = _1.Ref<Code>("code");
             args.push_back(_3.Ref<Var>("var"));
+            Appender{code}.append(_3.Ref<Code>("code"));
         } else {
-            args.push_back(_1.Ref<Var>("var"));
+            args = {_1.Ref<Var>("var")};
+            code = _1.Ref<Code>("code");
         }
     }
 
     // args_ <- arg_list |
     if (pidx == 75 || pidx == 76) {
         auto &args = _0.RefN<vector<Var>>("args");
+        auto &code = _0.RefN<Code>("code");
 
-        if (pidx == 75) { args = _1.Ref<vector<Var>>("args"); }
+        if (pidx == 75) {
+            args = _1.Ref<vector<Var>>("args");
+            code = _1.Ref<Code>("code");
+        }
     }
 
     // continue_stmt <- CONTINUE ';'
@@ -933,8 +1004,12 @@ void sdt_inherited_action(AttrDict *parent, AttrDict *child[], int pidx,
         }
 
         // make its params, return stmt, Referenceable
-        auto &f_decl   = get_function_by_name(f_name);
-        f_decl.ret.var = assign_new_varible();
+        auto &f_decl = get_function_by_name(f_name);
+        assert(f_decl.ret.size() <= 1);
+        for (auto &retvar : f_decl.ret) {
+            retvar.varname = ".retval";
+            retvar.var     = assign_new_varible();
+        }
         for (int i = 0; i < f_params_name.size(); i++) {
             f_decl.params[i].var     = assign_new_varible();
             f_decl.params[i].varname = f_params_name[i];
@@ -961,7 +1036,7 @@ void sdt_inherited_action(AttrDict *parent, AttrDict *child[], int pidx,
     if (pidx == 31 && dot == 4) {
         auto &while_idx = _0.Ref<int>("while_idx");
         // auto &cond_lbl  = _0.Ref<LblDecl>("cond_lbl");
-        auto &body_lbl  = _0.RefN<LblDecl>("body_lbl");
+        auto &body_lbl = _0.RefN<LblDecl>("body_lbl");
 
         body_lbl = LblDecl{.lblname = "while.body." + to_string(while_idx),
                            .lbl     = assign_new_label()};
@@ -1026,39 +1101,18 @@ string to_string(const VarDecl &var) {
 }
 
 string to_string(const QuadTuple &q) {
-    auto lbl_name = [&](const Lbl &lbl) -> string {
-        if (lblDecls.count(lbl) == 0) {
-            return string{"@"} + to_string(static_cast<int>(lbl));
-        } else {
-            return string{"@"} + lblDecls.at(lbl)->lblname;
-        }
-    };
-    auto var_name = [&](const Var &var) -> string {
-        if (varDecls.count(var) == 0) {
-            return string{"%"} + to_string(static_cast<int>(var));
-        } else {
-            const auto &var_decl = *varDecls.at(var);
-            if (var_decl.domain == VarDomain::kLocal) {
-                return string{"%"} + var_decl.varname;
-            } else if (var_decl.domain == VarDomain::kGlobal) {
-                return string{"@"} + var_decl.varname;
-            } else {
-                assert(false);
-            }
-        }
-    };
-
     stringstream ss;
     switch (q.op) {
         case Op::kNop:
             ss << fmt::format("{:s}", enum_name(q.op));
+            break;
+        case Op::kBackPatch:
+            ss << fmt::format("{:s}", enum_name(q.op));
+            logger.critical("backPatch IR not eliminated");
+            break;
         case Op::kAssign:
             ss << fmt::format("{} = {:s} {:d}", var_name(q.args.var),
                               enum_name(q.op), int(q.args.cval));
-            break;
-        case Op::kCopy:
-            ss << fmt::format("%{} = {:s} %{}", var_name(q.args.var),
-                              enum_name(q.op), var_name(q.args.src1));
             break;
         case Op::kAdd:
         case Op::kMinus:
@@ -1099,18 +1153,26 @@ string to_string(const QuadTuple &q) {
                               enum_name(q.op), var_name(q.args.var_m));
             break;
         case Op::kParamPut:
-            ss << fmt::format("{} <{:d}> {} ", enum_name(q.op),
-                              int(q.args.argc), var_name(q.args.var_r));
+            ss << fmt::format("{}<{:d}> {} ", enum_name(q.op), int(q.args.argc),
+                              var_name(q.args.var_r));
             break;
         case Op::kParamGet:
-            ss << fmt::format("{} = {:s} <{:d}>", var_name(q.args.var_r),
+            ss << fmt::format("{} = {:s}<{:d}>", var_name(q.args.var_r),
                               enum_name(q.op), int(q.args.argc));
             break;
+        case Op::kRetPut:
+            ss << fmt::format("{}<{:d}> {} ", enum_name(q.op), int(q.args.argc),
+                              var_name(q.args.var_r));
+            break;
+        case Op::kRetGet:
+            ss << fmt::format("{} = {:s}<{:d}>", var_name(q.args.var_r),
+                              enum_name(q.op), int(q.args.argc));
+            break;
+        case Op::kRet:
+            ss << fmt::format("{:s}<{:d}>", enum_name(q.op), int(q.args.argc));
+            break;
         case Op::kCall:
-            if (q.args.var_r != var_empty) {
-                ss << fmt::format("{} = ", var_name(q.args.var_r));
-            }
-            ss << fmt::format("{:s} {} <:d>", enum_name(q.op),
+            ss << fmt::format("{:s} {}<{:d}>", enum_name(q.op),
                               lbl_name(q.args.func), int(q.args.argc));
             break;
         case Op::kLabel:
@@ -1125,16 +1187,8 @@ string to_string(const QuadTuple &q) {
                               var_name(q.args.var_j), lbl_name(q.args.addr1),
                               lbl_name(q.args.addr2));
             break;
-        case Op::kRet:
-            if (q.args.argc == 0) {
-                ss << fmt::format("{:s}", enum_name(q.op));
-            } else {
-                ss << fmt::format("{:s} {}", enum_name(q.op),
-                                  var_name(q.args.var_r));
-            }
-            break;
         case Op::kFuncBegin:
-            ss << fmt::format("func {} {{", lbl_name(q.args.addr1));
+            ss << fmt::format("func {} {{", lbl_name(q.args.func));
             break;
         case Op::kFuncEnd:
             ss << fmt::format("}}");
@@ -1145,29 +1199,36 @@ string to_string(const QuadTuple &q) {
     return ss.str();
 }
 
+string to_string(const Code &code) {
+    stringstream ss;
+    for (const auto &q : code) {
+        if (q.op == Op::kLabel || q.op == Op::kFuncEnd ||
+            q.op == Op::kFuncBegin) {
+            ss << to_string(q) << "\n";
+        } else {
+            ss << "\t" << to_string(q) << "\n";
+        }
+    }
+    return ss.str();
+}
+
 // entry
 string get_ir_str() {
     stringstream ss;
 
     // collect lbl information
     for (auto &f : globalFuncDecls) {
-        auto &l = f.funcLbl;
+        auto &l         = f.funcLbl;
         lblDecls[l.lbl] = &l;
-        for (auto &l : f.localLbls) {
-            lblDecls[l.lbl] = &l;
-        }
+        for (auto &l : f.localLbls) { lblDecls[l.lbl] = &l; }
     }
     // collect var information
     for (auto &v : globalVarDecls) { varDecls[v.var] = &v; }
     for (auto &f : globalFuncDecls) {
-        auto &v = f.ret;
-        if (v.var != var_empty) { varDecls[v.var] = &v; }
-        for (auto &v : f.params) {
-            varDecls[v.var] = &v;
-        }
-        for (auto &v : f.localVars) {
-            varDecls[v.var] = &v;
-        }
+        logger.debug("func {} ret size {}", f.funcName, f.ret.size());
+        for (auto &v : f.ret) { varDecls[v.var] = &v; }
+        for (auto &v : f.params) { varDecls[v.var] = &v; }
+        for (auto &v : f.localVars) { varDecls[v.var] = &v; }
     }
 
     // print global variables declaration
@@ -1187,6 +1248,5 @@ string get_ir_str() {
             }
         }
     }
-    logger.info("intermediate code generation complete successfully");
     return ss.str();
 }

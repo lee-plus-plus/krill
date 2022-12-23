@@ -10,4 +10,7 @@ add_executable(test_syntax test_syntax.cpp)
 add_executable(test_minic 
 			   test_minic.cpp
 			   minic_parser.cpp
-			   minic_sdt.cpp)
+			   minic_sdt.cpp
+			   minic_ir_opt.cpp
+			   minic_backend.cpp
+			   )

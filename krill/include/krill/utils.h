@@ -88,6 +88,13 @@ template <typename T> inline std::vector<T> to_vector(std::set<T> s) {
     return v;
 }
 
+template <typename T1, typename T2> 
+inline std::vector<std::pair<T1, T2>> to_vector(std::map<T1, T2> m) {
+    std::vector<std::pair<T1, T2>> v;
+    v.assign(m.begin(), m.end());
+    return v;
+}
+
 template <typename T> inline std::set<T> to_set(std::vector<T> v) {
     return std::set<T>(v.begin(), v.end());
 }
@@ -114,7 +121,7 @@ inline R apply_reduce(Container v, R init, F func) {
 }
 
 template <typename T, typename F>
-inline std::vector<T> apply_filter(std::vector<T> &v, F func) {
+inline std::vector<T> apply_filter(const std::vector<T> &v, F func) {
     std::vector<T> r;
     copy_if(v.begin(), v.end(), back_inserter(r), func);
     return r;
@@ -160,7 +167,7 @@ inline std::map<T2, T1> reverse(std::map<T1, T2> m) {
 
 template <typename T> inline std::vector<T> reverse(std::vector<T> m) {
     std::vector<T> m_reversed;
-    std::reverse_copy(m.begin, m.end, back_inserter(m_reversed));
+    std::reverse_copy(m.begin(), m.end(), back_inserter(m_reversed));
     return m_reversed;
 }
 

@@ -15,9 +15,15 @@ using namespace krill::runtime;
 using namespace krill::minic;
 
 extern APTnode tokenToNode(Token token, istream &input, bool &drop);
+// minic_parser.cpp
 extern void    initSyntaxParser();
+// minic_sdt.cpp
 extern void    syntax_directed_translation(shared_ptr<APTnode> &node);
 extern string  get_ir_str();
+// minic_backend.cpp
+extern void    varsNamingTest();
+extern void    initVarInfo();
+extern string  get_ir_str2();
 
 void testLexicalParsing() {
     auto &lexicalParser = minicLexicalParser;
@@ -147,7 +153,7 @@ void testFullLexicalSyntaxParsing() {
 void testIRgeneration() {
     auto &lexicalParser = minicLexicalParser;
     auto &syntaxParser  = minicSyntaxParser;
-    auto &grammar       = minicGrammar;
+    // auto &grammar       = minicGrammar;
     cerr << "input characters (end with ^d): \n"
             "e.g., int main() {\\n} \n";
 
@@ -167,7 +173,7 @@ void testIRgeneration() {
         if (token == END_TOKEN) { break; }
     }
     
-    // krill::log::sink_cerr->set_level(spdlog::level::debug);
+    krill::log::sink_cerr->set_level(spdlog::level::debug);
 
     // syntax-directed translation
     auto root = syntaxParser.getAPT();
@@ -179,12 +185,51 @@ void testIRgeneration() {
 
 }
 
+void testIRgenerationWithRegNaming() {
+    auto &lexicalParser = minicLexicalParser;
+    auto &syntaxParser  = minicSyntaxParser;
+    // auto &grammar       = minicGrammar;
+    cerr << "input characters (end with ^d): \n"
+            "e.g., int main() {\\n} \n";
+
+    vector<APTnode> nodes;
+    while (true) {
+        Token   token;
+        APTnode node;
+        bool    drop;
+
+        token = lexicalParser.parseStep(cin);
+        node  = tokenToNode(token, cin, drop);
+        if (drop) { continue; }
+
+        nodes.push_back(node);
+        syntaxParser.parseStep(node);
+
+        if (token == END_TOKEN) { break; }
+    }
+    
+
+    // syntax-directed translation
+    auto root = syntaxParser.getAPT();
+    syntax_directed_translation(root);
+    cout << get_ir_str() << "\n";
+
+    krill::log::sink_cerr->set_level(spdlog::level::debug);
+    initVarInfo();
+    cout << "\n\n\n";
+    cout << get_ir_str2() << "\n";
+
+    // show naming result
+    varsNamingTest();
+}
+
 const char usage[] = "usage: test_minic {-l|-L|-s}\n"
                      "        -l    lexical parsing test\n"
                      "        -L    lexical parsing test (full)\n"
                      "        -s    syntax parsing test\n"
                      "        -Ls   lexical & syntax parsing test\n"
-                     "        -I    intermediate code generation\n";
+                     "        -I    intermediate code generation\n"
+                     "        -Ir   ir and register assignment\n";
 
 int main(int argc, char **argv) {
     if (argc != 2) {
@@ -207,6 +252,9 @@ int main(int argc, char **argv) {
         cerr << "done!\n";
     } else if (strcmp(argv[1], "-I") == 0) {
         testIRgeneration();
+        cerr << "done!\n";
+    } else if (strcmp(argv[1], "-Ir") == 0) {
+        testIRgenerationWithRegNaming();
         cerr << "done!\n";
     } else {
         cerr << usage;

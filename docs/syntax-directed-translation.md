@@ -565,6 +565,165 @@ local_decls
     ; 
 ```
 
+## 汇编指令生成
+
+考虑这样一个函数调用
+
+```c
+int func(int x, int y) {
+    int z;
+    ...
+    return z;
+}
+int main(void) {
+    ...
+    z = func(3, 4);
+    ...
+}
+```
+
+函数调用处
+
+```
+01      %1 = assign 3
+02      %2 = assign 4
+03      param<0> %1
+04      param<1> %2
+05      %3 = call func<2>
+```
+
+遵守约定，当用 offset($sp) 时，offset始终小于等于0
+也就是说先向 offset_1($sp) 写入，确定写入结束后再增长 $sp (减小) 
+也就是说约定仅在调用函数才增长栈指针，函数调用结束时立刻退回栈指针
+
+03-05行的指令生成策略如下: 
+
+```
+    $sp
+when passing params:    
+     -0($sp) <- $t1
+     -4($sp) <- $t2
+when call func
+     -8($sp) <- $ra
+    -12($sp) <- $fp
+        $sp  <- $sp - 16 
+    
+    jal @func
+    
+after call func
+        $sp  -> $sp + 16 
+     -8($sp) -> $ra
+    -12($sp) -> $fp
+
+get return val
+        $v0 -> $t3
+```
+
+函数被调用方: 
+
+```
+01  @func:
+02      %retval = alloca int
+03      %x = alloca int
+04      %y = alloca int
+05      %z = alloca int
+06      %retval = store %0
+07      %z = store %0
+...
+11 @ret:
+12     %5 = load %retval
+13     return %5
+```
+
+关注01到07行的行为
+
+```
+allocate space
+    (no instructions generated in this procedure)
+    ( %retval <=>  -0($sp) )
+    (      %x <=>  -4($sp) )
+    (      %y <=>  -8($sp) )
+    (      %z <=> -12($sp) )
+assign initial value
+     -0($sp) <- $0
+    -12($sp) <- $0
+
+```
+
+关注11到13行的行为
+
+```
+ret:
+     -0($sp) -> $t4
+         $v1 <- $t4 
+    jr ra
+```
+
+当一个函数开始时, $fp 是这个函数所使用的栈空间的(栈底)，$sp 是这个函数所使用的栈空间的终点(栈顶)
+简单来说, 0($fp), -4($fp) 始终是一个当前已经被使用的空间(可能是为函数参数，局部变量预留的内存位置)
+而0($sp), -4($sp)始终是一个未被使用过的新的空间. 
+$fp 在函数内部不会变，而 $sp可能随着寄存器名字不够、
+
+在函数调用时，约定由函数调用方履行移动栈指针这一职责，即每个函数的开头都假设当前的栈指针 $sp = $fp，
+同理，也由函数调用方恢复自己的栈指针现场. 
+
+参数传递始终通过
+
+```c
+const int x[2] = {1, 10};
+
+int func(int x, int y) {
+    int z;
+    z = x + y;
+    return z;
+}
+
+int main() {
+    int z;
+    z = func(3, 4);
+    return 0;
+}
+```
+
+```mips
+00000000 <func>:
+   0:   27bdfff0    addiu   sp,sp,-16
+   4:   afbe000c    sw  fp,12(sp)
+   8:   03a0f025    move    fp,sp
+   c:   afc40010    sw  a0,16(fp)
+  10:   afc50014    sw  a1,20(fp)
+  14:   8fc30010    lw  v1,16(fp)
+  18:   8fc20014    lw  v0,20(fp)
+  1c:   00621021    addu    v0,v1,v0
+  20:   afc20004    sw  v0,4(fp)
+  24:   8fc20004    lw  v0,4(fp)
+  28:   03c0e825    move    sp,fp
+  2c:   8fbe000c    lw  fp,12(sp)
+  30:   27bd0010    addiu   sp,sp,16
+  34:   03e00008    jr  ra
+  38:   00000000    nop
+
+0000003c <main>:
+  3c:   27bdffd8    addiu   sp,sp,-40
+  40:   afbf0024    sw  ra,36(sp)
+  44:   afbe0020    sw  fp,32(sp)
+  48:   03a0f025    move    fp,sp
+  4c:   24050004    li  a1,4
+  50:   24040003    li  a0,3
+  54:   0c000000    jal 0 <func>
+  58:   00000000    nop
+  5c:   afc2001c    sw  v0,28(fp)
+  60:   00001025    move    v0,zero
+  64:   03c0e825    move    sp,fp
+  68:   8fbf0024    lw  ra,36(sp)
+  6c:   8fbe0020    lw  fp,32(sp)
+  70:   27bd0028    addiu   sp,sp,40
+  74:   03e00008    jr  ra
+  78:   00000000    nop
+  7c:   00000000    nop
+
+```
 
 
 ## 附加
+

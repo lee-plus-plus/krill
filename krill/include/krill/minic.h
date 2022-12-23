@@ -8,6 +8,7 @@
 #include <ostream>
 #include <stack>
 #include <string>
+#include <optional>
 using krill::runtime::SyntaxParser, krill::runtime::LexicalParser;
 using krill::type::Grammar;
 
@@ -23,7 +24,7 @@ extern int           getMinicSyntaxId(Token token);
 namespace krill::minic::syntax {
 
 // Grammar
-constexpr int ζ = -1;
+// constexpr int ζ = -1;
 constexpr int IDENT = 258;
 constexpr int VOID = 259;
 constexpr int INT = 260;
@@ -117,26 +118,25 @@ struct QuadTuple {
         kNop, 
         kBackPatch, /* (func, argc) */
         kAssign, /* (var, cval) */
-        kCopy,   /* (var, src1) */
         kAdd, kMinus, kMult, kDiv, kMod,/* (dest, src1, src2) */
         kAnd, kOr, kXor, kNor,          /* (dest, src1, src2) */
         kLShift, kRShift,               /* (dest, src1, src2) */
         kEq, kNeq, kLeq, kLt,           /* (dest, src1, src2) */
         kAllocate,  kGlobal,     /* (var_a, width, len) */
         kLoad, kStore,  /* (var_m, addr_m) */
-        kParamPut,  /* (var_r, argc) */ 
-        kParamGet,  /* (var_r, argc) */ 
-        kCall,   /* (func, argc, var_r) */
+        kParamPut, kParamGet, /* (var_r, argc) */ 
+        kRetPut, kRetGet, /* (var_r, argc) */
+        kRet,    /* () */
+        kCall,   /* (func, argc) */
         kLabel,  /* (addr1) */
         kGoto,   /* (addr1) */
         kBranch, /* (var_j, addr1, addr2) */
-        kRet,    /* (argc, var_r) */
-        kFuncBegin, /* (addr1) */
+        kFuncBegin, /* (func) */
         kFuncEnd, 
     };
     // clang-format on
     Op op;
-    union Data {
+    union Data { // the following code use clang-only feature
         struct {
             Var  var;
             CVal cval;
@@ -161,9 +161,9 @@ struct QuadTuple {
             Lbl addr2;
         }; // jump, branch
         struct {
-            Lbl func;
-            int argc;
             Var var_r;
+            int argc;
+            Lbl func;
         };
     } args;
 };
@@ -178,12 +178,12 @@ constexpr Var var_zero  = {0};
 constexpr Var var_empty = {};
 constexpr Lbl lbl_empty = {};
 
-
 enum class TypeSpec { kVoid, kInt32 };
 enum class VarDomain { kLocal, kGlobal };
 struct TypeDecl {
     TypeSpec    basetype;
     vector<int> shape;
+    int         size;
 
     bool operator==(const TypeDecl &ts) const {
         return std::tie(basetype, shape) == std::tie(ts.basetype, ts.shape);
@@ -214,16 +214,20 @@ struct FuncDecl {
     vector<VarDecl> params;
     vector<VarDecl> localVars;
     vector<LblDecl> localLbls;
-    VarDecl         ret;
+    vector<VarDecl> ret;
     string          funcName;
     Code            code;
 };
 
-// intermediate represetation
-// extern struct MidRep {
-//     vector<FuncDecl> globalFuncDecls;
-//     vector<VarDecl>  globalVarDecls;
-// };
+struct VarInfo {
+    bool hasMem = false;
+
+    std::optional<int>     constVal; 
+    std::optional<string>  fpName;
+    std::optional<int>     fpOffset;
+    std::optional<string>  memName;
+    std::optional<int>     memOffset;
+};
 
 } // namespace krill::minic::ir
 

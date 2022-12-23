@@ -1,6 +1,10 @@
-int main(void) {
-	int a[5];
-	a[3] = 4;
+int func(int x, int y[5]) {
+    int z;
+    z = x + y[1];
+    return z;
+}
 
-	return 0;
+int main(void) {
+    int z;
+    z = -3;
 }
