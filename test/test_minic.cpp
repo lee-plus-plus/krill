@@ -24,7 +24,7 @@ extern string  get_ir_str();
 extern void    varsNamingTest();
 extern void    initVarInfo();
 extern string  get_ir_str2();
-extern void    genMips();
+extern string  getMipsCodeStr();
 
 void testLexicalParsing() {
     auto &lexicalParser = minicLexicalParser;
@@ -213,16 +213,19 @@ void testIRgenerationWithRegNaming() {
     // syntax-directed translation
     auto root = syntaxParser.getAPT();
     syntax_directed_translation(root);
-    cout << get_ir_str() << "\n";
+    // cout << get_ir_str() << "\n";
+    get_ir_str(); // have side effect
 
     krill::log::sink_cerr->set_level(spdlog::level::debug);
     initVarInfo();
-    cout << "\n\n\n";
-    cout << get_ir_str2() << "\n";
+    // cout << "\n\n\n";
+    // cout << get_ir_str2() << "\n";
 
     // show naming result
     varsNamingTest();
-    genMips();
+    string mipsCode = getMipsCodeStr();
+
+    cout << mipsCode;
 }
 
 const char usage[] = "usage: test_minic {-l|-L|-s}\n"

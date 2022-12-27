@@ -95,13 +95,17 @@ void genCode(string op, string src1, string src2, string src3) {
 
 void genCode(string op, string src1, string src2, int src3) {
     stringstream ss;
-    // if (src1 == "$fp") { src1 = "$s8"; } // to make assembler happy
-    // if (src2 == "$fp") { src2 = "$s8"; }
     if (op == "lw" || op == "sw") {
         ss << fmt::format("\t{} \t{}, {}({}) ", op, src1, src3, src2);
     } else {
         ss << fmt::format("\t{} \t{}, {}, {} ", op, src1, src2, src3);
     }
+    mipsCode.push_back(ss.str());
+}
+
+void genOffsetCode(string op, string src1, string addr, string offset) {
+    stringstream ss;
+    ss << fmt::format("\t{} \t{}, {}({}) ", op, src1, offset, addr);
     mipsCode.push_back(ss.str());
 }
 
@@ -593,7 +597,7 @@ void genFuncCall(const QuadTuple &q) {
     auto funcname = lblDecls.at(lbl)->lblname;
 
     // assume parameters already pushed before
-    genCode("add", "$sp", "$sp", -4 * info.numParams);
+    genCode("addiu", "$sp", "$sp", -4 * info.numParams);
 
     genComment(string{"call function "} + funcname + " begin");
     // push $sp, $ra, $fp
@@ -626,7 +630,6 @@ void genExprCode(const QuadTuple &q) {
         (info_src1.fpOffset.has_value() || info_src1.memName.has_value()) ||
         (info_src2.fpOffset.has_value() || info_src2.memName.has_value());
     bool isReg = varToReg.count(q.args.src1) || varToReg.count(q.args.src2);
-
 
     if (isReg && isOffset) {
         // reg1 + offset2
@@ -717,7 +720,8 @@ void genLoadStoreCode(const QuadTuple &q) {
     if (info_addr.fpOffset.has_value()) {
         genCode(op, reg_var, "$fp", info_addr.fpOffset.value());
     } else if (info_addr.memName.has_value()) {
-        genCode(op, reg_var, info_addr.memName.value(), 0);
+        // genCode(op, reg_var, "0", info_addr.memName.value());
+        genOffsetCode(op, reg_var, "$zero", info_addr.memName.value());
     } else if (varToReg.count(v_addr) > 0) {
         auto reg_addr = varToReg.at(v_addr);
         genCode(op, reg_var, reg_addr, 0);
@@ -787,7 +791,7 @@ void genBranch(const QuadTuple &q) {
     string addrname1 = lblDecls.at(addr1)->lblname;
     string addrname2 = lblDecls.at(addr2)->lblname;
 
-    genCode("bne", varToReg.at(var), addrname1);
+    genCode("bne", varToReg.at(var), "$zero", addrname1);
     genCode("nop");
     genCode("j", addrname2);
     genCode("nop");
@@ -799,6 +803,15 @@ string to_hex(int16_t src) {
     return ss.str();
 }
 
+int32_t zero_extend(int16_t src) {
+    return static_cast<uint16_t>(src);
+}
+
+int32_t sign_extend(int16_t src) {
+    return static_cast<int16_t>(src);
+}
+
+// assign const value by immediate
 void genAssign(const QuadTuple &q) {
     auto    var  = q.args.var;
     auto    reg  = varToReg.at(var);
@@ -806,11 +819,17 @@ void genAssign(const QuadTuple &q) {
     int16_t low  = cval & 0xFFFF;
     int16_t high = (cval >> 16) & 0xFFFF;
 
-    if (static_cast<int32_t>(low) == cval) {
+    if (zero_extend(low) == cval) {
         if (low < -100 || low > 100) {
             genCode("ori", reg, "$zero", to_hex(low));
         } else {
             genCode("ori", reg, "$zero", low);
+        }
+    } else if (sign_extend(low) == cval) {
+        if (low < -100 || low > 100) {
+            genCode("addiu", reg, "$zero", to_hex(low));
+        } else {
+            genCode("addiu", reg, "$zero", low);
         }
     } else {
         genCode("lui", reg, to_hex(high));
@@ -818,6 +837,7 @@ void genAssign(const QuadTuple &q) {
     }
 }
 
+// data segment definition
 void genGlobal(const QuadTuple &q) {
     /* (var_a, width, len) */
     auto        var     = q.args.var_a;
@@ -832,12 +852,11 @@ void genGlobal(const QuadTuple &q) {
 void genDirector() {
     Lbl lbl_main = get_function_by_name("main").funcLbl.lbl;
     genFuncCall(QuadTuple{Op::kCall, {.func = lbl_main, .argc = 0}});
-    // genCode("sw", "$fp", "$sp", -4);
-    // genCode("ori", "$fp", "$sp", 0);
-    // genCode("jar", "main");
+    // call main
     genCode("nop");
 }
 
+// dispatcher
 void genCodes(const QuadTuple &q) {
     switch (q.op) {
         case Op::kNop:
@@ -927,7 +946,7 @@ extern void varsNamingTest() {
     }
 }
 
-extern void genMips() {
+extern string getMipsCodeStr() {
     vector<QuadTuple> irDataCodes;
     vector<QuadTuple> irTextCodes;
     for (const auto &decl : globalVarDecls) {
@@ -943,5 +962,7 @@ extern void genMips() {
     genDirector(); // direct to main
     for (const auto &ir : irTextCodes) { genCodes(ir); }
 
-    for (auto line : mipsCode) { cout << line << endl; }
+    string mipsCodeStr = to_string(fmt::format("{}", fmt::join(
+        mipsCode, "\n")));
+    return mipsCodeStr;
 }

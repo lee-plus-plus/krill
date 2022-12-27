@@ -3,7 +3,6 @@
 #include "krill/minic.h"
 #include "krill/utils.h"
 #include <cstdlib>
-#include <fmt/color.h>
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -51,8 +50,8 @@ vector<vector<VarDecl> *> varDeclsDomains;
 vector<vector<LblDecl> *> lblDeclsDomains;
 
 // for getting var / lbl name, read only
-map<Var, VarDecl *> varDecls;
-map<Lbl, LblDecl *> lblDecls;
+map<Var, VarDecl *>  varDecls;
+map<Lbl, LblDecl *>  lblDecls;
 map<Lbl, FuncDecl *> funcDecls;
 
 
@@ -345,7 +344,7 @@ void sdt_expr_action(AttrDict *parent, AttrDict *child[], int pidx) {
         }
         Appender{code_0}
             .append({{Op::kCall,
-                     {.func = lbl_f, .argc = static_cast<int>(args.size())}}})
+                      {.func = lbl_f, .argc = static_cast<int>(args.size())}}})
             .append({{Op::kRetGet, {.var_r = v_0, .argc = 0}}});
 
 
@@ -562,7 +561,7 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
             head_code.push_back(
                 {Op::kStore, {.var_m = var_zero, .addr_m = decl.var}});
         }
-        
+
 
         // body code:
         auto &body_code = _6.Ref<Code>("code");
@@ -1076,7 +1075,24 @@ void sdt_visit(shared_ptr<APTnode> &node) {
 // entry
 void syntax_directed_translation(shared_ptr<APTnode> &node) {
     varDeclsDomains.push_back(&globalVarDecls); // global domain
-    sdt_visit(node);
+    sdt_visit(node);                            // core
+
+    // collect lbl information
+    for (auto &f : globalFuncDecls) {
+        auto &l         = f.funcLbl;
+        lblDecls[l.lbl] = &l;
+        for (auto &l : f.localLbls) { lblDecls[l.lbl] = &l; }
+        funcDecls[l.lbl] = &f;
+    }
+    // collect var information
+    for (auto &v : globalVarDecls) { varDecls[v.var] = &v; }
+    for (auto &f : globalFuncDecls) {
+        logger.debug("func {} ret size {}", f.funcName, f.ret.size());
+        for (auto &v : f.ret) { varDecls[v.var] = &v; }
+        for (auto &v : f.params) { varDecls[v.var] = &v; }
+        for (auto &v : f.localVars) { varDecls[v.var] = &v; }
+    }
+
     logger.info("syntax directed translation complete successfully");
 }
 
@@ -1212,22 +1228,6 @@ string to_string(const Code &code) {
 // entry
 string get_ir_str() {
     stringstream ss;
-
-    // collect lbl information
-    for (auto &f : globalFuncDecls) {
-        auto &l         = f.funcLbl;
-        lblDecls[l.lbl] = &l;
-        for (auto &l : f.localLbls) { lblDecls[l.lbl] = &l; }
-        funcDecls[l.lbl] = &f;
-    }
-    // collect var information
-    for (auto &v : globalVarDecls) { varDecls[v.var] = &v; }
-    for (auto &f : globalFuncDecls) {
-        logger.debug("func {} ret size {}", f.funcName, f.ret.size());
-        for (auto &v : f.ret) { varDecls[v.var] = &v; }
-        for (auto &v : f.params) { varDecls[v.var] = &v; }
-        for (auto &v : f.localVars) { varDecls[v.var] = &v; }
-    }
 
     // print global variables declaration
     for (const auto &var_decl : globalVarDecls) {

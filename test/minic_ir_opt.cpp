@@ -81,6 +81,7 @@ int calcExpr(Op op, int val1, int val2) {
 // map<Var, DagNode *> varToNodes;
 // map<int, DagNode *> cvalTolNodes;
 
+// additional information generated in this procedure
 MemInfo            memInfo;
 map<Var, VarInfo>  varInfo;
 map<Lbl, FuncInfo> funcInfo;
