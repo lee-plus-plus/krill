@@ -34,7 +34,6 @@ extern vector<FuncDecl>     globalFuncDecls;
 extern vector<VarDecl>      globalVarDecls;
 extern bool                 isOpExpr(Op op);
 
-extern MemInfo            memInfo;
 extern map<Var, VarInfo>  varInfo;
 extern map<Lbl, FuncInfo> funcInfo;
 
@@ -841,11 +840,10 @@ void genAssign(const QuadTuple &q) {
 void genGlobal(const QuadTuple &q) {
     /* (var_a, width, len) */
     auto        var     = q.args.var_a;
-    auto        varname = varInfo.at(var).name;
+    auto        varname = varInfo.at(var).memName.value();
     const auto &decl    = *varDecls.at(var);
-    int         size    = get_type_size(decl.type.basetype, decl.type.shape);
 
-    genData(varname, size);
+    genData(varname, decl.type.size());
 }
 
 // entry of the whole program

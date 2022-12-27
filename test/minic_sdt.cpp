@@ -41,7 +41,6 @@ int assign_new_name_idx(const string &name) {
 vector<FuncDecl> globalFuncDecls;
 vector<VarDecl>  globalVarDecls;
 
-
 // TODO: transform OOD to OOD (put global states into class)
 
 // domain stack, make it easier in sdt
@@ -89,19 +88,6 @@ bool has_function_by_name(const string &funcname) {
     return false;
 }
 
-int get_type_size(TypeSpec basetype, vector<int> shape = {}) {
-    int size;
-    if (basetype == TypeSpec::kInt32) {
-        size = 4;
-    } else if (basetype == TypeSpec::kVoid) {
-        size = 0;
-    } else {
-        assert(false);
-    }
-    for (auto len : shape) { size *= len; }
-    return size;
-}
-
 FuncDecl createFuncDecl(const string &          func_name,
                         const vector<TypeDecl> &params_type,
                         const TypeSpec &        ret_basetype) {
@@ -113,8 +99,7 @@ FuncDecl createFuncDecl(const string &          func_name,
     auto f_ret = vector<VarDecl>{};
     if (ret_basetype != TypeSpec::kVoid) {
         auto type       = TypeDecl{.basetype = ret_basetype,
-                             .shape    = {},
-                             .size     = get_type_size(ret_basetype, {})};
+                             .shape    = {}};
         auto f_ret_elem = VarDecl{.domain  = VarDomain::kLocal,
                                   .type    = type,
                                   .varname = ".retval",
@@ -147,7 +132,7 @@ QuadTuple gen_allocate_code(const VarDecl &decl, const Op &op) {
     int len = 1;
     for (auto s : decl.type.shape) { len *= s; }
     if (decl.type.shape.size() == 0) { len = 0; }
-    return QuadTuple{op, {.var_a = decl.var, .width = 4, .len = len}};
+    return QuadTuple{op, {.var_a = decl.var, .size = decl.type.size()}};
 };
 
 string lbl_name(const Lbl &lbl) {
@@ -349,7 +334,7 @@ void sdt_expr_action(AttrDict *parent, AttrDict *child[], int pidx) {
 
 
     } else if (pidx == 64) { // expr <- int_literal
-        auto &cval = _1.Ref<CVal>("cval");
+        auto &cval = _1.Ref<int32_t>("cval");
         v_0        = assign_new_varible();
         code_0.push_back(
             {.op = Op::kAssign, .args = {.var = v_0, .cval = cval}});
@@ -504,13 +489,12 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
         auto shape    = vector<int>{};
 
         if (pidx == 6) {
-            int arraySize = _4.Ref<CVal>("cval");
+            int arraySize = _4.Ref<int32_t>("cval");
             shape         = vector<int>{arraySize};
         }
 
-        auto size = get_type_size(basetype, shape);
         auto type =
-            TypeDecl{.basetype = basetype, .shape = shape, .size = size};
+            TypeDecl{.basetype = basetype, .shape = shape};
         var_decl = VarDecl{.domain  = VarDomain::kGlobal,
                            .type    = type,
                            .varname = varname,
@@ -683,12 +667,11 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
         auto basetype = _1.Ref<TypeSpec>("basetype");
         auto shape    = vector<int>{};
         if (pidx == 17) {
-            int size = _4.Ref<CVal>("cval");
+            int size = _4.Ref<int32_t>("cval");
             shape    = {size};
         }
         param_type = {.basetype = basetype,
-                      .shape    = shape,
-                      .size     = get_type_size(basetype, shape)};
+                      .shape    = shape};
     }
 
     // stmt_list <- stmt_list stmt |
@@ -798,15 +781,14 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
         auto var      = assign_new_varible();
 
         if (pidx == 38) {
-            int arraySize = _4.Ref<CVal>("cval");
+            int arraySize = _4.Ref<int32_t>("cval");
             shape         = vector<int>{arraySize};
         }
-        int size = get_type_size(basetype, shape);
 
         var_decl = VarDecl{
             .domain = VarDomain::kLocal,
             .type =
-                TypeDecl{.basetype = basetype, .shape = shape, .size = size},
+                TypeDecl{.basetype = basetype, .shape = shape},
             .varname = varname,
             .var     = var};
         varDeclsDomains.back()->push_back(var_decl);
@@ -906,7 +888,7 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
 
     // int_literal <- DECNUM | HEXNUM
     if (71 <= pidx && pidx <= 72) {
-        auto &cval = _0.RefN<CVal>("cval");
+        auto &cval = _0.RefN<int32_t>("cval");
 
         auto &lval = _1.Ref<string>("lval");
         if (pidx == 71) {
@@ -1148,14 +1130,8 @@ string to_string(const QuadTuple &q) {
             break;
         case Op::kAllocate:
         case Op::kGlobal:
-            ss << fmt::format("{} = {:s}", var_name(q.args.var_a),
-                              enum_name(q.op));
-            if (q.args.len == 0) {
-                ss << fmt::format(" {:d}", int(q.args.width));
-            } else {
-                ss << fmt::format(" [{:d} x {:d}]", int(q.args.len),
-                                  int(q.args.width));
-            }
+            ss << fmt::format("{} = {:s} ({} byte)", var_name(q.args.var_a),
+                              enum_name(q.op), q.args.size);
             break;
         case Op::kLoad:
             ss << fmt::format("{} = {:s} ({})", var_name(q.args.var_m),
@@ -1226,7 +1202,7 @@ string to_string(const Code &code) {
 }
 
 // entry
-string get_ir_str() {
+extern string get_ir_str() {
     stringstream ss;
 
     // print global variables declaration

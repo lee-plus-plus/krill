@@ -14,8 +14,9 @@ using namespace krill::minic::ir;
 
 using krill::log::logger;
 
-extern string lbl_name(const Lbl &lbl);
-extern string var_name(const Var &var);
+
+extern vector<FuncDecl> globalFuncDecls;
+extern vector<VarDecl>  globalVarDecls;
 
 bool isOpExpr(Op op) {
     switch (op) {
@@ -39,7 +40,6 @@ bool isOpExpr(Op op) {
             return false;
     }
 }
-
 int calcExpr(Op op, int val1, int val2) {
     switch (op) {
         case Op::kAdd:
@@ -77,25 +77,14 @@ int calcExpr(Op op, int val1, int val2) {
     }
 }
 
-// vector<DagNode *>   nodes;
-// map<Var, DagNode *> varToNodes;
-// map<int, DagNode *> cvalTolNodes;
 
 // additional information generated in this procedure
-MemInfo            memInfo;
 map<Var, VarInfo>  varInfo;
 map<Lbl, FuncInfo> funcInfo;
-
-extern vector<FuncDecl> globalFuncDecls;
-extern vector<VarDecl>  globalVarDecls;
-extern string           lbl_name(const Lbl &lbl);
-extern string           var_name(const Var &var);
-extern QuadTuple        gen_allocate_code(const VarDecl &decl, const Op &op);
 
 void initVarInfo() {
     varInfo  = {};
     funcInfo = {};
-    memInfo  = {};
 
     int memOffset = 0;
     // initlaize zero variable
@@ -103,56 +92,55 @@ void initVarInfo() {
     // initialize global variable info
     for (const auto &decl : globalVarDecls) {
         varInfo[decl.var] =
-            VarInfo{.name = {decl.varname}, 
-                    .memName = {decl.varname}};
-        memOffset += decl.type.size;
+            VarInfo{.memName = {decl.varname}};
+        memOffset += decl.type.size();
     }
-    memInfo.memOffset = memOffset;
 
     // initialize local variable info
     for (auto &funcDecl : globalFuncDecls) {
-        // e.g.: int func(int x, int y[10], int z);
-        // given:
-        // 12($fp) = param<0> (int32 x)
-        //  8($fp) = param<1> (int32* y)
-        //  4($fp) = param<2> (int32 z)
-        //  0($fp) = $ra
-        // -4($fp) = $fp_last
-        //    $sp  = $fp - 8
-        // do:
-        //  -8($fp) <- local_var<0> (int32 retval)
-        // -12($fp) <- local_var<3> (int32[10] z)
-        // -52($fp) <- local_var<4> (int32 a)
-        //     $sp  <- $fp - 48
+        /**
+         * e.g.: int func(int x, int y[10], int z);
+         * given:
+         *     12($fp) = param<0> (int32 x)
+         *      8($fp) = param<1> (int32* y)
+         *      4($fp) = param<2> (int32 z)
+         *      0($fp) = $ra
+         *     -4($fp) = $fp_last
+         *        $sp  = $fp - 8
+         * do:
+         *     -8($fp) <- local_var<0> (int32 retval)
+         *    -12($fp) <- local_var<3> (int32[10] z)
+         *    -52($fp) <- local_var<4> (int32 a)
+         *        $sp  <- $fp - 48
+         **/
 
         // assign local stack space for parameters
-        // if 3 params: 12($fp) for param<0>, 8($fp) for param<1>, 4($fp) for
-        // param<2>
+        // e.g. 12($fp) for param<0>, 8($fp) for param<1>, 4($fp) for param<0>
         int paramOffset = 4 * funcDecl.params.size();
         for (const auto &decl : funcDecl.params) {
             varInfo[decl.var] =
-                VarInfo{.name = decl.varname, .fpOffset = paramOffset};
+                VarInfo{.fpOffset = paramOffset};
             paramOffset -= 4;
         }
 
         // reverse 0($fp) for $fp, -4($fp) for $sp, -8($fp) for $ra
-        // assign local stack for return value, , local variables
+        // -12($fp) for retval (if there is), -16($fp) ... for local variables
         int spOffset = -8;
         for (const auto &decl : funcDecl.ret) {
             varInfo[decl.var] =
-                VarInfo{.name = decl.varname, .fpOffset = {spOffset}};
-            spOffset -= decl.type.size; // allocate actual spcae for variables
+                VarInfo{.fpOffset = {spOffset}};
+            spOffset -= decl.type.size(); // allocate actual spcae for variables
         }
         for (const auto &decl : funcDecl.localVars) {
             varInfo[decl.var] =
-                VarInfo{.name = decl.varname, .fpOffset = {spOffset}};
-            spOffset -= decl.type.size; // allocate actual spcae for variables
+                VarInfo{.fpOffset = {spOffset}};
+            spOffset -= decl.type.size(); // allocate actual spcae for variables
         }
+
         // set $sp
-        funcInfo[funcDecl.funcLbl.lbl] = {.name     = funcDecl.funcName,
-                                          .spOffset = spOffset,
-                                          .numParams =
-                                              int(funcDecl.params.size())};
+        Lbl lbl = funcDecl.funcLbl.lbl;
+        funcInfo[lbl] = {.spOffset  = spOffset,
+                         .numParams = int(funcDecl.params.size())};
 
 
         // assign const value for temporal variables
@@ -208,146 +196,10 @@ void initVarInfo() {
     }
 }
 
-string var_name2(Var var) {
-    auto info = varInfo.at(var);
-    // if (info.constVal.has_value()) { return to_string(info.constVal.value()); }
-    if (info.fpOffset.has_value()) {
-        return string{"@"} + info.name + string{": "} +
-               to_string(info.fpOffset.value()) + "($fp)";
-    }
-    if (info.memName.has_value()) {
-        return string{"@"} + to_string(info.memName.value());
-    }
-    return string{"%"} + to_string(var);
-}
 
-string to_string2(const QuadTuple &q) {
-    stringstream ss;
-    switch (q.op) {
-        case Op::kAdd:
-        case Op::kMinus:
-        case Op::kMult:
-        case Op::kDiv:
-        case Op::kMod:
-        case Op::kAnd:
-        case Op::kOr:
-        case Op::kXor:
-        case Op::kNor:
-        case Op::kLShift:
-        case Op::kRShift:
-        case Op::kEq:
-        case Op::kNeq:
-        case Op::kLeq:
-        case Op::kLt:
-            ss << fmt::format("{} = {:s} {} {}", var_name2(q.args.var),
-                              enum_name(q.op), var_name2(q.args.src1),
-                              var_name2(q.args.src2));
-            break;
-        case Op::kGlobal:
-            ss << fmt::format("{} = {:s}", var_name2(q.args.var_a),
-                              enum_name(q.op));
-            if (q.args.len == 0) {
-                ss << fmt::format(" {:d}", int(q.args.width));
-            } else {
-                ss << fmt::format(" [{:d} x {:d}]", int(q.args.len),
-                                  int(q.args.width));
-            }
-            break;
-        case Op::kLoad:
-            ss << fmt::format("{} = {:s} {}", var_name2(q.args.var_m),
-                              enum_name(q.op), var_name2(q.args.addr_m));
-            break;
-        case Op::kStore:
-            ss << fmt::format("{} = {:s} {}", var_name2(q.args.addr_m),
-                              enum_name(q.op), var_name2(q.args.var_m));
-            break;
-        case Op::kParamPut:
-            ss << fmt::format("{}<{:d}> {} ", enum_name(q.op), int(q.args.argc),
-                              var_name2(q.args.var_r));
-            break;
-        case Op::kParam:
-            ss << fmt::format("{} = {:s}<{:d}>", var_name2(q.args.var_r),
-                              enum_name(q.op), int(q.args.argc));
-            break;
-        case Op::kRetPut:
-            ss << fmt::format("{}<{:d}> {} ", enum_name(q.op), int(q.args.argc),
-                              var_name2(q.args.var_r));
-            break;
-        case Op::kRetGet:
-            ss << fmt::format("{} = {:s}<{:d}>", var_name2(q.args.var_r),
-                              enum_name(q.op), int(q.args.argc));
-            break;
-        case Op::kRet:
-            ss << fmt::format("{:s}<{:d}>", enum_name(q.op), int(q.args.argc));
-            break;
-        case Op::kCall:
-            ss << fmt::format("{:s} {}<{:d}>", enum_name(q.op),
-                              lbl_name(q.args.func), int(q.args.argc));
-            break;
-        case Op::kLabel:
-            ss << fmt::format("{}:", lbl_name(q.args.addr1));
-            break;
-        case Op::kGoto:
-            ss << fmt::format("{:s} {}", enum_name(q.op),
-                              lbl_name(q.args.addr1));
-            break;
-        case Op::kBranch:
-            ss << fmt::format("{:s} ({}) {} {}", enum_name(q.op),
-                              var_name2(q.args.var_j), lbl_name(q.args.addr1),
-                              lbl_name(q.args.addr2));
-            break;
-        case Op::kFuncBegin:
-            ss << fmt::format("func {} {{", lbl_name(q.args.func));
-            break;
-        case Op::kFuncEnd:
-            ss << fmt::format("}}");
-            break;
-        case Op::kAssign:
-            ss << fmt::format("{} = {:s} {:d}", var_name2(q.args.var),
-                              enum_name(q.op), int(q.args.cval));
-            break;
-        default:
-            assert(false);
-    }
-    return ss.str();
-}
-
-string to_string2(const Code &code) {
-    stringstream ss;
-    for (const auto &q : code) {
-        if (q.op == Op::kLabel || q.op == Op::kFuncEnd ||
-            q.op == Op::kFuncBegin) {
-            ss << to_string2(q) << "\n";
-        } else {
-            ss << "\t" << to_string2(q) << "\n";
-        }
-    }
-    return ss.str();
-}
-
-string get_ir_str2() {
-    stringstream ss;
-
-    // print global variables declaration
-    for (const auto &var_decl : globalVarDecls) {
-        ss << to_string2(gen_allocate_code(var_decl, Op::kGlobal)) << "\n";
-    }
-    ss << "\n";
-
-    // print global functions declaration
-    for (const auto &f : globalFuncDecls) {
-        for (const auto &q : f.code) {
-            if (q.op == Op::kLabel || q.op == Op::kFuncEnd ||
-                q.op == Op::kFuncBegin) {
-                ss << to_string2(q) << "\n";
-            } else {
-                ss << "\t" << to_string2(q) << "\n";
-            }
-        }
-    }
-    return ss.str();
-}
-
+// vector<DagNode *>   nodes;
+// map<Var, DagNode *> varToNodes;
+// map<int, DagNode *> cvalTolNodes;
 // DagNode *getOrNewNode(const Node &node, ) {
 //     for (DagNode *it : nodes) {
 //         if (*it == tgt) { return it; }

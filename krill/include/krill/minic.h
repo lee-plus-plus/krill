@@ -76,76 +76,72 @@ constexpr int arg_list = 303;
 
 namespace krill::minic::ir {
 
+
+enum class Op {
+    // clang-format off
+    kNop, 
+    kBackPatch, /* (func, argc) */
+    kAssign, /* (var, cval) */
+    kAdd, kMinus, kMult, kDiv, kMod,/* (dest, src1, src2) */
+    kAnd, kOr, kXor, kNor,          /* (dest, src1, src2) */
+    kLShift, kRShift,               /* (dest, src1, src2) */
+    kEq, kNeq, kLeq, kLt,           /* (dest, src1, src2) */
+    kAllocate,  kGlobal,     /* (var_a, width, len) */
+    kLoad, kStore,  /* (var_m, addr_m) */
+    kParamPut, kParam, /* (var_r, argc) */ 
+    kRetPut, kRetGet, /* (var_r, argc) */
+    kRet,    /* () */
+    kCall,   /* (func, argc) */
+    kLabel,  /* (addr1) */
+    kGoto,   /* (addr1) */
+    kBranch, /* (var_j, addr1, addr2) */
+    kFuncBegin, /* (func) */
+    kFuncEnd, 
+    // clang-format on
+};
+
+struct Lbl {
+    int id_;
+    Lbl() = default;
+    constexpr Lbl(int id) : id_(id){};
+         operator int() const { return id_; };
+    Lbl &operator++(int) {
+        id_++;
+        return *this;
+    };
+};
+struct Var {
+    int id_;
+    Var() = default;
+    constexpr Var(int id) : id_(id){};
+         operator int() const { return id_; };
+    Var &operator++(int) {
+        id_++;
+        return *this;
+    };
+    bool operator<=(const Var &var) const {
+        return id_ <= var.id_;
+    }
+    bool operator<(const Var &var) const {
+        return id_ < var.id_;
+    }
+    bool operator==(const Var &var) const {
+        return id_ == var.id_;
+    }
+};
+
 // intermediate code (quad-tuple)
 struct QuadTuple {
-    struct Lbl {
-        int data_;
-        Lbl() = default;
-        constexpr Lbl(int data) : data_(data){};
-             operator int() const { return data_; };
-        Lbl &operator++(int) {
-            data_++;
-            return *this;
-        };
-    };
-    struct Var {
-        int data_;
-        Var() = default;
-        constexpr Var(int data) : data_(data){};
-             operator int() const { return data_; };
-        Var &operator++(int) {
-            data_++;
-            return *this;
-        };
-        bool operator<=(const Var &var) const {
-            return data_ <= var.data_;
-        }
-        bool operator<(const Var &var) const {
-            return data_ < var.data_;
-        }
-        bool operator==(const Var &var) const {
-            return data_ == var.data_;
-        }
-    };
-    struct CVal {
-        uint32_t data_;
-        CVal() = default;
-        constexpr CVal(int data) : data_(data){};
-        operator int() const { return data_; };
-    };
-    // clang-format off
-    enum class Op {
-        kNop, 
-        kBackPatch, /* (func, argc) */
-        kAssign, /* (var, cval) */
-        kAdd, kMinus, kMult, kDiv, kMod,/* (dest, src1, src2) */
-        kAnd, kOr, kXor, kNor,          /* (dest, src1, src2) */
-        kLShift, kRShift,               /* (dest, src1, src2) */
-        kEq, kNeq, kLeq, kLt,           /* (dest, src1, src2) */
-        kAllocate,  kGlobal,     /* (var_a, width, len) */
-        kLoad, kStore,  /* (var_m, addr_m) */
-        kParamPut, kParam, /* (var_r, argc) */ 
-        kRetPut, kRetGet, /* (var_r, argc) */
-        kRet,    /* () */
-        kCall,   /* (func, argc) */
-        kLabel,  /* (addr1) */
-        kGoto,   /* (addr1) */
-        kBranch, /* (var_j, addr1, addr2) */
-        kFuncBegin, /* (func) */
-        kFuncEnd, 
-    };
-    // clang-format on
     Op op;
     union Data { // the following code use clang-only feature
         struct {
-            Var  var;
-            CVal cval;
+            Var     var;
+            int32_t cval;
         }; // assign
         struct {
             Var var_a;
-            int width;
-            int len; /* len > 0: is array */
-        };           // alloate,  global
+            int size;
+        }; // alloca,  global
         struct {
             Var dest;
             Var src1;
@@ -168,10 +164,6 @@ struct QuadTuple {
     } args;
 };
 
-using Op   = QuadTuple::Op;
-using Lbl  = QuadTuple::Lbl;  // label in TEXT section
-using Var  = QuadTuple::Var;  // register / local / global
-using CVal = QuadTuple::CVal; // const value in asm, uint32_t
 using Code = vector<QuadTuple>;
 
 constexpr Var var_zero  = {0};
@@ -180,11 +172,16 @@ constexpr Lbl lbl_empty = {};
 
 enum class TypeSpec { kVoid, kInt32 };
 enum class VarDomain { kLocal, kGlobal };
+
 struct TypeDecl {
     TypeSpec    basetype;
     vector<int> shape;
-    int         size;
-
+    
+    int size() const {
+        int size_ = (basetype == TypeSpec::kInt32) ? 4 : 0;
+        for (int len : shape) { size_ *= len; }
+        return size_;
+    };
     bool operator==(const TypeDecl &ts) const {
         return std::tie(basetype, shape) == std::tie(ts.basetype, ts.shape);
     }
@@ -219,23 +216,13 @@ struct FuncDecl {
     Code            code;
 };
 
-// struct Reg {
-//     string name;
-//     int idx;
-//     constexpr Reg() = default;
-// };
-
 struct VarInfo {
-    string name;
+    // exclusive
+    std::optional<int>     constVal; // it's a const value
+    std::optional<int>     fpOffset; // it's a offset relatived to $fp
+    std::optional<string>  memName;  // it's a data segment label
 
-    // std::optional<string>  reg;
-    std::optional<int>     constVal; 
-    std::optional<int>     fpOffset;
-    std::optional<string>  memName;
-    // std::optional<int>     memOffset;
-    // VarInfo *reload = nullptr;
-
-    // vector<Reg> hasValue;
+    std::optional<string>  reg;      // assigned register
 };
 
 struct FuncInfo {
@@ -244,11 +231,24 @@ struct FuncInfo {
     int numParams;
 };
 
-struct MemInfo {
-    int memOffset = 0;
-};
-
-
 } // namespace krill::minic::ir
 
 #endif
+
+// struct TypeDecl;
+// struct VarDecl;
+// struct LblDecl;
+// struct FuncDecl;
+// struct VarInfo;
+// struct FuncInfo;
+
+// struct Var {
+//     int id;
+//     VarInfo *info;
+//     VarDecl *decl;
+// };
+
+// vector<unique_ptr<LblDecl>> varDecls;
+// vector<unique_ptr<LblDecl>> lblDecls;
+// vector<unique_ptr<
+
