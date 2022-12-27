@@ -14,27 +14,8 @@ using namespace krill::minic::ir;
 
 using krill::log::logger;
 
-// kNop,
-// kBackPatch, /* (func, argc) */
-// kAssign, /* (var, cval) */
-// kCopy,   /* (var, src1) */
-// kAdd, kMinus, kMult, kDiv, kMod,/* (dest, src1, src2) */
-// kAnd, kOr, kXor, kNor,          /* (dest, src1, src2) */
-// kLShift, kRShift,               /* (dest, src1, src2) */
-// kEq, kNeq, kLeq, kLt,           /* (dest, src1, src2) */
-// kAllocate,  kGlobal,     /* (var_a, width, len) */
-// kLoad, kStore,  /* (var_m, addr_m) */
-// kParamPut, kParamGet, /* (var_f, argc) */
-// kRetPut, kRetGet, /* (var_f, argc) */
-// kRet,    /* () */
-// kCall,   /* (func, argc) */
-// kLabel,  /* (addr1) */
-// kGoto,   /* (addr1) */
-// kBranch, /* (var_j, addr1, addr2) */
-// kFuncBegin, /* (addr1) */
-// kFuncEnd,
-
-// vector<VarDecl> varDecls;
+extern string lbl_name(const Lbl &lbl);
+extern string var_name(const Var &var);
 
 bool isOpExpr(Op op) {
     switch (op) {
@@ -96,39 +77,32 @@ int calcExpr(Op op, int val1, int val2) {
     }
 }
 
-struct FuncInfo {
-    int fpOffset = 0;
-};
-
-struct MemInfo {
-    int memOffset = 0;
-};
-
 // vector<DagNode *>   nodes;
 // map<Var, DagNode *> varToNodes;
 // map<int, DagNode *> cvalTolNodes;
 
-MemInfo memInfo;
-map<Var, VarInfo> varInfo;
+MemInfo            memInfo;
+map<Var, VarInfo>  varInfo;
 map<Lbl, FuncInfo> funcInfo;
 
 extern vector<FuncDecl> globalFuncDecls;
 extern vector<VarDecl>  globalVarDecls;
-extern string lbl_name(const Lbl &lbl);
-extern string var_name(const Var &var);
-extern QuadTuple gen_allocate_code(const VarDecl &decl, const Op &op);
+extern string           lbl_name(const Lbl &lbl);
+extern string           var_name(const Var &var);
+extern QuadTuple        gen_allocate_code(const VarDecl &decl, const Op &op);
 
 void initVarInfo() {
-    varInfo = {};
+    varInfo  = {};
     funcInfo = {};
-    memInfo = {};
+    memInfo  = {};
 
     int memOffset = 0;
     // initlaize zero variable
     varInfo[var_zero] = VarInfo{.constVal = {0}};
     // initialize global variable info
     for (const auto &decl : globalVarDecls) {
-        varInfo[decl.var] = VarInfo{.memName = {decl.varname}, .memOffset = {memOffset}};
+        varInfo[decl.var] =
+            VarInfo{.name = {decl.varname}, .memOffset = {memOffset}};
         memOffset += decl.type.size;
     }
     memInfo.memOffset = memOffset;
@@ -136,25 +110,26 @@ void initVarInfo() {
     // initialize local variable info
     for (auto &funcDecl : globalFuncDecls) {
         // e.g.: int func(int x, int y[10], int z);
-        // given: 
-        // 12($fp) = param<0> (int32 x) 
+        // given:
+        // 12($fp) = param<0> (int32 x)
         //  8($fp) = param<1> (int32* y)
         //  4($fp) = param<2> (int32 z)
         //  0($fp) = $ra
         // -4($fp) = $fp_last
-        //    $sp  = $fp - 8 
-        // do: 
+        //    $sp  = $fp - 8
+        // do:
         //  -8($fp) <- local_var<0> (int32 retval)
         // -12($fp) <- local_var<3> (int32[10] z)
         // -52($fp) <- local_var<4> (int32 a)
-        //     $sp  <- $fp - 48 
+        //     $sp  <- $fp - 48
 
         // assign local stack space for parameters
-        // if 3 params: 12($fp) for param<0>, 8($fp) for param<1>, 4($fp) for param<2> 
+        // if 3 params: 12($fp) for param<0>, 8($fp) for param<1>, 4($fp) for
+        // param<2>
         int paramOffset = 4 * funcDecl.params.size();
         for (const auto &decl : funcDecl.params) {
             varInfo[decl.var] =
-                VarInfo{.fpName = {decl.varname}, .fpOffset = paramOffset};
+                VarInfo{.name = decl.varname, .fpOffset = paramOffset};
             paramOffset -= 4;
         }
 
@@ -163,49 +138,64 @@ void initVarInfo() {
         int spOffset = -8;
         for (const auto &decl : funcDecl.ret) {
             varInfo[decl.var] =
-                VarInfo{.fpName = {decl.varname}, .fpOffset = {spOffset}};
+                VarInfo{.name = decl.varname, .fpOffset = {spOffset}};
             spOffset -= decl.type.size; // allocate actual spcae for variables
         }
         for (const auto &decl : funcDecl.localVars) {
             varInfo[decl.var] =
-                VarInfo{.fpName = {decl.varname}, .fpOffset = {spOffset}};
+                VarInfo{.name = decl.varname, .fpOffset = {spOffset}};
             spOffset -= decl.type.size; // allocate actual spcae for variables
         }
         // set $sp
-        funcInfo[funcDecl.funcLbl.lbl] = {.spOffset = spOffset};
-
+        funcInfo[funcDecl.funcLbl.lbl] = {.name     = funcDecl.funcName,
+                                          .spOffset = spOffset};
 
 
         // assign const value for temporal variables
+        map<Var, QuadTuple *> cvalCode;
+
         for (auto &q : funcDecl.code) {
             // set var info
-            if (q.op == Op::kAllocate) {
+            if (q.op == Op::kAllocate || q.op == Op::kParam) {
                 // pass
                 q = QuadTuple{.op = Op::kNop}; // delete
-            } if (q.op == Op::kAssign) {
+            }
+            if (q.op == Op::kAssign) {
                 varInfo[q.args.var] = VarInfo{.constVal = {q.args.cval}};
-                q = QuadTuple{.op = Op::kNop}; // delete
+                // q = QuadTuple{.op = Op::kNop}; // delete
+                cvalCode[q.args.var] = &q;
             } else if (q.op == Op::kLoad) {
-                varInfo[q.args.var_m] = VarInfo{.hasMem = true};
+                varInfo[q.args.var_m] = VarInfo{};
             } else if (isOpExpr(q.op)) {
                 varInfo[q.args.var_m] = VarInfo{};
-            } else if (q.op == Op::kParamGet || q.op == Op::kRetGet) {
-                varInfo[q.args.var_m] = VarInfo{.hasMem = true};
-            } 
+            } else if (q.op == Op::kRetGet) {
+                varInfo[q.args.var_m] = VarInfo{};
+            }
 
             // const value propagation
             if (isOpExpr(q.op)) {
-                const auto src1 = varInfo.at(q.args.src1);
-                const auto src2 = varInfo.at(q.args.src2);
-                auto &dest = varInfo.at(q.args.dest);
-                if (src1.constVal.has_value() && src1.constVal.has_value()) {
-                    // const value propagation
-                    int cval1 = src1.constVal.value();
-                    int cval2 = src2.constVal.value();
-                    int result = calcExpr(q.op, cval1, cval2);
-                    dest.constVal = {result};
-                    q = QuadTuple{.op = Op::kNop}; // delete
+                // const value propagation
+                const Var  var_src1 = q.args.src1;
+                const Var  var_src2 = q.args.src2;
+                const Var  var_dest = q.args.dest;
+                const auto src1   = varInfo.at(var_src1);
+                const auto src2   = varInfo.at(var_src2);
+                auto &     dest   = varInfo.at(var_dest);
+
+                if (!src1.constVal.has_value() || !src2.constVal.has_value()) {
+                    continue;
                 }
+                int cval1     = src1.constVal.value();
+                int cval2     = src2.constVal.value();
+                int result    = calcExpr(q.op, cval1, cval2);
+                dest.constVal = {result};
+                // q = QuadTuple{.op = Op::kNop}; // delete
+                q = QuadTuple{Op::kAssign,
+                              {.var = var_dest, .cval = result}};
+
+                cvalCode[var_dest]     = &q;
+                *cvalCode.at(var_src1) = QuadTuple{.op = Op::kNop};
+                *cvalCode.at(var_src2) = QuadTuple{.op = Op::kNop};
             }
         }
 
@@ -217,15 +207,14 @@ void initVarInfo() {
 
 string var_name2(Var var) {
     auto info = varInfo.at(var);
-    if (info.constVal.has_value()) {
-        return to_string(info.constVal.value());
-    } 
+    // if (info.constVal.has_value()) { return to_string(info.constVal.value()); }
     if (info.fpOffset.has_value()) {
-        return string{"@"} + info.fpName.value() + string{": "} + to_string(info.fpOffset.value()) + "($fp)";
+        return string{"@"} + info.name + string{": "} +
+               to_string(info.fpOffset.value()) + "($fp)";
     }
     if (info.memOffset.has_value()) {
-        return string{"@"} + to_string(info.memName.value());
-    } 
+        return string{"@"} + to_string(info.name);
+    }
     return string{"%"} + to_string(var);
 }
 
@@ -273,7 +262,7 @@ string to_string2(const QuadTuple &q) {
             ss << fmt::format("{}<{:d}> {} ", enum_name(q.op), int(q.args.argc),
                               var_name2(q.args.var_r));
             break;
-        case Op::kParamGet:
+        case Op::kParam:
             ss << fmt::format("{} = {:s}<{:d}>", var_name2(q.args.var_r),
                               enum_name(q.op), int(q.args.argc));
             break;
@@ -309,6 +298,10 @@ string to_string2(const QuadTuple &q) {
             break;
         case Op::kFuncEnd:
             ss << fmt::format("}}");
+            break;
+        case Op::kAssign:
+            ss << fmt::format("{} = {:s} {:d}", var_name2(q.args.var),
+                              enum_name(q.op), int(q.args.cval));
             break;
         default:
             assert(false);
@@ -400,7 +393,7 @@ void optimization1(Code &code, const map<Var, *VarDecl> &varDecls) {
                 getOrCreateNode({.constVal = q.args.cval, .var = q.args.var});
             varToNodes[q.args.var] = node;
             // delete code
-            q = QuadTuple{.op = Op::kNop}; 
+            q = QuadTuple{.op = Op::kNop};
             // set var info
             varInfo[var] = {.constVal = {q.args.cval}};
         } else if (isOpExpr(op)) { // set, use

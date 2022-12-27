@@ -190,6 +190,23 @@ struct pair_hash {
     }
 };
 
+inline unsigned bit_count(unsigned v) {
+    unsigned int c;
+    for (c = 0; v; c++) {
+        v &= v - 1; 
+    }
+    return c;
+}
+
+inline unsigned bit_high_pos(unsigned v) {
+    assert(v != 0);
+    unsigned int c;
+    for (c = -1; v; c++) {
+        v = v >> 1;
+    }
+    return c;
+}
+
 template <class> inline constexpr bool is_vector = false;
 template <class T, class A>
 inline constexpr bool is_vector<std::vector<T, A>> = true;

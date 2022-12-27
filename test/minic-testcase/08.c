@@ -1,10 +1,18 @@
-int func(int x, int y[5]) {
+int func2(int x, int y, int z) {
+    int a;
+    a = x - y;
+    return a;
+}
+
+int func(int x, int y) {
     int z;
-    z = x + y[1];
+    z = x + y;
+    z = z + func2(x, y, x);
     return z;
 }
 
 int main(void) {
     int z;
-    z = -3;
+    z = func(3, 4);
+    return 0;
 }

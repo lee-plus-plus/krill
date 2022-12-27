@@ -124,7 +124,7 @@ struct QuadTuple {
         kEq, kNeq, kLeq, kLt,           /* (dest, src1, src2) */
         kAllocate,  kGlobal,     /* (var_a, width, len) */
         kLoad, kStore,  /* (var_m, addr_m) */
-        kParamPut, kParamGet, /* (var_r, argc) */ 
+        kParamPut, kParam, /* (var_r, argc) */ 
         kRetPut, kRetGet, /* (var_r, argc) */
         kRet,    /* () */
         kCall,   /* (func, argc) */
@@ -219,15 +219,33 @@ struct FuncDecl {
     Code            code;
 };
 
-struct VarInfo {
-    bool hasMem = false;
+// struct Reg {
+//     string name;
+//     int idx;
+//     constexpr Reg() = default;
+// };
 
+struct VarInfo {
+    string name;
+
+    // std::optional<string>  reg;
     std::optional<int>     constVal; 
-    std::optional<string>  fpName;
     std::optional<int>     fpOffset;
-    std::optional<string>  memName;
     std::optional<int>     memOffset;
+    VarInfo *reload = nullptr;
+
+    // vector<Reg> hasValue;
 };
+
+struct FuncInfo {
+    string name;
+    int spOffset = 0; // local space
+};
+
+struct MemInfo {
+    int memOffset = 0;
+};
+
 
 } // namespace krill::minic::ir
 

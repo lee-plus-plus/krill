@@ -46,6 +46,7 @@ vector<VarDecl>  globalVarDecls;
 // TODO: transform OOD to OOD (put global states into class)
 
 // domain stack, make it easier in sdt
+// not used later
 vector<vector<VarDecl> *> varDeclsDomains;
 vector<vector<LblDecl> *> lblDeclsDomains;
 
@@ -251,7 +252,7 @@ void sdt_expr_action(AttrDict *parent, AttrDict *child[], int pidx) {
             q = {Op::kLShift, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         } else if (pidx == 69) { // expr RSHIFT expr
             q = {Op::kRShift, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
-        } else if (pidx == 66) { // expr '|'' expr
+        } else if (pidx == 70) { // expr '|'' expr
             q = {Op::kOr, {.dest = v_0, .src1 = v_lhs, .src2 = v_rhs}};
         }
         Appender{code_0}
@@ -544,28 +545,23 @@ void sdt_synthetic_action(AttrDict *parent, AttrDict *child[], int pidx) {
                                  .lbl     = assign_new_label()};
         lblDeclsDomains.back()->push_back(lbl_entry);
 
+        for (int i = 0; i < f.params.size(); i++) {
+            head_code.push_back(
+                {Op::kParam, {.var_r = f.params[i].var, .argc = i}});
+        }
         // allocate stack space for retval, params, local parameters
         for (const auto &decl : f.ret) {
-            head_code.push_back(gen_allocate_code(decl, Op::kAllocate));
-        }
-        for (const auto &decl : f.params) {
             head_code.push_back(gen_allocate_code(decl, Op::kAllocate));
         }
         for (const auto &decl : f.localVars) {
             head_code.push_back(gen_allocate_code(decl, Op::kAllocate));
         }
-        // initialize retval, params
+        // initialize retval
         for (const auto &decl : f.ret) {
             head_code.push_back(
                 {Op::kStore, {.var_m = var_zero, .addr_m = decl.var}});
         }
-        for (int i = 0; i < f.params.size(); i++) {
-            int v_temp = assign_new_varible();
-            head_code.push_back(
-                {Op::kParamGet, {.var_r = v_temp, .argc = i}});
-            head_code.push_back(
-                {Op::kStore, {.var_m = v_temp, .addr_m = f.params[i].var}});
-        }
+        
 
         // body code:
         auto &body_code = _6.Ref<Code>("code");
@@ -1156,7 +1152,7 @@ string to_string(const QuadTuple &q) {
             ss << fmt::format("{}<{:d}> {} ", enum_name(q.op), int(q.args.argc),
                               var_name(q.args.var_r));
             break;
-        case Op::kParamGet:
+        case Op::kParam:
             ss << fmt::format("{} = {:s}<{:d}>", var_name(q.args.var_r),
                               enum_name(q.op), int(q.args.argc));
             break;

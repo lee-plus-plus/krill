@@ -24,6 +24,7 @@ extern string  get_ir_str();
 extern void    varsNamingTest();
 extern void    initVarInfo();
 extern string  get_ir_str2();
+extern void    genMips();
 
 void testLexicalParsing() {
     auto &lexicalParser = minicLexicalParser;
@@ -221,6 +222,7 @@ void testIRgenerationWithRegNaming() {
 
     // show naming result
     varsNamingTest();
+    genMips();
 }
 
 const char usage[] = "usage: test_minic {-l|-L|-s}\n"
