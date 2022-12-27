@@ -1,3 +1,7 @@
+int a;
+int b[10];
+int c;
+
 int main(void) {
 	int a;
 	int b;

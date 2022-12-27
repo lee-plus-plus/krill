@@ -53,6 +53,7 @@ vector<vector<LblDecl> *> lblDeclsDomains;
 // for getting var / lbl name, read only
 map<Var, VarDecl *> varDecls;
 map<Lbl, LblDecl *> lblDecls;
+map<Lbl, FuncDecl *> funcDecls;
 
 
 VarDecl &get_varible_by_name(const string &varname) {
@@ -1217,6 +1218,7 @@ string get_ir_str() {
         auto &l         = f.funcLbl;
         lblDecls[l.lbl] = &l;
         for (auto &l : f.localLbls) { lblDecls[l.lbl] = &l; }
+        funcDecls[l.lbl] = &f;
     }
     // collect var information
     for (auto &v : globalVarDecls) { varDecls[v.var] = &v; }

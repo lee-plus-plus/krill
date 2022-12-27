@@ -102,7 +102,8 @@ void initVarInfo() {
     // initialize global variable info
     for (const auto &decl : globalVarDecls) {
         varInfo[decl.var] =
-            VarInfo{.name = {decl.varname}, .memOffset = {memOffset}};
+            VarInfo{.name = {decl.varname}, 
+                    .memName = {decl.varname}};
         memOffset += decl.type.size;
     }
     memInfo.memOffset = memOffset;
@@ -148,7 +149,9 @@ void initVarInfo() {
         }
         // set $sp
         funcInfo[funcDecl.funcLbl.lbl] = {.name     = funcDecl.funcName,
-                                          .spOffset = spOffset};
+                                          .spOffset = spOffset,
+                                          .numParams =
+                                              int(funcDecl.params.size())};
 
 
         // assign const value for temporal variables
@@ -182,20 +185,19 @@ void initVarInfo() {
                 const auto src2   = varInfo.at(var_src2);
                 auto &     dest   = varInfo.at(var_dest);
 
-                if (!src1.constVal.has_value() || !src2.constVal.has_value()) {
-                    continue;
-                }
-                int cval1     = src1.constVal.value();
-                int cval2     = src2.constVal.value();
-                int result    = calcExpr(q.op, cval1, cval2);
-                dest.constVal = {result};
-                // q = QuadTuple{.op = Op::kNop}; // delete
-                q = QuadTuple{Op::kAssign,
-                              {.var = var_dest, .cval = result}};
+                if (src1.constVal.has_value() && src2.constVal.has_value()) {
+                    int cval1     = src1.constVal.value();
+                    int cval2     = src2.constVal.value();
+                    int result    = calcExpr(q.op, cval1, cval2);
+                    dest.constVal = {result};
+                    // overwrite
+                    q = QuadTuple{Op::kAssign,
+                                  {.var = var_dest, .cval = result}}; 
 
-                cvalCode[var_dest]     = &q;
-                *cvalCode.at(var_src1) = QuadTuple{.op = Op::kNop};
-                *cvalCode.at(var_src2) = QuadTuple{.op = Op::kNop};
+                    cvalCode[var_dest]     = &q;
+                    *cvalCode.at(var_src1) = QuadTuple{.op = Op::kNop};
+                    *cvalCode.at(var_src2) = QuadTuple{.op = Op::kNop};
+                }
             }
         }
 
@@ -212,8 +214,8 @@ string var_name2(Var var) {
         return string{"@"} + info.name + string{": "} +
                to_string(info.fpOffset.value()) + "($fp)";
     }
-    if (info.memOffset.has_value()) {
-        return string{"@"} + to_string(info.name);
+    if (info.memName.has_value()) {
+        return string{"@"} + to_string(info.memName.value());
     }
     return string{"%"} + to_string(var);
 }

@@ -231,8 +231,9 @@ struct VarInfo {
     // std::optional<string>  reg;
     std::optional<int>     constVal; 
     std::optional<int>     fpOffset;
-    std::optional<int>     memOffset;
-    VarInfo *reload = nullptr;
+    std::optional<string>  memName;
+    // std::optional<int>     memOffset;
+    // VarInfo *reload = nullptr;
 
     // vector<Reg> hasValue;
 };
@@ -240,6 +241,7 @@ struct VarInfo {
 struct FuncInfo {
     string name;
     int spOffset = 0; // local space
+    int numParams;
 };
 
 struct MemInfo {
