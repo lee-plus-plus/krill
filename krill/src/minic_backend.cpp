@@ -24,7 +24,6 @@ string to_string(const Code &code);
 extern void      initVarInfo();
 extern string    to_string(const QuadTuple &q);
 extern QuadTuple gen_allocate_code(const VarDecl &decl, const Op &op);
-extern int       get_type_size(TypeSpec basetype, vector<int> shape);
 extern FuncDecl &get_function_by_name(const string &funcname);
 
 extern map<Var, VarDecl *>  varDecls;

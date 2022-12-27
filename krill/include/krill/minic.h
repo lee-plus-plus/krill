@@ -9,6 +9,7 @@
 #include <stack>
 #include <string>
 #include <optional>
+#include <list>
 using krill::runtime::SyntaxParser, krill::runtime::LexicalParser;
 using krill::type::Grammar;
 
@@ -75,3 +76,21 @@ constexpr int arg_list = 303;
 } // namespace krill::minic::syntax
 
 #endif
+
+// struct TypeDecl;
+// struct VarDecl;
+// struct LblDecl;
+// struct FuncDecl;
+// struct VarInfo;
+// struct FuncInfo;
+
+// struct Var {
+//     int id;
+//     VarInfo *info;
+//     VarDecl *decl;
+// };
+
+// vector<unique_ptr<LblDecl>> varDecls;
+// vector<unique_ptr<LblDecl>> lblDecls;
+// vector<unique_ptr<
+
