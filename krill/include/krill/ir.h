@@ -169,7 +169,8 @@ struct FuncInfo {
     int numParams;
 };
 
-
+// all you need to do is using this lovely interface
+string genMipsCodes(istream iss);
 
 } // namespace krill::ir
 

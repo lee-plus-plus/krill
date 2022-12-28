@@ -15,7 +15,7 @@ using namespace krill::ir;
 
 using krill::log::logger;
 
-
+extern string genMipsCodes(istream iss);
 extern vector<FuncDecl> globalFuncDecls;
 extern vector<VarDecl>  globalVarDecls;
 

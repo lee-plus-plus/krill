@@ -967,3 +967,45 @@ extern string getMipsCodeStr() {
         mipsCode, "\n")));
     return mipsCodeStr;
 }
+
+extern APTnode tokenToNode(Token token, istream &input, bool &drop);
+// minic_parser.cpp
+extern void    initSyntaxParser();
+// minic_sdt.cpp
+extern void    syntax_directed_translation(shared_ptr<APTnode> &node);
+extern string  get_ir_str();
+
+// input mini-c code, output mips code
+string genMipsCodes(istream &iss) {
+    auto &lexicalParser = minicLexicalParser;
+    auto &syntaxParser  = minicSyntaxParser;
+    // auto &grammar       = minicGrammar;
+    cerr << "input characters (end with ^d): \n"
+            "e.g., int main() {\\n} \n";
+
+    vector<APTnode> nodes;
+    while (true) {
+        Token   token;
+        APTnode node;
+        bool    drop;
+
+        token = lexicalParser.parseStep(iss);
+        node  = tokenToNode(token, iss, drop);
+        if (drop) { continue; }
+
+        nodes.push_back(node);
+        syntaxParser.parseStep(node);
+
+        if (token == END_TOKEN) { break; }
+    }
+
+    // syntax-directed translation
+    auto root = syntaxParser.getAPT();
+    syntax_directed_translation(root);
+
+    krill::log::sink_cerr->set_level(spdlog::level::debug);
+
+    // get mips code
+    string mipsCode = getMipsCodeStr();
+    return mipsCode;
+}

@@ -23,6 +23,8 @@ extern string  get_ir_str();
 // minic_backend.cpp
 extern string  getMipsCodeStr();
 
+extern string genMipsCodes(istream &iss);
+
 void testLexicalParsing() {
     auto &lexicalParser = minicLexicalParser;
     cerr << "input characters (end with ^d): \n"
@@ -183,37 +185,38 @@ void testIRgeneration() {
 }
 
 void testMipsGeneration() {
-    auto &lexicalParser = minicLexicalParser;
-    auto &syntaxParser  = minicSyntaxParser;
-    // auto &grammar       = minicGrammar;
-    cerr << "input characters (end with ^d): \n"
-            "e.g., int main() {\\n} \n";
+    cout << genMipsCodes(cin);
+    // auto &lexicalParser = minicLexicalParser;
+    // auto &syntaxParser  = minicSyntaxParser;
+    // // auto &grammar       = minicGrammar;
+    // cerr << "input characters (end with ^d): \n"
+    //         "e.g., int main() {\\n} \n";
 
-    vector<APTnode> nodes;
-    while (true) {
-        Token   token;
-        APTnode node;
-        bool    drop;
+    // vector<APTnode> nodes;
+    // while (true) {
+    //     Token   token;
+    //     APTnode node;
+    //     bool    drop;
 
-        token = lexicalParser.parseStep(cin);
-        node  = tokenToNode(token, cin, drop);
-        if (drop) { continue; }
+    //     token = lexicalParser.parseStep(cin);
+    //     node  = tokenToNode(token, cin, drop);
+    //     if (drop) { continue; }
 
-        nodes.push_back(node);
-        syntaxParser.parseStep(node);
+    //     nodes.push_back(node);
+    //     syntaxParser.parseStep(node);
 
-        if (token == END_TOKEN) { break; }
-    }
+    //     if (token == END_TOKEN) { break; }
+    // }
 
-    // syntax-directed translation
-    auto root = syntaxParser.getAPT();
-    syntax_directed_translation(root);
+    // // syntax-directed translation
+    // auto root = syntaxParser.getAPT();
+    // syntax_directed_translation(root);
 
-    krill::log::sink_cerr->set_level(spdlog::level::debug);
+    // krill::log::sink_cerr->set_level(spdlog::level::debug);
 
-    // get mips code
-    string mipsCode = getMipsCodeStr();
-    cout << mipsCode;
+    // // get mips code
+    // string mipsCode = getMipsCodeStr();
+    // cout << mipsCode;
 }
 
 const char usage[] = "usage: test_minic {-l|-L|-s|-s|-Ls|-I|-S}\n"
