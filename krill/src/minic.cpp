@@ -13,7 +13,6 @@
 using namespace std;
 using namespace krill::type;
 
-
 namespace krill::minic::syntax {
 
 // compress storage

@@ -1,5 +1,6 @@
 #include "fmt/format.h"
 #include "krill/minic.h"
+#include "krill/ir.h"
 #include "krill/utils.h"
 #include <cstdlib>
 #include <iostream>
@@ -10,7 +11,7 @@ using namespace std;
 using namespace krill::type;
 using namespace krill::utils;
 using namespace krill::minic;
-using namespace krill::minic::ir;
+using namespace krill::ir;
 
 using krill::log::logger;
 
@@ -195,133 +196,3 @@ void initVarInfo() {
         });
     }
 }
-
-
-// vector<DagNode *>   nodes;
-// map<Var, DagNode *> varToNodes;
-// map<int, DagNode *> cvalTolNodes;
-// DagNode *getOrNewNode(const Node &node, ) {
-//     for (DagNode *it : nodes) {
-//         if (*it == tgt) { return it; }
-//     }
-//     node = new DagNode{Node};
-//     nodes.push_back(node);
-//     return node;
-// }
-
-
-// struct DagNode {
-//     Op            op   = Op::kNop;
-//     DagNode *     src1 = nullptr;
-//     DagNode *     src2 = nullptr;
-//     optional<int> constVal;
-
-//     bool used = false;
-
-//     inline bool operator==(const DagNode &dn) const {
-//         if (constVal.has_value() && dn.constVal.has_value()) {
-//             return constVal.value() == dn.constVal.value();
-//         }
-//         return std::tie(op, src1, src2) == std::tie(dn.op, dn.src1, dn.src2);
-//     }
-// }; // comparable
-
-// optimization1: const value propagation
-/*
-void optimization1(Code &code, const map<Var, *VarDecl> &varDecls) {
-    // build DAG
-    int fpOffset  = 0;
-    int memOffset = 0;
-
-    map<Var, Var> replaced;
-    set<Var> removed;
-
-
-    // build DAG, do const value propagation
-    for (auto &q : code) {
-        if (op == kNop || kBackPatch) {
-            // pass
-        }
-        if (op == Op::kAssign) { // set
-            // (var, cval)
-            DagNode *node =
-                getOrCreateNode({.constVal = q.args.cval, .var = q.args.var});
-            varToNodes[q.args.var] = node;
-            // delete code
-            q = QuadTuple{.op = Op::kNop};
-            // set var info
-            varInfo[var] = {.constVal = {q.args.cval}};
-        } else if (isOpExpr(op)) { // set, use
-            // (dest, src1, src2)
-            DagNode *src1 = varToNodes.at(q.args.src1);
-            DagNode *src2 = varToNodes.at(q.args.src2);
-            DagNode *node;
-            if (src1.constVal.has_value() && src1.constVal.has_value()) {
-                // const value propagation
-                int cval1 = src1.constVal.value();
-                int cval2 = src2.constVal.value();
-                int result = calcExpr(op, cval1, cval2);
-                node = getOrCreateNode({.constVal = result, .var = q.args.var});
-                // delete code
-                q = QuadTuple{.op = Op::kNop};
-                // set var info
-                varInfo[var] = {.constVal = {result}};
-            } else {
-                node = getOrCreateNode(
-                    {.op = op, .src1 = src1, .src2 = src2, .var = q.args.dest});
-                // replace used var
-                q.args.src1 = src1->var;
-                q.args.src2 = src1->var;
-                // set var info
-                varInfo[var] = {};
-            }
-            varToNodes[q.args.dest] = node;
-        } else if (op == Op::kAllocate || op == Op::kGlobal) { // set
-            // (var_a, width, len)
-            int &    offset = (op == Op::kAllocate) ? fpOffset : memOffset;
-            DagNode *node   = getOrCreateNode({.constVal = offset});
-            offset -= varDecls.at(q.args.var_a)->type.size;
-            varToNodes[q.args.var] = node;
-            // set var info
-            varInfo[var] = (op == Op::kAllocate) ? {.fpOffset = {offset}}
-                                                 : {.memOffset = {offset}};
-            }
-        } else if (op == Op::kLoad) { // set, use
-            // (var_m, addr_m)
-            DagNode *node_addr_m = varToNodes.at(q.args.addr_m);
-            DagNode *node = getOrCreateNode({.op = op, .src1 = node_addr_m});
-            // replace used var
-            q.args.addr_m = node_addr_m->var;
-            varToNodes[q.args.var_m] = node;
-        } else if (op == Op::kStore) { // use
-            // (var_m, addr_m)
-            DagNode *node_addr_m = varToNodes.at(q.args.addr_m);
-            DagNode *node_var_m  = varToNodes.at(q.args.var_m);
-            // replace used var
-            q.args.addr_m = node_addr_m->var;
-            q.args.addr_m = node_addr_m->var;
-            node_addr_m->used    = true;
-            node_var_m->used     = true;
-        } else if (op == Op::kParamPut || op == Op::kRetPut) {
-            // (var_r, argc)
-            DagNode *node = varToNodes.at(q.args.var_r) node_addr_m->used =
-                true;
-        } else if (op == Op::kParamGet || op == Op::kRetGet) {
-            // (var_r, argc)
-            DagNode *node          = new Node{};
-            varToNodes[q.args.var] = node;
-        } else if (op == Op::kRet || op == Op::kCall) {
-            // pass
-        } else if (op == Op::kLabel || op == Op::kGoto || op == Op::kBranch) {
-            // pass
-        } else if (op == Op::kFuncBegin || op == Op::kFuncEnd) {
-            // pass
-        } else {
-            assert(false);
-        }
-    }
-
-    // eliminate unused variables
-
-}
-*/

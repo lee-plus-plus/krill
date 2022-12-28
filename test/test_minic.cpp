@@ -21,9 +21,6 @@ extern void    initSyntaxParser();
 extern void    syntax_directed_translation(shared_ptr<APTnode> &node);
 extern string  get_ir_str();
 // minic_backend.cpp
-extern void    varsNamingTest();
-extern void    initVarInfo();
-extern string  get_ir_str2();
 extern string  getMipsCodeStr();
 
 void testLexicalParsing() {
@@ -181,12 +178,11 @@ void testIRgeneration() {
     syntax_directed_translation(root);
 
     // show result
-    // cout << getAPTstr(root, minicGrammar) << "\n";
     cout << get_ir_str() << "\n";
 
 }
 
-void testIRgenerationWithRegNaming() {
+void testMipsGeneration() {
     auto &lexicalParser = minicLexicalParser;
     auto &syntaxParser  = minicSyntaxParser;
     // auto &grammar       = minicGrammar;
@@ -208,33 +204,25 @@ void testIRgenerationWithRegNaming() {
 
         if (token == END_TOKEN) { break; }
     }
-    
 
     // syntax-directed translation
     auto root = syntaxParser.getAPT();
     syntax_directed_translation(root);
-    // cout << get_ir_str() << "\n";
-    get_ir_str(); // have side effect
 
     krill::log::sink_cerr->set_level(spdlog::level::debug);
-    initVarInfo();
-    // cout << "\n\n\n";
-    // cout << get_ir_str2() << "\n";
 
-    // show naming result
-    varsNamingTest();
+    // get mips code
     string mipsCode = getMipsCodeStr();
-
     cout << mipsCode;
 }
 
-const char usage[] = "usage: test_minic {-l|-L|-s}\n"
+const char usage[] = "usage: test_minic {-l|-L|-s|-s|-Ls|-I|-S}\n"
                      "        -l    lexical parsing test\n"
                      "        -L    lexical parsing test (full)\n"
                      "        -s    syntax parsing test\n"
                      "        -Ls   lexical & syntax parsing test\n"
                      "        -I    intermediate code generation\n"
-                     "        -Ir   ir and register assignment\n";
+                     "        -S    mips code generation\n";
 
 int main(int argc, char **argv) {
     if (argc != 2) {
@@ -258,8 +246,8 @@ int main(int argc, char **argv) {
     } else if (strcmp(argv[1], "-I") == 0) {
         testIRgeneration();
         cerr << "done!\n";
-    } else if (strcmp(argv[1], "-Ir") == 0) {
-        testIRgenerationWithRegNaming();
+    } else if (strcmp(argv[1], "-S") == 0) {
+        testMipsGeneration();
         cerr << "done!\n";
     } else {
         cerr << usage;

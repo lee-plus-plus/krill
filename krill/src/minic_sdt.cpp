@@ -1,6 +1,7 @@
 #include "fmt/format.h"
 #include "krill/grammar.h"
 #include "krill/minic.h"
+#include "krill/ir.h"
 #include "krill/utils.h"
 #include <cstdlib>
 #include <iostream>
@@ -12,7 +13,7 @@ using namespace krill::type;
 using namespace krill::utils;
 using namespace krill::runtime;
 using namespace krill::minic;
-using namespace krill::minic::ir;
+using namespace krill::ir;
 using krill::grammar::ProdItem;
 
 using krill::log::logger;

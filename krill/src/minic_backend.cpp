@@ -1,9 +1,9 @@
 #include "fmt/format.h"
 #include "krill/grammar.h"
 #include "krill/minic.h"
+#include "krill/ir.h"
 #include "krill/utils.h"
 #include <cstdlib>
-#include <fmt/color.h>
 #include <iostream>
 #include <map>
 #include <queue>
@@ -12,9 +12,8 @@
 using namespace std;
 using namespace krill::type;
 using namespace krill::utils;
-using namespace krill::runtime;
 using namespace krill::minic;
-using namespace krill::minic::ir;
+using namespace krill::ir;
 
 using krill::log::logger;
 
@@ -22,6 +21,7 @@ string lbl_name(const Lbl &lbl);
 string var_name(const Var &var);
 string to_string(const Code &code);
 
+extern void      initVarInfo();
 extern string    to_string(const QuadTuple &q);
 extern QuadTuple gen_allocate_code(const VarDecl &decl, const Op &op);
 extern int       get_type_size(TypeSpec basetype, vector<int> shape);
@@ -936,15 +936,18 @@ void genCodes(const QuadTuple &q) {
 }
 
 extern void varsNamingTest() {
-    // initVarInfo();
+    
+    
+}
+
+extern string getMipsCodeStr() {
+    initVarInfo();
     for (const auto &funcDecl : globalFuncDecls) {
         logger.info("in function {}:", lbl_name(funcDecl.funcLbl.lbl));
         const auto &code = funcDecl.code;
         assignVarsWithRegister(code);
     }
-}
 
-extern string getMipsCodeStr() {
     vector<QuadTuple> irDataCodes;
     vector<QuadTuple> irTextCodes;
     for (const auto &decl : globalVarDecls) {
