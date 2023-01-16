@@ -3,6 +3,7 @@
 #include "defs.h"
 #include "lexical.h"
 #include "syntax.h"
+#include "ir.h"
 #include <deque>
 #include <memory>
 #include <ostream>
@@ -12,13 +13,23 @@
 #include <list>
 using krill::runtime::SyntaxParser, krill::runtime::LexicalParser;
 using krill::type::Grammar;
+using krill::ir::Func, krill::ir::Var;
 
 namespace krill::minic {
 
+// syntax 
 extern Grammar       minicGrammar;
 extern SyntaxParser  minicSyntaxParser;
 extern LexicalParser minicLexicalParser;
 extern int           getMinicSyntaxId(Token token);
+
+// parsed result 
+inline vector<Func *> globalFuncs;
+inline vector<Var *>  globalVars;
+
+// in minic_sdt.cpp
+void syntax_directed_translation(shared_ptr<APTnode> &node);
+string get_ir();
 
 } // namespace krill::minic
 

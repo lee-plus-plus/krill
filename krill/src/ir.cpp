@@ -1,4 +1,5 @@
 #include "krill/ir.h"
+#include "krill/utils.h"
 #include "fmt/format.h"
 #include "krill/defs.h"
 #include <cassert>
@@ -6,15 +7,21 @@
 #include <map>
 #include <set>
 #include <vector>
+#include <string>
 using namespace std;
 using namespace krill::type;
+using namespace krill::utils;
 
 
 namespace krill::ir {
 
+int Var::TypeDecl::baseSize() const {
+    return ((basetype == TypeSpec::kInt32) ? 4 : 0);
+}
+
 int Var::TypeDecl::size() const {
     return apply_reduce(
-        shape, ((basetype == TypeSpec::kInt32) ? 4 : 0),
+        shape, baseSize(),
         [](int size, int dimSize) -> int { return size * dimSize; });
 };
 
@@ -27,20 +34,26 @@ string Var::TypeDecl::str() const {
     return ss.str();
 }
 
-bool Var::TypeDecl::operator==(const TypeDecl &ts) const {
-    return std::tie(basetype, shape) == std::tie(ts.basetype, ts.shape);
+bool Var::TypeDecl::operator==(const TypeDecl &td) const {
+    return std::tie(basetype, shape) == std::tie(td.basetype, td.shape);
 }
 
-bool Var::TypeDecl::operator!=(const TypeDecl &ts) const {
-    return std::tie(basetype, shape) != std::tie(ts.basetype, ts.shape);
+bool Var::TypeDecl::operator!=(const TypeDecl &td) const {
+    return std::tie(basetype, shape) != std::tie(td.basetype, td.shape);
 }
 
-bool Var::TypeDecl::operator<(const TypeDecl &ts) const {
-    return std::tie(basetype, shape) < std::tie(ts.basetype, ts.shape);
+bool Var::TypeDecl::operator<(const TypeDecl &td) const {
+    return std::tie(basetype, shape) < std::tie(td.basetype, td.shape);
+}
+
+string Var::fullname() const {
+    return type.str() + " " + name;
 }
 
 string Func::TypeDecl::str() const {
     assert(returnsType.size() <= 1);
+
+    stringstream ss;
     ss << (returnsType.size() ? returnsType[0].str() : enum_name(TypeSpec::kVoid));
     ss << " " << funcName << "(";
     for (const auto &paramType : paramsType) {
@@ -50,16 +63,38 @@ string Func::TypeDecl::str() const {
     return ss.str();
 }
 
-bool Func::TypeDecl::operator==(const TypeDecl &ts) const {
-    return std::tie(basetype, shape) == std::tie(ts.basetype, ts.shape);
+bool Func::TypeDecl::operator==(const Func::TypeDecl &td) const {
+    return std::tie(funcName, returnsType, paramsType) ==
+           std::tie(td.funcName, td.returnsType, td.paramsType);
 }
 
-bool Func::TypeDecl::operator!=(const TypeDecl &ts) const {
-    return std::tie(basetype, shape) != std::tie(ts.basetype, ts.shape);
+bool Func::TypeDecl::operator!=(const Func::TypeDecl &td) const {
+    return std::tie(funcName, returnsType, paramsType) !=
+           std::tie(td.funcName, td.returnsType, td.paramsType);
 }
 
-bool Func::TypeDecl::operator<(const TypeDecl &ts) const {
-    return std::tie(basetype, shape) < std::tie(ts.basetype, ts.shape);
+bool Func::TypeDecl::operator<(const Func::TypeDecl &td) const {
+    return std::tie(funcName, returnsType, paramsType) <
+           std::tie(td.funcName, td.returnsType, td.paramsType);
+}
+
+string Func::fullname() const {
+    auto getTypeStr = [](Var *var) -> string { return var->type.str(); };
+    auto getFullname = [](Var *var) -> string { return var->fullname(); };
+
+    stringstream ss;
+    ss << fmt::format(
+        "{} {}({})",
+        fmt::join((returns.size() != 0)
+                      ? apply_map(returns, getTypeStr)
+                      : vector<string>{string{enum_name(TypeSpec::kVoid)}},
+                  ", "),
+        name,
+        fmt::join((params.size() != 0)
+                      ? apply_map(params, getFullname)
+                      : vector<string>{string{enum_name(TypeSpec::kVoid)}},
+                  ", "));
+    return ss.str();
 }
 
 Func::TypeDecl Func::type() const {
@@ -70,30 +105,149 @@ Func::TypeDecl Func::type() const {
         .funcName    = this->name,
         .returnsType = apply_map(this->returns, extractType),
         .paramsType  = apply_map(this->params, extractType)
-    }
+    };
 }
 
 // ---
 
-Var *assign_new_variable(Var &&base) {
-    auto ownership = make_unique<Var>(move(base));
-    auto var       = ownership.get();
-    variables_pool.emplace_back(move(ownership));
-    return var;
+// readable intermediate representation generator
+inline map<Var *, string> var_name_;
+inline int tempVarIdx = 1;
+
+string var_name(Var *var) {
+    if (var_name_.count(var)) {
+        return var_name_.at(var);
+    } else {
+        if (var->name != "") {
+            string varname = string{"%"} + var->name;
+            var_name_[var] = varname;
+            return varname;
+        } else {
+            string varname = string{"%"} + std::to_string(tempVarIdx++);
+            var_name_[var] = varname;
+            return varname;
+        }
+    }
 }
 
-Lbl *assign_new_label(Lbl &&base) {
-    auto ownership = make_unique<Lbl>(move(base));
-    auto lbl       = ownership.get();
-    labels_pool.emplace_back(move(ownership));
-    return lbl;
+string lbl_name(Lbl *lbl) {
+    return string{"@"} + lbl->name;
 }
 
-Func *assign_new_function(Func &&base) {
-    auto ownership = make_unique<Func>(move(base));
-    auto func      = ownership.get();
-    functions_pool.emplace_back(move(ownership));
-    return func;
+string lbl_fullname(Lbl *lbl) {
+    return lbl->name;
+}
+
+string func_name(Func *func) {
+    return string{"@"} + func->name;
+}
+
+string func_fullname(Func *func) {
+    return func->fullname();
+}
+
+string to_string(const QuadTuple &q) {
+    stringstream ss;
+    switch (q.op) {
+        case Op::kNop:
+            ss << fmt::format("{:s}", enum_name(q.op));
+            break;
+        case Op::kAssign:
+            ss << fmt::format("{} = {:s} {:d}", var_name(q.args_i.var),
+                              enum_name(q.op), int(q.args_i.cval));
+            break;
+        case Op::kAdd:
+        case Op::kMinus:
+        case Op::kMult:
+        case Op::kDiv:
+        case Op::kMod:
+        case Op::kAnd:
+        case Op::kOr:
+        case Op::kXor:
+        case Op::kNor:
+        case Op::kLShift:
+        case Op::kRShift:
+        case Op::kEq:
+        case Op::kNeq:
+        case Op::kLeq:
+        case Op::kLt:
+            ss << fmt::format("{} = {:s} {} {}", var_name(q.args_e.dest),
+                              enum_name(q.op), var_name(q.args_e.src1),
+                              var_name(q.args_e.src2));
+            break;
+        case Op::kAlloca:
+        case Op::kGlobal:
+            ss << fmt::format("{} = {:s} ({} byte)", var_name(q.args_d.var),
+                              enum_name(q.op), q.args_d.size);
+            break;
+        case Op::kLoad:
+            ss << fmt::format("{} = {:s} ({})", var_name(q.args_m.var),
+                              enum_name(q.op), var_name(q.args_m.mem));
+            break;
+        case Op::kStore:
+            ss << fmt::format("({}) = {:s} {}", var_name(q.args_m.mem),
+                              enum_name(q.op), var_name(q.args_m.var));
+            break;
+        case Op::kRet:
+            ss << fmt::format("{:s}", enum_name(q.op));
+            break;
+        case Op::kLabel:
+            ss << fmt::format("{}:", lbl_fullname(q.args_j.addr1));
+            break;
+        case Op::kGoto:
+            ss << fmt::format("{:s} {}", enum_name(q.op),
+                              lbl_name(q.args_j.addr1));
+            break;
+        case Op::kBranch:
+            ss << fmt::format("{:s} ({}) {} {}", enum_name(q.op),
+                              var_name(q.args_j.var), lbl_name(q.args_j.addr1),
+                              lbl_name(q.args_j.addr2));
+            break;
+        case Op::kCall:
+            ss << fmt::format("{:s} {}", enum_name(q.op), func_name(q.args_f.func));
+            break;
+        case Op::kParamPut:
+            ss << fmt::format("{}<{:d}> {} ", enum_name(q.op), int(q.args_f.idx),
+                              var_name(q.args_f.var));
+            break;
+        case Op::kRetPut:
+            ss << fmt::format("{}<{:d}> {} ", enum_name(q.op), int(q.args_f.idx),
+                              var_name(q.args_f.var));
+            break;
+        case Op::kRetGet:
+            ss << fmt::format("{} = {:s}<{:d}>", var_name(q.args_f.var),
+                              enum_name(q.op), int(q.args_f.idx));
+            break;
+        case Op::kFuncBegin:
+            ss << fmt::format("{} {{", func_fullname(q.args_f.func));
+            break;
+        case Op::kFuncEnd:
+            ss << fmt::format("}}") << "\n";
+            break;
+        default:
+            assert(false);
+    }
+    return ss.str();
+}
+
+string to_string(const Code &code) {
+    // initialize
+    var_name_.clear();
+    var_name_[var_zero] = "%zero";
+    tempVarIdx = 1;
+
+    stringstream ss;
+    for (const auto &q : code) {
+        if (q.op == Op::kFuncBegin) {
+            ss << '\n';
+        }
+        if (q.op != Op::kLabel && q.op != Op::kFuncBegin &&
+            q.op != Op::kFuncEnd && q.op != Op::kGlobal) {
+            ss << "\t";
+        }
+        ss << to_string(q) << "\n";
+    }
+    return ss.str();
 }
 
 

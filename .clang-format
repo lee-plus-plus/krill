@@ -7,7 +7,7 @@
     "MaxEmptyLinesToKeep": 4,
     "BreakBeforeBraces": "Attach",
     "AllowShortIfStatementsOnASingleLine": true,
-    "IndentCaseLabels": true,
+    "IndentCaseLabels": false,
     "ObjCBlockIndentWidth": 4,
     "ObjCSpaceAfterProperty": true,
     "ColumnLimit": 0,

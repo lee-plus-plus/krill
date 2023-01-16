@@ -1,3 +1,4 @@
+#include "krill/utils.h"
 #include "krill/minic.h"
 #include "fmt/format.h"
 #include "krill/automata.h"
@@ -12,6 +13,8 @@
 #include <vector>
 using namespace std;
 using namespace krill::type;
+using namespace krill::utils;
+using krill::ir::Op, krill::ir::QuadTuple, krill::ir::Code;
 
 namespace krill::minic::syntax {
 
@@ -1314,5 +1317,24 @@ Grammar minicGrammar = krill::minic::syntax::grammar;
 SyntaxParser minicSyntaxParser(minicGrammar, krill::minic::syntax::actionTable);
 
 LexicalParser minicLexicalParser(krill::minic::lexical::dfa);
+
+string get_ir() {
+    auto code = Code{};
+    for (const auto &var : globalVars) {
+        code.emplace_back(
+            QuadTuple{.op     = Op::kGlobal,
+                      .args_d = {.var = var, .size = var->type.size()}});
+    }
+    for (const auto &func : globalFuncs) {
+        if (func->code.has_value()) {
+            Appender{code}
+                .append({{.op = Op::kFuncBegin, .args_f = {.func = func}}})
+                .append(func->code.value())
+                .append({{.op = Op::kFuncEnd, .args_f = {}}});
+        }
+    }
+    return to_string(code);
+}
+
 
 } // namespace krill::minic

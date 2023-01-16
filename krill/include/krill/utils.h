@@ -146,7 +146,7 @@ inline std::string slice(const std::string &s, int st, int ed) {
     if (st < 0) { st = size + st; }
     if (ed < 0) { ed = size + size; }
     if (st >= size || ed < 0 || st >= ed) {
-        return string("");
+        return std::string("");
     } else {
         if (st < 0) { st = 0; }
         if (ed > size) { ed = size; }
