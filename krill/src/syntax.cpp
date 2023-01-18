@@ -159,7 +159,10 @@ void SyntaxParser::parseAll(vector<APTnode> tokensWithAttr) {
 }
 
 shared_ptr<APTnode> SyntaxParser::getAPT() {
-    if (!isAccepted_) { return nullptr; }
+    if (!isAccepted_) { 
+        assert(false);
+        return {nullptr}; 
+    }
     assert(nodes_.size() == 1);
 
     shared_ptr<APTnode> root = nodes_.top();

@@ -1,4 +1,3 @@
-#include "krill/utils.h"
 #include "krill/minic.h"
 #include "fmt/format.h"
 #include "krill/automata.h"
@@ -6,6 +5,7 @@
 #include "krill/grammar.h"
 #include "krill/lexical.h"
 #include "krill/syntax.h"
+#include "krill/utils.h"
 #include <cassert>
 #include <iostream>
 #include <map>
@@ -14,7 +14,8 @@
 using namespace std;
 using namespace krill::type;
 using namespace krill::utils;
-using krill::ir::Op, krill::ir::QuadTuple, krill::ir::Code;
+
+using krill::runtime::AptNodeFunc;
 
 namespace krill::minic::syntax {
 
@@ -1312,29 +1313,301 @@ const DFA dfa({.graph = graph, .finality = finality});
 
 namespace krill::minic {
 
-Grammar minicGrammar = krill::minic::syntax::grammar;
+// ---------- MinicParser ----------
 
-SyntaxParser minicSyntaxParser(minicGrammar, krill::minic::syntax::actionTable);
-
-LexicalParser minicLexicalParser(krill::minic::lexical::dfa);
-
-string get_ir() {
-    auto code = Code{};
-    for (const auto &var : globalVars) {
-        code.emplace_back(
-            QuadTuple{.op     = Op::kGlobal,
-                      .args_d = {.var = var, .size = var->type.size()}});
+void MinicParser::count(char c) {
+    if (c == '\n') {
+        row_ += 1;
+        col_ = 1;
+    } else if (c == '\t') {
+        // col_ = ((col_ + 3) / 4) * 4 + 1; // bad
+        col_ += 1;
+        while (col_ % 8 != 1) { col_ += 1; } // good
+    } else {
+        col_ += 1;
     }
-    for (const auto &func : globalFuncs) {
-        if (func->code.has_value()) {
-            Appender{code}
-                .append({{.op = Op::kFuncBegin, .args_f = {.func = func}}})
-                .append(func->code.value())
-                .append({{.op = Op::kFuncEnd, .args_f = {}}});
-        }
+    // update source, by the way
+    source_ << c;
+    if (sourceLines_.size() == 0) { sourceLines_.push_back({}); }
+    if (c == '\n') {
+        sourceLines_.push_back({});
+    } else {
+        sourceLines_.back() << c;
     }
-    return to_string(code);
 }
 
+APTnode MinicParser::tokenToNode(Token token, istream &input, bool &drop) {
+    APTnode node;
+    node.attr.Set<string>("lval", token.lval);
+    node.attr.Set<int>("col_st", col_);
+    node.attr.Set<int>("row_st", row_);
+
+    if (token.id == 43) { // 43: /\*
+        bool match1 = false, match2 = false;
+        while (input.good() && !input.eof() && !input.fail()) {
+            char c = input.get();
+            count(c);
+            match2 = match1 && (c == '/');
+            match1 = (c == '*');
+            if (match2) { break; }
+        }
+        if (!match2) {
+            throw runtime_error("error: unclosed block comment /*\n");
+        }
+        drop = true;
+    } else if (token.id == 42) { // 42: //[^\n\r]*
+        for (char c : token.lval) { count(c); }
+        drop = true;
+    } else if (token.id == 39 || token.id == 40) {
+        // 39: [ \t]+
+        // 40: \n|\r\n
+        for (char c : token.lval) { count(c); }
+        drop = true;
+    } else { // normal token
+        for (char c : token.lval) { count(c); }
+        switch (token.id) {
+        case -1: // END_
+            node.id = -1;
+            break;
+        case 0: // void
+            node.id = syntax::VOID;
+            break;
+        case 1: // continue
+            node.id = syntax::CONTINUE;
+            break;
+        case 2: // if
+            node.id = syntax::IF;
+            break;
+        case 3: // while
+            node.id = syntax::WHILE;
+            break;
+        case 4: // else
+            node.id = syntax::ELSE;
+            break;
+        case 5: // break
+            node.id = syntax::BREAK;
+            break;
+        case 6: // int
+            node.id = syntax::INT;
+            break;
+        case 7: // return
+            node.id = syntax::RETURN;
+            break;
+        case 8: // \|\|
+            node.id = syntax::OR;
+            break;
+        case 9: // &&
+            node.id = syntax::AND;
+            break;
+        case 10: // [a-zA-Z]([a-zA-Z]|([0-9])|([1-9][0-9]*))*
+            node.id = syntax::IDENT;
+            break;
+        case 11: // 0(x|X)([a-zA-Z]|[0-9])*
+            node.id = syntax::HEXNUM;
+            break;
+        case 12: // ([0-9])|([1-9][0-9]*)[1-9]*
+            node.id = syntax::DECNUM;
+            break;
+        case 13: // \<=
+            node.id = syntax::LE;
+            break;
+        case 14: // \>=
+            node.id = syntax::GE;
+            break;
+        case 15: // \=\=
+            node.id = syntax::EQ;
+            break;
+        case 16: // \!\=
+            node.id = syntax::NE;
+            break;
+        case 17: // \>
+            node.id = '>';
+            break;
+        case 18: // \<
+            node.id = '<';
+            break;
+        case 19: // \,
+            node.id = ',';
+            break;
+        case 20: // \;
+            node.id = ';';
+            break;
+        case 21: // \{
+            node.id = '{';
+            break;
+        case 22: // \}
+            node.id = '}';
+            break;
+        case 23: // \%
+            node.id = '%';
+            break;
+        case 24: // \*
+            node.id = '*';
+            break;
+        case 25: // \+
+            node.id = '+';
+            break;
+        case 26: // \-
+            node.id = '-';
+            break;
+        case 27: // /
+            node.id = '/';
+            break;
+        case 28: // \=
+            node.id = '=';
+            break;
+        case 29: // \(
+            node.id = '(';
+            break;
+        case 30: // \)
+            node.id = ')';
+            break;
+        case 31: // ~
+            node.id = '~';
+            break;
+        case 32: // &
+            node.id = '&';
+            break;
+        case 33: // \^
+            node.id = '^';
+            break;
+        case 34: // \[
+            node.id = '[';
+            break;
+        case 35: // \]
+            node.id = ']';
+            break;
+        case 36: // \<\<
+            node.id = syntax::LSHIFT;
+            break;
+        case 37: // \>\>
+            node.id = syntax::RSHIFT;
+            break;
+        case 38: // \|
+            node.id = '|';
+            break;
+        // case 39: // [\t ]
+        //     return 0;
+        //     break;
+        // case 40: // \n|\r\n
+        //     return 0;
+        //     break;
+        case 41: // $
+            node.id = '$';
+            break;
+        // case 42: // //[^\n\r]*
+        //     return 0;
+        //     break;
+        // case 43: // /\*
+        //     return 0;
+        //     break;
+        case 44: // \!
+            node.id = '!';
+            break;
+        default:
+            cerr << token.id << endl;
+            assert(false);
+        }
+        drop = false;
+    }
+
+    node.attr.Set<int>("col_ed", col_);
+    node.attr.Set<int>("row_ed", row_);
+    return node;
+}
+
+string MinicParser::getLocatedSource(int colSt, int rowSt, int colEd,
+                                     int rowEd) {
+    assert(std::tie(rowSt, colSt) <= std::tie(rowEd, colEd));
+    stringstream ss;
+    for (int row = rowSt; row <= rowEd; row++) {
+        string rowStr    = sourceLines_[row - 1].str();
+        int    currColSt = (row > rowSt) ? 0 : (colSt - 1);
+        int    currColEd = (row < rowSt) ? rowStr.size() : (colEd - 1);
+        ss << fmt::format("{}\n{}{}\n", rowStr, string(currColSt, ' '),
+                          string(currColEd - currColSt, '~'));
+        break; // only print one line
+    }
+    return ss.str();
+}
+
+void MinicParser::parseStep(istream &input) {
+    if (root_.get() != nullptr) { return; }
+    bool    drop  = false;
+    Token   token = lexicalParser_.parseStep(cin);
+    APTnode node  = tokenToNode(token, cin, drop);
+
+    if (!drop) {
+        nodes_.push_back(node);
+        syntaxParser_.parseStep(node);
+    }
+
+    if (token == END_TOKEN) {
+        root_ = syntaxParser_.getAPT();
+        // root_ = shared_ptr<APTnode>(new APTnode());
+    }
+}
+
+void MinicParser::parseAll(istream &input) {
+    while (root_.get() == nullptr) { parseStep(input); }
+}
+
+shared_ptr<APTnode> MinicParser::getAptNode() const { return root_; }
+
+vector<APTnode> MinicParser::getNodes()  const { return nodes_; }
+
+MinicParser::MinicParser(SyntaxParser  minicSynParser,
+                         LexicalParser minicLexParser)
+    : syntaxParser_(minicSynParser), lexicalParser_(minicLexParser) {
+
+    // add location attributes for every APT node
+    int         col, row; // closure variable
+    AptNodeFunc minicActionFunc = [&col, &row](APTnode &node) {
+        assert(node.attr.Has<int>("col_st"));
+        assert(node.attr.Has<int>("row_st"));
+        assert(node.attr.Has<int>("col_ed"));
+        assert(node.attr.Has<int>("row_st"));
+        col = node.attr.Get<int>("col_ed");
+        row = node.attr.Get<int>("row_ed");
+    };
+    AptNodeFunc minicReduceFunc = [&col, &row](APTnode &node) {
+        if (node.child.size() != 0) {
+            node.attr.RefN<int>("col_st") =
+                node.child.front().get()->attr.Get<int>("col_st");
+            node.attr.RefN<int>("row_st") =
+                node.child.front().get()->attr.Get<int>("row_st");
+            node.attr.RefN<int>("col_ed") =
+                node.child.back().get()->attr.Get<int>("col_ed");
+            node.attr.RefN<int>("row_ed") =
+                node.child.back().get()->attr.Get<int>("row_ed");
+        } else {
+            // empty production (local_decl <- )
+            node.attr.RefN<int>("col_st") = col;
+            node.attr.RefN<int>("row_st") = row;
+            node.attr.RefN<int>("col_ed") = col;
+            node.attr.RefN<int>("row_ed") = row;
+        }
+    };
+    AptNodeFunc minicErrorFunc = [this](APTnode &node) {
+        int col_st = node.attr.Get<int>("col_st");
+        int row_st = node.attr.Get<int>("row_st");
+        int col_ed = node.attr.Get<int>("col_ed");
+        int row_ed = node.attr.Get<int>("row_ed");
+
+        cerr << fmt::format(
+            "error:{}: {}\n{}", row_st, col_st,
+            this->getLocatedSource(col_st, row_st, col_ed, row_ed));
+    };
+    syntaxParser_.actionFunc_ = minicActionFunc;
+    syntaxParser_.reduceFunc_ = minicReduceFunc;
+    syntaxParser_.errorFunc_  = minicErrorFunc;
+}
+
+// ---------- minic parser instance ----------
+
+Grammar      minicGrammar = krill::minic::syntax::grammar;
+SyntaxParser minicSyntaxParser(minicGrammar, krill::minic::syntax::actionTable);
+LexicalParser minicLexicalParser(krill::minic::lexical::dfa);
+MinicParser   minicParser(minicSyntaxParser, minicLexicalParser);
 
 } // namespace krill::minic

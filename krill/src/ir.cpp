@@ -108,7 +108,38 @@ Func::TypeDecl Func::type() const {
     };
 }
 
-// ---
+// ---------- Ir ----------
+
+void Ir::clear() {
+    variables.clear();
+    labels.clear();
+    functions.clear();
+    globalVars.clear();
+    globalFuncs.clear();
+}
+
+Code Ir::code() {
+    Code code;
+    for (auto &var : globalVars) {
+        code.emplace_back(QuadTuple{
+            .op = Op::kGlobal, .args_d = {.var = var, .size = var->type.size()}
+        });
+    }
+    for (auto &func : globalFuncs) {
+        if (func->code.has_value()) {
+            Appender{code}
+            .append({{.op = Op::kFuncBegin, .args_f = {.func = func}}})
+            .append(func->code.value())
+            .append({{.op = Op::kFuncEnd}});
+        } else {
+            // not linked yet
+            // do nothing
+        }
+    }
+    return code;
+}
+
+// ---------- to_string ----------
 
 // readable intermediate representation generator
 inline map<Var *, string> var_name_;

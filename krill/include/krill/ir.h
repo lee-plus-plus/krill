@@ -129,9 +129,7 @@ struct Func {
     };
 
     struct Info {
-        string name;
-        int    spOffset = 0; // local space
-        int    numParams;
+        std::optional<int> spOffset; // local space
     };
 
     string        name;
@@ -182,14 +180,15 @@ struct Ir {
     Ir(Ir &&ir)      = default;
     Ir(const Ir &ir) = delete;
 
-    void clear() {
-        variables.clear();
-        labels.clear();
-        functions.clear();
-        globalVars.clear();
-        globalFuncs.clear();
-    }
+    void clear();
+    Code code();
 };
+
+string var_name(Var *var);
+string lbl_name(Lbl *lbl);
+string lbl_fullname(Lbl *lbl);
+string func_name(Func *func);
+string func_fullname(Func *func);
 
 string to_string(const QuadTuple &q);
 string to_string(const Code &code);

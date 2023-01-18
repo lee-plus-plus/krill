@@ -1,6 +1,9 @@
 #include "fmt/format.h"
-#include "krill/minic.h"
 #include "krill/ir.h"
+#include "krill/ir_opt.h"
+#include "krill/minic.h"
+#include "krill/minic_sdt.h"
+#include "krill/mips_backend.h"
 #include "krill/utils.h"
 #include <cstring>
 #include <fmt/color.h>
@@ -18,7 +21,7 @@ using krill::log::logger;
 
 extern APTnode tokenToNode(Token token, istream &input, bool &drop);
 // minic_parser.cpp
-extern void    initSyntaxParser();
+extern void initSyntaxParser();
 // minic_sdt.cpp
 // extern void    syntax_directed_translation(shared_ptr<APTnode> &node);
 // extern string  get_ir_str();
@@ -91,26 +94,14 @@ void testSyntaxParsing() {
 }
 
 void testFullLexicalParsing() {
-    auto &   lexicalParser = minicLexicalParser;
-    Grammar &grammar       = minicGrammar;
+    MinicParser &parser  = minicParser;
+    Grammar &    grammar = minicGrammar;
     cerr << "input characters (end with ^d): \n"
             "e.g., int main() {\\n} \n";
 
-    vector<Token>   tokens;
-    vector<APTnode> nodes;
-    while (true) {
-        Token   token;
-        APTnode node;
-        bool    drop;
+    parser.parseAll(cin);
 
-        token = lexicalParser.parseStep(cin);
-        node  = tokenToNode(token, cin, drop);
-        if (drop) { continue; }
-
-        nodes.push_back(node);
-        if (token == END_TOKEN) { break; }
-    }
-
+    auto nodes = parser.getNodes();
     for (auto node : nodes) {
         cout << fmt::format(
             "[{} \"{}\"] ", grammar.symbolNames.at(node.id),
@@ -121,73 +112,77 @@ void testFullLexicalParsing() {
 }
 
 void testFullLexicalSyntaxParsing() {
-    auto &lexicalParser = minicLexicalParser;
-    auto &syntaxParser  = minicSyntaxParser;
-    auto &grammar       = minicGrammar;
+    MinicParser &parser  = krill::minic::minicParser;
+    Grammar &    grammar = krill::minic::minicGrammar;
     cerr << "input characters (end with ^d): \n"
             "e.g., int main() {\\n} \n";
 
-    vector<APTnode> nodes;
-    while (true) {
-        Token   token;
-        APTnode node;
-        bool    drop;
+    parser.parseAll(cin);
 
-        token = lexicalParser.parseStep(cin);
-        node  = tokenToNode(token, cin, drop);
-        if (drop) { continue; }
-
-        nodes.push_back(node);
-        syntaxParser.parseStep(node);
-
-        if (token == END_TOKEN) { break; }
-    }
-
+    auto nodes = parser.getNodes();
+    auto root  = parser.getAptNode();
     for (auto node : nodes) {
         cout << fmt::format("{} ", grammar.symbolNames.at(node.id));
     }
-    logger.debug("annotated parsing tree:\n{}", syntaxParser.getAPTstr());
+    logger.debug("annotated parsing tree:\n{}", getAPTstr(root, grammar));
 
     cout << "\n";
-    cout << syntaxParser.getASTstr();
+    cout << getASTstr(root, grammar);
     cout << "\n";
 }
 
-void testIRgeneration() {
-    auto &lexicalParser = minicLexicalParser;
-    auto &syntaxParser  = minicSyntaxParser;
-    // auto &grammar       = minicGrammar;
+void testIrGeneration() {
+    MinicParser &parser = krill::minic::minicParser;
     cerr << "input characters (end with ^d): \n"
             "e.g., int main() {\\n} \n";
 
-    vector<APTnode> nodes;
-    while (true) {
-        Token   token;
-        APTnode node;
-        bool    drop;
+    // get annotated parsing tree
+    parser.parseAll(cin); 
+    shared_ptr<APTnode> root = parser.getAptNode(); 
 
-        token = lexicalParser.parseStep(cin);
-        node  = tokenToNode(token, cin, drop);
-        if (drop) { continue; }
-
-        nodes.push_back(node);
-        syntaxParser.parseStep(node);
-
-        if (token == END_TOKEN) { break; }
-    }
-    
     krill::log::sink_cerr->set_level(spdlog::level::debug);
 
     // syntax-directed translation
-    auto root = syntaxParser.getAPT();
-    auto sdtParser = krill::minic::SdtParser();
-    auto ir = sdtParser.parse(root).get();
-    
+    auto sdtParser = krill::minic::SdtParser(root.get());
+    auto ir        = sdtParser.parse().get();
+    auto irCode    = ir.code();
 
-    // show result
-    // cout << getAPTstr(root, minicGrammar) << "\n";
-    cout << get_ir() << "\n";
+    // show intermediate representation code
+    cout << to_string(irCode) << "\n";
+}
 
+void testMipsGeneration() {
+    MinicParser &parser = minicParser;
+    cerr << "input characters (end with ^d): \n"
+            "e.g., int main() {\\n} \n";
+
+    // get annotated parsing tree
+    minicParser.parseAll(cin); // here is a critical bug
+    auto root1 = minicParser.root_; // magic, don't remove
+    auto root = minicParser.getAptNode();
+
+    krill::log::sink_cerr->set_level(spdlog::level::debug);
+
+    // syntax-directed translation
+    auto sdtParser = krill::minic::SdtParser(root.get());
+    auto ir        = sdtParser.parse().get();
+    auto irCode    = ir.code();
+
+    // side-effect: record name for temporary variables
+    // good for debug
+    to_string(irCode);
+
+    // optimization
+    auto irOptimizer = krill::ir::IrOptimizer(ir);
+    irOptimizer.annotateInfo().assignRegs();
+
+    // mips code generation
+    auto mipsGenerator = krill::mips::MipsGenerator(ir);
+    mipsGenerator.parse();
+    auto mipsCode      = mipsGenerator.gen();
+
+    // this code may lead to previous runtime error (weird)
+    cout << mipsCode << "\n";
 }
 
 const char usage[] = "usage: test_minic {-l|-L|-s}\n"
@@ -195,15 +190,14 @@ const char usage[] = "usage: test_minic {-l|-L|-s}\n"
                      "        -L    lexical parsing test (full)\n"
                      "        -s    syntax parsing test\n"
                      "        -Ls   lexical & syntax parsing test\n"
-                     "        -I    intermediate code generation\n";
-                     // "        -Ir   ir and register assignment\n";
+                     "        -I    intermediate code generation\n"
+                     "        -m    mips code generation\n";
 
 int main(int argc, char **argv) {
     if (argc != 2) {
         cerr << usage;
         return 1;
     }
-    initSyntaxParser();
 
     if (strcmp(argv[1], "-l") == 0) {
         testLexicalParsing();
@@ -218,11 +212,11 @@ int main(int argc, char **argv) {
         testFullLexicalSyntaxParsing();
         cerr << "done!\n";
     } else if (strcmp(argv[1], "-I") == 0) {
-        testIRgeneration();
+        testIrGeneration();
         cerr << "done!\n";
-    // } else if (strcmp(argv[1], "-Ir") == 0) {
-    //     testIRgenerationWithRegNaming();
-    //     cerr << "done!\n";
+    } else if (strcmp(argv[1], "-m") == 0) {
+        testMipsGeneration();
+        cerr << "done!\n";
     } else {
         cerr << usage;
         return 1;

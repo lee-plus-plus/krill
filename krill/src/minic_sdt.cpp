@@ -3,20 +3,18 @@
 #include "krill/utils.h"
 #include <cstdlib>
 #include <iostream>
-#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
 using namespace std;
-using namespace krill::type;
+// using namespace krill::type;
 using namespace krill::utils;
-using namespace krill::runtime;
+// using namespace krill::runtime;
 using namespace krill::minic;
 using namespace krill::ir;
 
 using std::make_shared, std::shared_ptr;
 using krill::log::logger;
-
 
 namespace krill::minic {
 
@@ -61,7 +59,7 @@ int SdtParser::parse_int_literal(APTnode *node) {
 
     auto child0 = node->child[0].get();
     auto lval   = child0->attr.Get<string>("lval");
-    int  constVal;
+    int  constVal = 0;
 
     switch (child0->id) {
         case syntax::DECNUM:
@@ -87,6 +85,7 @@ TypeSpec SdtParser::parse_basetype(APTnode *node) {
         return TypeSpec::kInt32;
     } else {
         assert(false);
+        return TypeSpec::kVoid;
     }
 }
 
@@ -142,6 +141,7 @@ vector<Var *> SdtParser::parse_params(APTnode *node) {
         }
         default:
             assert(false);
+            return {};
     }
 }
 
@@ -356,10 +356,12 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
     for (auto &ret : func->returns) {
         ret->name = counter_.assign_unique_name("retval");
     }
+    auto lbl_init = assign_new_label({.name = counter_.assign_unique_name("init")});
     auto lbl_entry =
         assign_new_label({.name = counter_.assign_unique_name("entry")});
     auto lbl_return =
         assign_new_label({.name = counter_.assign_unique_name("return")});
+    auto q_init = QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_init}};
     auto q_entry = QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_entry}};
     auto q_return =
         QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_return}};
@@ -425,6 +427,7 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
     auto funcCode = Code{};
 
     Appender{funcCode}
+        .append({q_init})
         .append(head_code)
         .append({q_entry})
         .append(body_code)
@@ -481,6 +484,7 @@ vector<Var *> SdtParser::sdt_args(APTnode *node, Code &code) {
         }
         default:
             assert(false);
+            return {};
     }
 }
 
@@ -726,12 +730,15 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
         auto code_args = Code{};
         auto node_args = child[2].get();
         auto var_args  = sdt_args(node_args, code_args);
-        auto code_func = parse_function_call(func, var_args);
+        auto code_funccall = parse_function_call(func, var_args);
 
         auto var_ret   = assign_new_variable({.type = func->returns[0]->type});
-        auto code_dest = code_func;
-        code_dest.emplace_back(
-            QuadTuple{.op = Op::kRetGet, .args_f = {.var = var_ret, .idx = 0}});
+        auto code_dest = Code{};
+        Appender{code_dest}
+            .append(code_args)
+            .append(code_funccall)
+            .append({QuadTuple{.op     = Op::kRetGet,
+                               .args_f = {.var = var_ret, .idx = 0}}});
 
         return {var_ret, code_dest};
     } else if (child[0].get()->id == syntax::int_literal) {
@@ -743,6 +750,7 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
     } else {
         logger.error("expr pidx={}", node->pidx);
         assert(false);
+        throw runtime_error("sdt_expr error");
     }
 }
 
@@ -802,9 +810,9 @@ void SdtParser::sdt_expr_stmt(APTnode *node, Code &code) {
         auto code_args = Code{};
         auto node_args = child[2].get();
         auto var_args  = sdt_args(node_args, code_args);
-        auto code_func = parse_function_call(func, var_args);
+        auto code_funccall = parse_function_call(func, var_args);
 
-        Appender{code}.append(code_func);
+        Appender{code}.append(code_args).append(code_funccall);
         return;
 
     } else {
@@ -923,7 +931,7 @@ void SdtParser::sdt_break_stmt(APTnode *node, Code &code) {
 
 // ---------- public ----------
 
-void SdtParser::parse(shared_ptr<APTnode> &node) {
+SdtParser &SdtParser::parse() {
     logger.info("syntax directed translation begin");
 
     // initialization
@@ -940,11 +948,12 @@ void SdtParser::parse(shared_ptr<APTnode> &node) {
     // syntax directed translation
     var_domains_.emplace_back(&ir_.globalVars);
     func_domains_.emplace_back(&ir_.globalFuncs);
-    sdt_decl(node.get()); // core
+    sdt_decl(root_); // core
     var_domains_.pop_back();
     func_domains_.pop_back();
 
     logger.info("syntax directed translation complete successfully");
+    return *this;
 }
 
 Ir SdtParser::get() {
