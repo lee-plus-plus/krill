@@ -18,10 +18,20 @@ using std::stringstream;
 
 namespace krill::minic {
 
+class MinicSyntaxParser : public SyntaxParser {
+  public:
+    MinicSyntaxParser();
+};
+
+class MinicLexicalParser : public LexicalParser {
+  public:
+    MinicLexicalParser();
+};
+
 class MinicParser {
   private:
-    SyntaxParser  syntaxParser_;
-    LexicalParser lexicalParser_;
+    MinicSyntaxParser  syntaxParser_;
+    MinicLexicalParser lexicalParser_;
 
     int col_ = 1;
     int row_ = 1;
@@ -29,15 +39,16 @@ class MinicParser {
     stringstream         source_;
     vector<stringstream> sourceLines_;
 
+    shared_ptr<APTnode> root_; // magic, don't touch
     vector<APTnode> nodes_;
 
     void    count(char c);
     APTnode tokenToNode(Token token, istream &input, bool &drop);
 
   public:
-    shared_ptr<APTnode> root_; // magic, don't touch
 
-    MinicParser(SyntaxParser minicSynParser, LexicalParser minicLexParser);
+    MinicParser();
+
     string getLocatedSource(int colSt, int rowSt, int colEd, int rowEd);
     void   parseStep(istream &input);
     void   parseAll(istream &input);
@@ -47,9 +58,9 @@ class MinicParser {
 };
 
 extern Grammar       minicGrammar;
-extern SyntaxParser  minicSyntaxParser;
-extern LexicalParser minicLexicalParser;
-extern MinicParser   minicParser;
+// extern SyntaxParser  minicSyntaxParser;
+// extern LexicalParser minicLexicalParser;
+// extern MinicParser   minicParser;
 
 } // namespace krill::minic
 
