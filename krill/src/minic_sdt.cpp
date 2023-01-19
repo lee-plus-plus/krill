@@ -7,9 +7,7 @@
 #include <stdexcept>
 #include <vector>
 using namespace std;
-// using namespace krill::type;
 using namespace krill::utils;
-// using namespace krill::runtime;
 using namespace krill::minic;
 using namespace krill::ir;
 
@@ -399,10 +397,10 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
                           .args_d = {.var = var, .size = var->type.size()}});
         }
         // set default value for retval
-        for (const auto &var : func->returns) {
-            head_code.emplace_back(QuadTuple{
-                .op = Op::kStore, .args_m = {.var = var_zero, .mem = var}});
-        }
+        // for (const auto &var : func->returns) {
+        //     head_code.emplace_back(QuadTuple{
+        //         .op = Op::kStore, .args_m = {.var = var_zero, .mem = var}});
+        // }
         return head_code;
     };
     // tail code: only one return point
@@ -598,7 +596,7 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
                      .args_e = {.dest = v_dest, .src1 = v_lhs, .src2 = v_rhs}};
                 break;
             case '-':
-                q = {.op     = Op::kMinus,
+                q = {.op     = Op::kSub,
                      .args_e = {.dest = v_dest, .src1 = v_lhs, .src2 = v_rhs}};
                 break;
             case '*':
@@ -649,7 +647,7 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
         QuadTuple q;
         switch (oprt) {
             case '-':
-                q = {.op     = Op::kMinus,
+                q = {.op     = Op::kSub,
                      .args_e = {
                          .dest = v_dest, .src1 = v_src, .src2 = var_zero}};
                 break;
@@ -888,7 +886,7 @@ void SdtParser::sdt_while_stmt(APTnode *node, Code &code) {
                              .addr2 = lbl_end}}})
         .append({{.op = Op::kLabel, .args_j = {.addr1 = lbl_body}}})
         .append(code_stmt)
-        .append({{.op = Op::kGoto, .args_j = {.addr1 = lbl_end}}})
+        .append({{.op = Op::kGoto, .args_j = {.addr1 = lbl_cond}}})
         .append({{.op = Op::kLabel, .args_j = {.addr1 = lbl_end}}});
 }
 

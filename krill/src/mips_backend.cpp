@@ -101,13 +101,17 @@ void MipsGenerator::genFuncBegin(const QuadTuple &q) {
     genComment(to_string(fmt::format("# {}", func_fullname(func))));
     genLabel(funcname);
 
-    // assign stack space for local variables (example given below:)
+    // assign stack space for local variables (example given below: 
+
     // 8($fp) = param<1> (x)
     // 4($fp) = param<2> (y)
     // 0($fp) = $ra
     // -4($fp) = $fp_last
     // $fp - 8 = $sp
     assert(spOffset.has_value());
+    genCode("sw", "$ra", "$sp", 0);
+    genCode("sw", "$fp", "$sp", -4);
+    genCode("ori", "$fp", "$sp", 0);
     genCode("addiu", "$sp", "$fp", spOffset.value());
 
     // gen comments for offset meanings
@@ -150,15 +154,11 @@ void MipsGenerator::genFuncCall(const QuadTuple &q) {
     genCode("addiu", "$sp", "$sp", -4 * func->params.size());
 
     genComment(to_string(fmt::format("\t# call function {} begin", funcname)));
-    // push $sp, $ra, $fp
-    genCode("sw", "$ra", "$sp", 0);
-    genCode("sw", "$fp", "$sp", -4);
-    genCode("ori", "$fp", "$sp", 0);
 
     genCode("jal", funcname);
     genCode("nop");
 
-    genCode("lw", "$ra", "$sp", 0);
+    // genCode("lw", "$ra", "$sp", 0);
     genCode("addiu", "$sp", "$sp", +4 * func->params.size());
     genComment(to_string(fmt::format("\t# call function {} end", funcname)));
 }
@@ -204,12 +204,16 @@ void MipsGenerator::genExprCode(const QuadTuple &q) {
         if (v_src2->info.fpOffset.has_value()) {
             // is fp-offset
             int32_t fpOffset = v_src2->info.fpOffset.value();
-            genCode("addiu", reg_dest, "$fp", fpOffset);
-            genCode("addu", reg_dest, reg_dest, reg_src1);
+            // bug: reg_dest can be the same as reg_src1
+            // x genCode("addiu", reg_dest, "$fp", fpOffset);
+            genCode("addiu", "$t0", "$fp", fpOffset);
+            genCode("addu", reg_dest, "$t0", reg_src1);
         } else if (v_src2->info.memName.has_value()) {
             // is memory-name
-            string memName = v_src2->info.memName.value();
-            genCode("addiu", reg_dest, reg_src1, memName);
+            // string memName = v_src2->info.memName.value();
+            assert(v_src2->info.memOffset.has_value());
+            auto memOffset = v_src2->info.memOffset.value();
+            genCode("addiu", reg_dest, reg_src1, memOffset);
         } else {
             assert(false);
         }
@@ -224,7 +228,7 @@ void MipsGenerator::genExprCode(const QuadTuple &q) {
         case Op::kAdd:
             genCode("addu", reg_dest, reg_src1, reg_src2);
             break;
-        case Op::kMinus:
+        case Op::kSub:
             genCode("subu", reg_dest, reg_src1, reg_src2);
             break;
         case Op::kMult:
@@ -424,8 +428,15 @@ void MipsGenerator::genGlobal(const QuadTuple &q) {
 void MipsGenerator::genDirector() {
     // auto func_main = get_function_by_name("main").funcLbl.lbl;
     // genFuncCall(QuadTuple{Op::kCall, {.func = lbl_main, .argc = 0}});
+    genCode("ori", "$fp", "$zero", "0x8000");
+    genCode("ori", "$sp", "$zero", "0x8000");
     // call main
-    genCode("j", "main");
+    genCode("jal", "main");
+    genCode("nop");
+
+    genLabel("end.end");
+    genCode("j", "end.end");
+    genCode("nop");
     genCode("nop");
 }
 
@@ -433,6 +444,7 @@ void MipsGenerator::genDirector() {
 
 // dispatcher
 void MipsGenerator::genCodes(const QuadTuple &q) {
+    // genComment(to_string(fmt::format("\t# {}", to_string(q))));
     // clang-format off
     switch (q.op) {
         case Op::kNop:
@@ -441,7 +453,7 @@ void MipsGenerator::genCodes(const QuadTuple &q) {
         case Op::kAssign:
             genAssign(q);
             break;
-        case Op::kAdd:      case Op::kMinus:    case Op::kMult: 
+        case Op::kAdd:      case Op::kSub:    case Op::kMult: 
         case Op::kDiv:      case Op::kMod:  
         case Op::kAnd:      case Op::kOr:       case Op::kXor:  case Op::kNor:
         case Op::kLShift:   case Op::kRShift:

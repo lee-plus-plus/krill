@@ -59,13 +59,15 @@ BasicBlockGraph IrOptimizer::getBasicBlocks(const Code &funcCode) {
         blockEdges.insert({toBlockIdx.at(fromLbl), toBlockIdx.at(toLbl)});
     }
 
-    logger.debug("{:d} basic blocks", blocks.size());
-    for (const auto &block : blocks) {
-        logger.debug("block {}:\n{}\n", block.lbl->name, to_string(block.code));
-    }
-    for (const auto & [ fromLbl, toLbl ] : lblEdges) {
-        logger.debug("block {} -> {}", fromLbl->name, toLbl->name);
-    }
+    auto block_name    = [](BasicBlock b) { return lbl_name(b.lbl); };
+    auto lbl_edge_name = [](pair<Lbl *, Lbl *> p) {
+        return fmt::format("<{}, {}>", lbl_name(p.first), lbl_name(p.second));
+    };
+    logger.debug("basic blocks(num={}): {}", blocks.size(),
+                 fmt::join(apply_map(blocks, block_name), ", "));
+    logger.debug(
+        "basic block edges(num={}): {}", blocks.size(),
+        fmt::join(apply_map(to_vector(lblEdges), lbl_edge_name), ", "));
 
     return BasicBlockGraph{.blocks = blocks, .edges = blockEdges};
 }
@@ -79,7 +81,7 @@ void IrOptimizer::livenessAnalysis(const QuadTuple &q, vector<Var *> &defs,
         case Op::kAssign:
             defs.push_back(q.args_i.var);
             break;
-        case Op::kAdd: case Op::kMinus: case Op::kMult: case Op::kDiv:
+        case Op::kAdd: case Op::kSub: case Op::kMult: case Op::kDiv:
         case Op::kMod: case Op::kAnd: case Op::kOr: case Op::kXor:
         case Op::kNor: case Op::kLShift: case Op::kRShift: case Op::kEq:
         case Op::kNeq: case Op::kLeq: case Op::kLt:
@@ -128,7 +130,7 @@ void IrOptimizer::livenessAnalysis(const QuadTuple &q, vector<Var *> &defs,
 // get Interference Graph Edges over basic blocks
 // by liveness analysis
 InfGraph IrOptimizer::getGlobalInfGraph(const BasicBlockGraph &blockGraph) {
-    logger.debug("global interference graph construction begin");
+    // logger.debug("global interference graph construction begin");
     auto &blocks     = blockGraph.blocks;
     auto &blockEdges = blockGraph.edges;
     // build edge table
@@ -197,13 +199,14 @@ InfGraph IrOptimizer::getGlobalInfGraph(const BasicBlockGraph &blockGraph) {
         }
         if (!flag) { break; }
     }
-    logger.debug("over the basic blocks");
+    // logger.debug("over the basic blocks");
     for (int i : bidxs) {
-        logger.debug("  IN[{}] = [{}]", lbl_name(blocks[i].lbl),
-                     fmt::join(apply_map(to_vector(inVars[i]), var_name), " "));
-        logger.debug(
-            "  OUT[{}] = [{}]", lbl_name(blocks[i].lbl),
-            fmt::join(apply_map(to_vector(outVars[i]), var_name), " "));
+        // logger.debug("  IN[{}] = [{}]", lbl_name(blocks[i].lbl),
+        //              fmt::join(apply_map(to_vector(inVars[i]), var_name), "
+        //              "));
+        // logger.debug(
+        //     "  OUT[{}] = [{}]", lbl_name(blocks[i].lbl),
+        //     fmt::join(apply_map(to_vector(outVars[i]), var_name), " "));
         assert(inVars[i] == regAssignNeeded(inVars[i]));
         assert(outVars[i] == regAssignNeeded(outVars[i]));
     }
@@ -232,13 +235,13 @@ InfGraph IrOptimizer::getGlobalInfGraph(const BasicBlockGraph &blockGraph) {
         }
     }
 
-    logger.debug("interference edges (num={})", infEdges.size());
-    vector<string> infVarnames =
-        apply_map(to_vector(infEdges), [](pair<Var *, Var *> p) -> string {
-            return var_name(p.first) + "-" + var_name(p.second);
-        });
-    logger.debug("edges:  {}", fmt::join(infVarnames, " "));
-    logger.debug("global interference graph construction complete");
+    auto inf_edge_name = [](pair<Var *, Var *> p) {
+        return fmt::format("<{}, {}>", var_name(p.first), var_name(p.second));
+    };
+    logger.debug(
+        "  interference edges (num={}): {}", infEdges.size(),
+        fmt::join(apply_map(to_vector(infEdges), inf_edge_name), ", "));
+    // logger.debug("global interference graph construction complete");
 
     return InfGraph{.vars = globalRegVars, .edges = infEdges};
 }
@@ -247,7 +250,7 @@ InfGraph IrOptimizer::getGlobalInfGraph(const BasicBlockGraph &blockGraph) {
 // by liveness analysis
 InfGraph IrOptimizer::getLocalInfGraph(const BasicBlock &block,
                                        const set<Var *> &globalRegVars) {
-    logger.debug("local interference graph construction begin");
+    // logger.debug("local interference graph construction begin");
     // liveness analysis
     set<Var *>                 localVars;
     map<Var *, pair<int, int>> varsLifetime;
@@ -282,17 +285,15 @@ InfGraph IrOptimizer::getLocalInfGraph(const BasicBlock &block,
     };
     localVars = regAssignNeeded(localVars);
 
-    logger.debug("local variables(num={}): {}", localVars.size(),
+    auto lifetime_name = [varsLifetime](Var *var) -> string {
+        auto[st, ed] = varsLifetime.at(var);
+        return fmt::format("{}: [{},{}]", var_name(var), st, ed);
+    };
+    logger.debug("  local variables(num={}): {}", localVars.size(),
                  fmt::join(apply_map(to_vector(localVars), var_name), " "));
-    logger.debug("lifetime: \n  {}",
-                 fmt::join(apply_map(to_vector(localVars),
-                                     [varsLifetime](Var *var) -> string {
-                                         auto[st, ed] = varsLifetime.at(var);
-                                         return var_name(var) + ":[" +
-                                                std::to_string(st) + "," +
-                                                std::to_string(ed) + "]";
-                                     }),
-                           ", "));
+    logger.debug(
+        "  lifetime: {}",
+        fmt::join(apply_map(to_vector(localVars), lifetime_name), ", "));
 
     // construct interference graph
     EdgeSet<Var *> infEdges;
@@ -314,14 +315,13 @@ InfGraph IrOptimizer::getLocalInfGraph(const BasicBlock &block,
         }
     }
 
-    logger.debug("interference edges:\n  {}",
-                 fmt::join(apply_map(to_vector(infEdges),
-                                     [](pair<Var *, Var *> p) -> string {
-                                         return var_name(p.first) + "-" +
-                                                var_name(p.second);
-                                     }),
-                           " "));
-    logger.debug("local interference graph construction complete");
+
+    auto inf_edge_name = [](pair<Var *, Var *> p) {
+        return fmt::format("<{} , {}>", var_name(p.first), var_name(p.second));
+    };
+    logger.debug(
+        "  interference edges (num={}): {}", infEdges.size(),
+        fmt::join(apply_map(to_vector(infEdges), inf_edge_name), ", "));
 
     return InfGraph{.vars = localVars, .edges = infEdges};
 }
@@ -412,11 +412,13 @@ IrOptimizer &IrOptimizer::assignRegs() {
         }
         const auto &code = func->code.value();
         // build basic block graph
+        logger.debug("in {}:", func_fullname(func));
         auto  blockGraph = getBasicBlocks(code);
         auto &blocks     = blockGraph.blocks;
 
         // build global Interference Graph (over basic blocks)
         // and assign colors for registers
+        logger.debug("in {}: global", func_name(func));
         auto globalInfGraph  = getGlobalInfGraph(blockGraph);
         auto globalVars      = globalInfGraph.vars;
         auto globalVarColors = coloring(globalInfGraph);
@@ -426,6 +428,8 @@ IrOptimizer &IrOptimizer::assignRegs() {
         auto localVarColors = vector<map<Var *, int>>{};
         auto localVars      = vector<set<Var *>>{};
         for (const auto &block : blocks) {
+            logger.debug("in {}: {}\n{}", func_name(func),
+                         lbl_fullname(block.lbl), to_string(block.code));
             auto infGraph  = getLocalInfGraph(block, globalVars);
             auto varColors = coloring(infGraph);
             localVars.push_back(infGraph.vars);
@@ -466,6 +470,8 @@ IrOptimizer &IrOptimizer::assignRegs() {
         auto varColors = mergeVarColors();
 
         // assign registers for var
+        // notice: $t0 is reserved for compiler
+        // DO NOT assgin $t0 to any variable!
         const string regName[19] = {"$t0", "$t1", "$t2", "$t3", "$t4", "$t5",
                                     "$t6", "$t7", "$t8", "$t9", "$s0", "$s1",
                                     "$s2", "$s3", "$s4", "$s5", "$s6", "$s7"};
@@ -482,9 +488,10 @@ IrOptimizer &IrOptimizer::assignRegs() {
             logger.debug("  {} = {}", var_name(var), var->info.reg.value());
         }
         for (int i = 0; i < blocks.size(); i++) {
-            logger.debug("in {}: {}", func_fullname(func), lbl_fullname(blocks[i].lbl));
+            logger.debug("in {}: {}", func_fullname(func),
+                         lbl_fullname(blocks[i].lbl));
             for (const auto &var : localVars[i]) {
-                logger.debug("    {} = {}", var_name(var), var->info.reg.value());
+                logger.debug("  {} = {}", var_name(var), var->info.reg.value());
             }
         }
     }
@@ -498,7 +505,7 @@ IrOptimizer &IrOptimizer::assignRegs() {
 bool isOpExpr(Op op) {
     switch (op) {
     case Op::kAdd:
-    case Op::kMinus:
+    case Op::kSub:
     case Op::kMult:
     case Op::kDiv:
     case Op::kMod:
@@ -522,7 +529,7 @@ int calcExpr(Op op, int val1, int val2) {
     switch (op) {
     case Op::kAdd:
         return val1 + val2;
-    case Op::kMinus:
+    case Op::kSub:
         return val1 - val2;
     case Op::kMult:
         return val1 * val2;
@@ -565,7 +572,10 @@ IrOptimizer &IrOptimizer::annotateInfo() {
 
     // initialize global variable info
     for (const auto &var : ir_.globalVars) {
-        var->info = Var::Info{.memName = {var->name}};
+        var->info = Var::Info{
+            .memOffset = {memOffset},
+            .memName   = {var->name},
+        };
         memOffset += var->type.size();
     }
 
@@ -582,7 +592,8 @@ IrOptimizer &IrOptimizer::annotateInfo() {
          *        $sp  = $fp - 8
          * do:
          *     -8($fp) <- local_var<0> (int32 retval)
-         *    -12($fp) <- local_var<3> (int32[10] z)
+         *  x -12($fp) <- local_var<3> (int32[10] z) (bug)
+         *    -48($fp) <- local_var<3> (int32[10] z)
          *    -52($fp) <- local_var<4> (int32 a)
          *        $sp  <- $fp - 48
          **/
@@ -597,15 +608,16 @@ IrOptimizer &IrOptimizer::annotateInfo() {
 
         // reverse 0($fp) for $fp, -4($fp) for $sp, -8($fp) for $ra
         // -12($fp) for retval (if there is), -16($fp) ... for local variables
-        int spOffset = -8;
+        int spOffset = -4;
         for (auto &var : func->returns) {
-            var->info = Var::Info{.fpOffset = {spOffset}};
             spOffset -= var->type.size(); // allocate actual spcae for variables
+            var->info = Var::Info{.fpOffset = {spOffset}};
         }
         for (auto &var : func->localVars) {
-            var->info = Var::Info{.fpOffset = {spOffset}};
             spOffset -= var->type.size(); // allocate actual spcae for variables
+            var->info = Var::Info{.fpOffset = {spOffset}};
         }
+        spOffset -= 4;
 
         // set function info ($sp size)
         func->info = Func::Info{.spOffset = {spOffset}};
@@ -621,6 +633,7 @@ IrOptimizer &IrOptimizer::annotateInfo() {
                     // pass
                     break;
                 case Op::kAssign:
+                    // logger.debug("const value {}", var_name(q.args_i.var));
                     q.args_i.var->info = Var::Info{.constVal = {q.args_i.cval}};
                     // q = QuadTuple{.op = Op::kNop}; // delete
                     cvalCode[q.args_i.var] = &q;
@@ -647,6 +660,9 @@ IrOptimizer &IrOptimizer::annotateInfo() {
 
                     if (src1.constVal.has_value() &&
                         src2.constVal.has_value()) {
+                        // logger.debug("const value propagation: {}",
+                        // to_string(q));
+
                         int cval1     = src1.constVal.value();
                         int cval2     = src2.constVal.value();
                         int result    = calcExpr(q.op, cval1, cval2);
@@ -665,8 +681,9 @@ IrOptimizer &IrOptimizer::annotateInfo() {
         }
 
         // delete Nop
-        func->code.value() = apply_filter(
-            func->code.value(), [](QuadTuple q) -> bool { return q.op != Op::kNop; });
+        func->code.value() =
+            apply_filter(func->code.value(),
+                         [](QuadTuple q) -> bool { return q.op != Op::kNop; });
     }
 
     return *this;

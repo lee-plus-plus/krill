@@ -23,7 +23,7 @@ enum class Op {
     // clang-format off
     kNop, 
     kAssign, /* .args_i (var, cval) */
-    kAdd, kMinus, kMult, kDiv, kMod,/* .args_e (dest, src1, src2) */
+    kAdd, kSub, kMult, kDiv, kMod,/* .args_e (dest, src1, src2) */
     kAnd, kOr, kXor, kNor,          /* .args_e (dest, src1, src2) */
     kLShift, kRShift,               /* .args_e (dest, src1, src2) */
     kEq, kNeq, kLeq, kLt,           /* .args_e (dest, src1, src2) */
@@ -95,9 +95,10 @@ struct Var {
     };
     struct Info {
         // exclusive
-        std::optional<int>    constVal; // it's a const value
-        std::optional<int>    fpOffset; // it's a offset relatived to $fp
-        std::optional<string> memName;  // it's a data segment label
+        std::optional<int>    constVal;  // it's a const value
+        std::optional<int>    fpOffset;  // it's a offset relatived to $fp
+        std::optional<int>    memOffset; // it's a data segment position
+        std::optional<string> memName;   // it's a data segment label
 
         std::optional<string> reg; // assigned register
     };

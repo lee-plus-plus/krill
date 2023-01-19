@@ -188,7 +188,7 @@ string to_string(const QuadTuple &q) {
                               enum_name(q.op), int(q.args_i.cval));
             break;
         case Op::kAdd:
-        case Op::kMinus:
+        case Op::kSub:
         case Op::kMult:
         case Op::kDiv:
         case Op::kMod:

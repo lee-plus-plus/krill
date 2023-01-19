@@ -244,15 +244,15 @@ string SyntaxParser::getErrorMessage() {
         grammar_.symbolNames.at(tokenWithAttr.id),
         unescape(tokenWithAttr.attr.Get<string>("lval")));
 
-    logger.error("{}", errorMsg);
-    logger.error("  history_: \"{}\"", history_);
-    logger.error("  look: {} \"{}\"", grammar_.symbolNames.at(tokenWithAttr.id),
+    logger.debug("{}", errorMsg);
+    logger.debug("  history_: \"{}\"", history_);
+    logger.debug("  look: {} \"{}\"", grammar_.symbolNames.at(tokenWithAttr.id),
                  unescape(tokenWithAttr.attr.Get<string>("lval")));
-    logger.error(
+    logger.debug(
         "  symbols: [{}]",
         fmt::join(apply_map(to_vector(symbols_), grammar_.symbolNames), ","));
-    logger.error("  states: [{}]", fmt::join(to_vector(states_), ","));
-    logger.error("Current AST: \n{}", getASTstr());
+    logger.debug("  states: [{}]", fmt::join(to_vector(states_), ","));
+    logger.debug("Current AST: \n{}", getASTstr());
 
     return errorMsg;
 }

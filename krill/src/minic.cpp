@@ -1,4 +1,5 @@
 #include "krill/minic.h"
+#include "fmt/color.h"
 #include "fmt/format.h"
 #include "krill/automata.h"
 #include "krill/defs.h"
@@ -14,6 +15,7 @@
 using namespace std;
 using namespace krill::type;
 using namespace krill::utils;
+using krill::log::logger;
 
 using krill::runtime::AptNodeFunc;
 
@@ -1524,8 +1526,9 @@ string MinicParser::getLocatedSource(int colSt, int rowSt, int colEd,
         string rowStr    = sourceLines_[row - 1].str();
         int    currColSt = (row > rowSt) ? 0 : (colSt - 1);
         int    currColEd = (row < rowSt) ? rowStr.size() : (colEd - 1);
-        ss << fmt::format("{}\n{}{}\n", rowStr, string(currColSt, ' '),
-                          string(currColEd - currColSt, '~'));
+        ss << fmt::format("{}\n{}\033[33m{}{}\033[0m", rowStr,
+                          string(currColSt, ' '), "^",
+                          string(currColEd - currColSt - 1, '~'));
         break; // only print one line
     }
     return ss.str();
@@ -1534,18 +1537,15 @@ string MinicParser::getLocatedSource(int colSt, int rowSt, int colEd,
 void MinicParser::parseStep(istream &input) {
     if (root_.get() != nullptr) { return; }
     bool    drop  = false;
-    Token   token = lexicalParser_.parseStep(cin);
-    APTnode node  = tokenToNode(token, cin, drop);
+    Token   token = lexicalParser_.parseStep(input);
+    APTnode node  = tokenToNode(token, input, drop);
 
     if (!drop) {
         nodes_.push_back(node);
         syntaxParser_.parseStep(node);
     }
 
-    if (token == END_TOKEN) {
-        root_ = syntaxParser_.getAPT();
-        // root_ = shared_ptr<APTnode>(new APTnode());
-    }
+    if (token == END_TOKEN) { root_ = syntaxParser_.getAPT(); }
 }
 
 void MinicParser::parseAll(istream &input) {
@@ -1554,7 +1554,7 @@ void MinicParser::parseAll(istream &input) {
 
 shared_ptr<APTnode> MinicParser::getAptNode() const { return root_; }
 
-vector<APTnode> MinicParser::getNodes()  const { return nodes_; }
+vector<APTnode> MinicParser::getNodes() const { return nodes_; }
 
 MinicParser::MinicParser(SyntaxParser  minicSynParser,
                          LexicalParser minicLexParser)
@@ -1594,9 +1594,11 @@ MinicParser::MinicParser(SyntaxParser  minicSynParser,
         int col_ed = node.attr.Get<int>("col_ed");
         int row_ed = node.attr.Get<int>("row_ed");
 
-        cerr << fmt::format(
-            "error:{}: {}\n{}", row_st, col_st,
-            this->getLocatedSource(col_st, row_st, col_ed, row_ed));
+        auto errorMsg =
+            fmt::format("input:{}:{}: {}: {}\n{}", row_st, col_st,
+                        "\033[31merror\033[0m", "unexpected token",
+                        this->getLocatedSource(col_st, row_st, col_ed, row_ed));
+        logger.error(errorMsg);
     };
     syntaxParser_.actionFunc_ = minicActionFunc;
     syntaxParser_.reduceFunc_ = minicReduceFunc;
