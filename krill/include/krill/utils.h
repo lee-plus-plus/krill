@@ -17,7 +17,7 @@
 
 namespace krill::utils {
 
-using magic_enum::enum_name;
+using magic_enum::enum_name; // NOLINT
 
 template <typename T> inline std::string to_string(const T &v) {
     std::stringstream ss;
@@ -45,8 +45,8 @@ inline std::string unescape(std::string str) {
 inline std::vector<std::string> split(std::string str,
                                       const char *delim = " \t\r\n\0") {
     std::vector<std::string> res;
-    char *                   strc = &str[0];
-    char *                   temp = strtok(strc, delim);
+    char                    *strc = &str[0];
+    char                    *temp = strtok(strc, delim);
     while (temp != NULL) {
         res.push_back(std::string(temp));
         temp = strtok(NULL, delim);
@@ -88,7 +88,7 @@ template <typename T> inline std::vector<T> to_vector(std::set<T> s) {
     return v;
 }
 
-template <typename T1, typename T2> 
+template <typename T1, typename T2>
 inline std::vector<std::pair<T1, T2>> to_vector(std::map<T1, T2> m) {
     std::vector<std::pair<T1, T2>> v;
     v.assign(m.begin(), m.end());
@@ -108,9 +108,16 @@ inline std::vector<T2> apply_map(std::vector<T1> v, const std::map<T1, T2> &m) {
 }
 
 template <typename T, typename F>
-inline auto apply_map(std::vector<T> v, F func)
-    -> std::vector<typename std::result_of<F(T &)>::type> {
+inline auto apply_map(std::vector<T> v, F func) {
+#ifndef __cplusplus
+#error "Not cpp error."
+#else
+#if __cplusplus < 201703L
     std::vector<typename std::result_of<F(T &)>::type> r;
+#else
+    std::vector<typename std::invoke_result<F, T&>::type> r;
+#endif
+#endif
     transform(v.begin(), v.end(), back_inserter(r), func);
     return r;
 }
@@ -161,7 +168,7 @@ template <typename T> inline T slice(const T &s, int st) {
 template <typename T1, typename T2>
 inline std::map<T2, T1> reverse(std::map<T1, T2> m) {
     std::map<T2, T1> m_reversed;
-    for (auto[key, value] : m) { m_reversed[value] = key; }
+    for (auto [key, value] : m) { m_reversed[value] = key; }
     return m_reversed;
 }
 
@@ -171,10 +178,10 @@ template <typename T> inline std::vector<T> reverse(std::vector<T> m) {
     return m_reversed;
 }
 
-template <typename T> inline std::vector<T> get_top(std::stack<T> s, int size) {
+template <typename T> inline std::vector<T> get_top(std::stack<T> s, size_t size) {
     assert(size >= 0);
     std::vector<T> v(size);
-    for (int i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i++) {
         v[i] = s.top();
         s.pop();
     }
@@ -192,18 +199,14 @@ struct pair_hash {
 
 inline unsigned bit_count(unsigned v) {
     unsigned int c;
-    for (c = 0; v; c++) {
-        v &= v - 1; 
-    }
+    for (c = 0; v; c++) { v &= v - 1; }
     return c;
 }
 
 inline unsigned bit_high_pos(unsigned v) {
     assert(v != 0);
     unsigned int c;
-    for (c = -1; v; c++) {
-        v = v >> 1;
-    }
+    for (c = -1; v; c++) { v = v >> 1; }
     return c;
 }
 
@@ -276,20 +279,20 @@ struct ToString {
     type __reduce(const type &h) const { return h; }
     type __combine(const type &l, const type &r) const { return l + "," + r; }
     template <typename... SZ>
-    type __reduce(const type &h, const SZ &... args) const {
+    type __reduce(const type &h, const SZ &...args) const {
         return __combine(h, __reduce(args...));
     }
 
     template <typename T> type comb(const T &t) const { return ToString{}(t); }
 
     template <typename T, typename... Args>
-    type comb(const T &t, const Args &... args) const {
+    type comb(const T &t, const Args &...args) const {
         return __reduce(ToString{}(t), comb(args...));
     }
 
   public:
     template <typename T1, typename T2, typename... Args>
-    type operator()(const T1 &t1, const T2 &t2, const Args &... args) {
+    type operator()(const T1 &t1, const T2 &t2, const Args &...args) {
         return "<" + comb(t1, t2, args...) + ">";
     }
 
@@ -312,7 +315,7 @@ struct ToString {
 
     type operator()(const std::vector<bool> &bs) const {
         std::string hv = "";
-        for (int i = 0; i < bs.size(); ++i) {
+        for (size_t i = 0; i < bs.size(); ++i) {
             hv = ToString{}((int) bs[i]) + ", ";
         }
         return "[" + hv + "]";
