@@ -33,9 +33,11 @@ class MinicParser {
     MinicSyntaxParser  syntaxParser_;
     MinicLexicalParser lexicalParser_;
 
-    int col_ = 1;
-    int row_ = 1;
-
+    int col_lex_ = 1;
+    int row_lex_ = 1;
+    int col_syn_ = 1;
+    int row_syn_ = 1;
+    
     stringstream         source_;
     vector<stringstream> sourceLines_;
 

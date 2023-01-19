@@ -1319,14 +1319,14 @@ namespace krill::minic {
 
 void MinicParser::count(char c) {
     if (c == '\n') {
-        row_ += 1;
-        col_ = 1;
+        row_lex_ += 1;
+        col_lex_ = 1;
     } else if (c == '\t') {
         // col_ = ((col_ + 3) / 4) * 4 + 1; // bad
-        col_ += 1;
-        while (col_ % 8 != 1) { col_ += 1; } // good
+        col_lex_ += 1;
+        while (col_lex_ % 8 != 1) { col_lex_ += 1; } // good
     } else {
-        col_ += 1;
+        col_lex_ += 1;
     }
     // update source, by the way
     source_ << c;
@@ -1341,8 +1341,8 @@ void MinicParser::count(char c) {
 APTnode MinicParser::tokenToNode(Token token, istream &input, bool &drop) {
     APTnode node;
     node.attr.Set<string>("lval", token.lval);
-    node.attr.Set<int>("col_st", col_);
-    node.attr.Set<int>("row_st", row_);
+    node.attr.Set<int>("col_st", col_lex_);
+    node.attr.Set<int>("row_st", row_lex_);
 
     if (token.id == 43) { // 43: /\*
         bool match1 = false, match2 = false;
@@ -1513,8 +1513,8 @@ APTnode MinicParser::tokenToNode(Token token, istream &input, bool &drop) {
         drop = false;
     }
 
-    node.attr.Set<int>("col_ed", col_);
-    node.attr.Set<int>("row_ed", row_);
+    node.attr.Set<int>("col_ed", col_lex_);
+    node.attr.Set<int>("row_ed", row_lex_);
     return node;
 }
 
@@ -1551,13 +1551,8 @@ void MinicParser::parseStep(istream &input) {
 }
 
 void MinicParser::parseAll(istream &input) {
-    int i = 0;
     while (this->root_.get() == nullptr) { 
         parseStep(input); 
-        cerr << "parseAll: " << i++ << "\n";
-        cerr << (void*)this << "\n";
-        cerr << this->root_ << "\n";
-        cerr << this->root_.get() << "\n";
     }
 }
 
@@ -1568,16 +1563,16 @@ vector<APTnode> MinicParser::getNodes() const { return nodes_; }
 MinicParser::MinicParser():
     root_(nullptr) {
     // add location attributes for every APT node
-    int         col, row; // closure variable
-    AptNodeFunc minicActionFunc = [&col, &row](APTnode &node) {
+
+    AptNodeFunc minicActionFunc = [this](APTnode &node) {
         assert(node.attr.Has<int>("col_st"));
         assert(node.attr.Has<int>("row_st"));
         assert(node.attr.Has<int>("col_ed"));
-        assert(node.attr.Has<int>("row_st"));
-        col = node.attr.Get<int>("col_ed");
-        row = node.attr.Get<int>("row_ed");
+        assert(node.attr.Has<int>("row_ed"));
+        this->col_syn_ = node.attr.Get<int>("col_ed"); // bug!
+        this->row_syn_ = node.attr.Get<int>("row_ed"); // bug!
     };
-    AptNodeFunc minicReduceFunc = [&col, &row](APTnode &node) {
+    AptNodeFunc minicReduceFunc = [this](APTnode &node) {
         if (node.child.size() != 0) {
             node.attr.RefN<int>("col_st") =
                 node.child.front().get()->attr.Get<int>("col_st");
@@ -1589,10 +1584,10 @@ MinicParser::MinicParser():
                 node.child.back().get()->attr.Get<int>("row_ed");
         } else {
             // empty production (local_decl <- )
-            node.attr.RefN<int>("col_st") = col;
-            node.attr.RefN<int>("row_st") = row;
-            node.attr.RefN<int>("col_ed") = col;
-            node.attr.RefN<int>("row_ed") = row;
+            node.attr.RefN<int>("col_st") = this->col_syn_;
+            node.attr.RefN<int>("row_st") = this->row_syn_;
+            node.attr.RefN<int>("col_ed") = this->col_syn_;
+            node.attr.RefN<int>("row_ed") = this->row_syn_;
         }
     };
     AptNodeFunc minicErrorFunc = [this](APTnode &node) {

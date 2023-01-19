@@ -55,7 +55,7 @@ void SyntaxParser::parse() {
                 shared_ptr<APTnode> nextNode(new APTnode(input));
                 nextNode.get()->pidx = -1;
                 // ACTION action
-                actionFunc_(*nextNode.get());
+                actionFunc_(*nextNode.get()); // bug!
                 
                 nodes_.push(nextNode);
 
@@ -74,9 +74,11 @@ void SyntaxParser::parse() {
                 deque<shared_ptr<APTnode>> childNodes;
 
                 auto poped_states = get_top(states_, r.right.size());
+                assert(nodes_.size() >= r.right.size());
                 for (int j = 0; (int) j < r.right.size(); j++) {
                     states_.pop();
                     symbols_.pop();
+
                     childNodes.push_front(nodes_.top());
                     nodes_.pop();
                 }

@@ -16,11 +16,13 @@ spdlog::logger logger("krill", sink_list.begin(), sink_list.end());
 
 int init_logger_ = []() {
     logger.set_level(spdlog::level::trace); // lowest
+    logger.flush_on(spdlog::level::debug);  // flush immediately
 
     sink_cerr->set_pattern("[%n] [%^%l%$] %v");
     sink_cerr->set_level(spdlog::level::info);
     sink_file->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%^%l%$] %v");
     sink_file->set_level(spdlog::level::debug);
+
     
     return 0;
 }();
