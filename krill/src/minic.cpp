@@ -1607,8 +1607,8 @@ MinicParser::MinicParser(SyntaxParser  minicSynParser,
 
 // ---------- minic parser instance ----------
 
-Grammar      minicGrammar = krill::minic::syntax::grammar;
-SyntaxParser minicSyntaxParser(minicGrammar, krill::minic::syntax::actionTable);
+Grammar       minicGrammar = krill::minic::syntax::grammar;
+SyntaxParser  minicSyntaxParser(minicGrammar, krill::minic::syntax::actionTable);
 LexicalParser minicLexicalParser(krill::minic::lexical::dfa);
 MinicParser   minicParser(minicSyntaxParser, minicLexicalParser);
 

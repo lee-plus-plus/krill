@@ -497,6 +497,8 @@ IrOptimizer &IrOptimizer::assignRegs() {
     }
 
     var_zero->info.reg = {"$zero"};
+
+    logger.info("registers assignment complete successfully");
     return *this;
 }
 
@@ -685,7 +687,6 @@ IrOptimizer &IrOptimizer::annotateInfo() {
             apply_filter(func->code.value(),
                          [](QuadTuple q) -> bool { return q.op != Op::kNop; });
     }
-
     return *this;
 }
 

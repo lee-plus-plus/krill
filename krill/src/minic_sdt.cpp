@@ -930,8 +930,6 @@ void SdtParser::sdt_break_stmt(APTnode *node, Code &code) {
 // ---------- public ----------
 
 SdtParser &SdtParser::parse() {
-    logger.info("syntax directed translation begin");
-
     // initialization
     ir_.clear();
     var_domains_.clear();
@@ -950,7 +948,7 @@ SdtParser &SdtParser::parse() {
     var_domains_.pop_back();
     func_domains_.pop_back();
 
-    logger.info("syntax directed translation complete successfully");
+    logger.info("syntax-directed-translation complete successfully");
     return *this;
 }
 

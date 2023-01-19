@@ -534,6 +534,7 @@ MipsGenerator &MipsGenerator::parse() {
     genDirector(); // direct to main
     for (const auto &ir : textCode) { genCodes(ir); }
 
+    logger.info("mips code generation complete successfully");
     return *this;
 }
 

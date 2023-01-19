@@ -23,7 +23,7 @@ using krill::log::logger;
 void testLexicalParsing() {
     auto &lexicalParser = minicLexicalParser;
     cerr << "input characters (end with ^d): \n"
-            "e.g., int main() {\\n} \n";
+            "e.g., int main(void) {\\n} \n";
 
     vector<Token> tokens = lexicalParser.parseAll(cin);
     for (auto token : tokens) {
@@ -88,7 +88,7 @@ void testFullLexicalParsing() {
     MinicParser &parser  = minicParser;
     Grammar &    grammar = minicGrammar;
     cerr << "input characters (end with ^d): \n"
-            "e.g., int main() {\\n} \n";
+            "e.g., int main(void) {\\n} \n";
 
     parser.parseAll(cin);
 
@@ -107,7 +107,7 @@ void testFullLexicalSyntaxParsing() {
     MinicParser &parser  = krill::minic::minicParser;
     Grammar &    grammar = krill::minic::minicGrammar;
     cerr << "input characters (end with ^d): \n"
-            "e.g., int main() {\\n} \n";
+            "e.g., int main(void) {\\n} \n";
 
     parser.parseAll(cin);
 
@@ -127,7 +127,7 @@ void testFullLexicalSyntaxParsing() {
 void testIrGeneration() {
     MinicParser &parser = krill::minic::minicParser;
     cerr << "input characters (end with ^d): \n"
-            "e.g., int main() {\\n} \n";
+            "e.g., int main(void) {\\n} \n";
 
     // get annotated parsing tree
     parser.parseAll(cin); 
@@ -140,6 +140,8 @@ void testIrGeneration() {
     auto ir        = sdtParser.parse().get();
     auto irCode    = ir.code();
 
+    // side-effect: record name for temporary variables
+    // good for debug
     to_string(ir.code());
 
     auto irOptimizer = krill::ir::IrOptimizer(ir);
@@ -153,14 +155,12 @@ void testIrGeneration() {
 void testMipsGeneration() {
     MinicParser &parser = minicParser;
     cerr << "input characters (end with ^d): \n"
-            "e.g., int main() {\\n} \n";
+            "e.g., int main(void) {\\n} \n";
 
     // get annotated parsing tree
     parser.parseAll(cin); // here is a critical bug
     auto root1 = parser.root_; // magic, don't remove
     auto root = parser.getAptNode();
-
-    krill::log::sink_cerr->set_level(spdlog::level::debug);
 
     // syntax-directed translation
     auto sdtParser = krill::minic::SdtParser(root.get());
