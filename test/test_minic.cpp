@@ -21,7 +21,7 @@ using krill::log::logger;
 
 // lexical parsing test
 void testLexicalParsing() {
-    auto &lexicalParser = minicLexicalParser;
+    auto lexicalParser = MinicLexicalParser();
     cerr << "input characters (end with ^d): \n"
             "e.g., int main(void) {\\n} \n";
 
@@ -36,8 +36,8 @@ void testLexicalParsing() {
 
 // lexical parsing test (full)
 void testSyntaxParsing() {
-    Grammar &     grammar      = minicGrammar;
-    SyntaxParser &syntaxParser = minicSyntaxParser;
+    auto grammar       = minicGrammar;
+    auto syntaxParser = MinicSyntaxParser();
 
     cerr << "terminal set of grammar:\n  ";
     for (int i : grammar.terminalSet) {
@@ -85,8 +85,8 @@ void testSyntaxParsing() {
 
 // syntax parsing test
 void testFullLexicalParsing() {
-    MinicParser &parser  = minicParser;
-    Grammar &    grammar = minicGrammar;
+    auto parser = MinicParser();
+    auto grammar = minicGrammar;
     cerr << "input characters (end with ^d): \n"
             "e.g., int main(void) {\\n} \n";
 
@@ -104,8 +104,8 @@ void testFullLexicalParsing() {
 
 // lexical & syntax parsing test
 void testFullLexicalSyntaxParsing() {
-    MinicParser &parser  = krill::minic::minicParser;
-    Grammar &    grammar = krill::minic::minicGrammar;
+    auto parser = MinicParser();
+    auto grammar = minicGrammar;
     cerr << "input characters (end with ^d): \n"
             "e.g., int main(void) {\\n} \n";
 
@@ -125,7 +125,7 @@ void testFullLexicalSyntaxParsing() {
 
 // intermediate code generation
 void testIrGeneration() {
-    MinicParser &parser = krill::minic::minicParser;
+    auto parser = MinicParser();
     cerr << "input characters (end with ^d): \n"
             "e.g., int main(void) {\\n} \n";
 
@@ -153,13 +153,13 @@ void testIrGeneration() {
 
 // mips code generation
 void testMipsGeneration() {
-    MinicParser &parser = minicParser;
+    auto parser = MinicParser();
     cerr << "input characters (end with ^d): \n"
             "e.g., int main(void) {\\n} \n";
 
     // get annotated parsing tree
     parser.parseAll(cin); // here is a critical bug
-    auto root1 = parser.root_; // magic, don't remove
+    // auto root1 = parser.root_; // magic, don't remove
     auto root = parser.getAptNode();
 
     // syntax-directed translation
