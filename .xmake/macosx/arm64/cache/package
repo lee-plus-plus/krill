@@ -1,0 +1,51 @@
+{
+    spdlog = {
+        defines = "SPDLOG_FMT_EXTERNAL",
+        __installdir = "/Users/yangjerry/.xmake/packages/s/spdlog/v1.11.0/f6b19bfe87c946bb848ffe834396b857",
+        envs = {
+            DYLD_LIBRARY_PATH = {
+                "/Users/yangjerry/.xmake/packages/s/spdlog/v1.11.0/f6b19bfe87c946bb848ffe834396b857/lib",
+                "/Users/yangjerry/.xmake/packages/f/fmt/9.1.0/831f559f24864708becabdfa026ee43c/lib"
+            },
+            LD_LIBRARY_PATH = {
+                "/Users/yangjerry/.xmake/packages/s/spdlog/v1.11.0/f6b19bfe87c946bb848ffe834396b857/lib",
+                "/Users/yangjerry/.xmake/packages/f/fmt/9.1.0/831f559f24864708becabdfa026ee43c/lib"
+            }
+        },
+        links = "fmt",
+        __requirestr = "spdlog",
+        version = "v1.11.0",
+        linkdirs = "/opt/homebrew/Cellar/fmt/9.1.0/lib",
+        __enabled = true,
+        sysincludedirs = {
+            "/Users/yangjerry/.xmake/packages/s/spdlog/v1.11.0/f6b19bfe87c946bb848ffe834396b857/include",
+            "/opt/homebrew/Cellar/fmt/9.1.0/include"
+        },
+        __extrainfo = {
+            configs = {
+                fmt_external = true
+            }
+        }
+    },
+    magic_enum = {
+        __installdir = "/Users/yangjerry/.xmake/packages/m/magic_enum/v0.8.1/6135efd76a20454ab63c4edb36ad31aa",
+        version = "v0.8.1",
+        license = "MIT",
+        __enabled = true,
+        sysincludedirs = "/Users/yangjerry/.xmake/packages/m/magic_enum/v0.8.1/6135efd76a20454ab63c4edb36ad31aa/include",
+        __requirestr = "magic_enum",
+        envs = {
+            DYLD_LIBRARY_PATH = {
+                "/Users/yangjerry/.xmake/packages/m/magic_enum/v0.8.1/6135efd76a20454ab63c4edb36ad31aa/lib",
+                "/Users/yangjerry/.xmake/packages/c/cmake/3.24.2/6b2b7880d90e44f69311d5a446c0fc96/lib"
+            },
+            LD_LIBRARY_PATH = {
+                "/Users/yangjerry/.xmake/packages/m/magic_enum/v0.8.1/6135efd76a20454ab63c4edb36ad31aa/lib",
+                "/Users/yangjerry/.xmake/packages/c/cmake/3.24.2/6b2b7880d90e44f69311d5a446c0fc96/lib"
+            },
+            PATH = {
+                "/Users/yangjerry/.xmake/packages/c/cmake/3.24.2/6b2b7880d90e44f69311d5a446c0fc96/bin"
+            }
+        }
+    }
+}

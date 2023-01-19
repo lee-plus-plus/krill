@@ -1,0 +1,171 @@
+{
+    tool_target_test_grammar_macosx_arm64_ld = {
+        toolname = "clangxx",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang++"
+    },
+    tool_target_test_minic_macosx_arm64_cxx = {
+        toolname = "clang",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang"
+    },
+    tool_target_test_codegen_macosx_arm64_ld = {
+        toolname = "clangxx",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang++"
+    },
+    tool_target_test_automata_macosx_arm64_cxx = {
+        toolname = "clang",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang"
+    },
+    tool_target_test_syntax_macosx_arm64_cxx = {
+        toolname = "clang",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang"
+    },
+    tool_target_test_regex_macosx_arm64_cxx = {
+        toolname = "clang",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang"
+    },
+    tool_target_test_regex_macosx_arm64_ld = {
+        toolname = "clangxx",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang++"
+    },
+    tool_target_test_lexical_macosx_arm64_ld = {
+        toolname = "clangxx",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang++"
+    },
+    tool_target_test_automata_macosx_arm64_ld = {
+        toolname = "clangxx",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang++"
+    },
+    tool_target_test_minic_macosx_arm64_ld = {
+        toolname = "clangxx",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang++"
+    },
+    tool_target_krill_macosx_arm64_cxx = {
+        toolname = "clang",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang"
+    },
+    tool_target_test_syntax_macosx_arm64_ld = {
+        toolname = "clangxx",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang++"
+    },
+    tool_target_test_codegen_macosx_arm64_cxx = {
+        toolname = "clang",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang"
+    },
+    xcode_arch_arm64_plat_macosx = {
+        xcode_sysroot = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk",
+        arch = "arm64",
+        plat = "macosx",
+        xcode_sdkver = "13.1",
+        __global = true,
+        xcode = "/Applications/Xcode.app",
+        target_minver = "13.1"
+    },
+    tool_target_krill_macosx_arm64_ar = {
+        toolname = "ar",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx ar"
+    },
+    tool_target_test_grammar_macosx_arm64_cxx = {
+        toolname = "clang",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang"
+    },
+    tool_target_test_lexical_macosx_arm64_cxx = {
+        toolname = "clang",
+        toolchain_info = {
+            plat = "macosx",
+            name = "xcode",
+            arch = "arm64",
+            cachekey = "xcode_arch_arm64_plat_macosx"
+        },
+        program = "/usr/bin/xcrun -sdk macosx clang"
+    }
+}

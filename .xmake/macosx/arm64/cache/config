@@ -1,0 +1,11 @@
+{
+    mtimes = {
+        ["xmake.lua"] = 1674093784,
+        ["krill/xmake.lua"] = 1674093834,
+        ["test/xmake.lua"] = 1674093727
+    },
+    options = {
+        mode = "debug"
+    },
+    recheck = false
+}
