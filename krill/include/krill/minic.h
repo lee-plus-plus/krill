@@ -46,12 +46,11 @@ class MinicParser {
     APTnode tokenToNode(Token token, istream &input, bool &drop);
 
   public:
-
     MinicParser();
 
     string getLocatedSource(int colSt, int rowSt, int colEd, int rowEd);
-    void   parseStep(istream &input);
     void   parseAll(istream &input);
+    void   parseStep(istream &input);
 
     shared_ptr<APTnode> getAptNode() const;
     vector<APTnode>     getNodes() const;

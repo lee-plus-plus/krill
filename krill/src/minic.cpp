@@ -32,7 +32,7 @@ namespace krill::minic::syntax {
 
 ActionTable actionTable = {
     // clang-format off
-	{{0, 259}, {AT0, 1}},     {{0, 260}, {AT0, 2}},
+    {{0, 259}, {AT0, 1}},     {{0, 260}, {AT0, 2}},
     {{0, 278}, {AT2, 3}},     {{0, 279}, {AT2, 4}},
     {{0, 280}, {AT2, 5}},     {{0, 281}, {AT2, 6}},
     {{0, 282}, {AT2, 7}},     {{1, 258}, {AT1, 7}},
@@ -931,7 +931,7 @@ ActionTable actionTable = {
 
 map<int, string> symbolNames = {
     {-1, "ζ"},
-    {0, "ε"},
+    {0,  "ε"},
     {33, "'!'"},
     {36, "'$'"},
     {37, "'%'"},
@@ -1545,12 +1545,19 @@ void MinicParser::parseStep(istream &input) {
         syntaxParser_.parseStep(node);
     }
 
-    if (token == END_TOKEN) { root_ = syntaxParser_.getAPT(); }
+    if (token == END_TOKEN) { 
+        root_ = syntaxParser_.getAPT(); 
+    }
 }
 
 void MinicParser::parseAll(istream &input) {
-    while (root_.get() == nullptr) {
+    int i = 0;
+    while (this->root_.get() == nullptr) { 
         parseStep(input); 
+        cerr << "parseAll: " << i++ << "\n";
+        cerr << (void*)this << "\n";
+        cerr << this->root_ << "\n";
+        cerr << this->root_.get() << "\n";
     }
 }
 
@@ -1558,7 +1565,8 @@ shared_ptr<APTnode> MinicParser::getAptNode() const { return root_; }
 
 vector<APTnode> MinicParser::getNodes() const { return nodes_; }
 
-MinicParser::MinicParser() {
+MinicParser::MinicParser():
+    root_(nullptr) {
     // add location attributes for every APT node
     int         col, row; // closure variable
     AptNodeFunc minicActionFunc = [&col, &row](APTnode &node) {
@@ -1606,16 +1614,18 @@ MinicParser::MinicParser() {
 
 // ---------- minic parser instance ----------
 
-Grammar       minicGrammar = krill::minic::syntax::grammar;
+Grammar minicGrammar = krill::minic::syntax::grammar;
 
-MinicSyntaxParser::MinicSyntaxParser():
-    SyntaxParser(krill::minic::syntax::grammar, krill::minic::syntax::actionTable) {};
+MinicSyntaxParser::MinicSyntaxParser()
+    : SyntaxParser(krill::minic::syntax::grammar,
+                   krill::minic::syntax::actionTable){};
 
-MinicLexicalParser::MinicLexicalParser():
-    LexicalParser(krill::minic::lexical::dfa) {};
+MinicLexicalParser::MinicLexicalParser()
+    : LexicalParser(krill::minic::lexical::dfa){};
 
-// SyntaxParser  minicSyntaxParser(minicGrammar, krill::minic::syntax::actionTable);
-// LexicalParser minicLexicalParser(krill::minic::lexical::dfa);
-// MinicParser   minicParser(minicSyntaxParser, minicLexicalParser);
+// SyntaxParser  minicSyntaxParser(minicGrammar,
+// krill::minic::syntax::actionTable); LexicalParser
+// minicLexicalParser(krill::minic::lexical::dfa); MinicParser
+// minicParser(minicSyntaxParser, minicLexicalParser);
 
 } // namespace krill::minic
