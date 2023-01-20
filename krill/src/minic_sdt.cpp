@@ -208,9 +208,9 @@ Code SdtParser::parse_function_call(Func *func, const vector<Var *> &var_args) {
     auto extract_type = [](Var *var) { return var->type; };
     if (apply_map(func->params, extract_type) !=
         apply_map(var_args, extract_type)) {
-        logger.error("error: input parameters' type are not match to "
+        logger.error("input parameters' type are not match to "
                      "the declaration of function {}",
-                     func->name);
+                     func_fullname(func));
         throw runtime_error("error: parameters type do not match");
     }
 
@@ -329,12 +329,16 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
         auto prevDecl = find_function_by_name(funcname);
         if (prevDecl != nullptr) {
             if (prevDecl->type() != func->type()) {
-                logger.error("error: conflict declaration of function {}, "
-                             "previous declaration {}",
-                             func->type().str(), prevDecl->type().str());
+                logger.error("input:{}: {}: conflict declaration of function {}, "
+                             "previous declaration {}", 
+                             "\033[31merror\033[0m", 
+                             node->attr.Get<int>("row_st"), 
+                             node->attr.Get<int>("col_st"), 
+                             func_fullname(func), func_fullname(prevDecl));
+                throw runtime_error("conflict declaration of function");
             }
             if (prevDecl->code.has_value() != false) {
-                logger.error("error: re-definition of function {}",
+                logger.error("re-definition of function {}",
                              func->type().str());
             }
             func = prevDecl;

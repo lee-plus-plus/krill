@@ -44,7 +44,7 @@ $ ./test/test_syntax
 
 ### test_codegen
 
-`test_codegen`为编译器前端开发和调试提供了四个简易功能: 
+`test_codegen`为编译器前端开发和调试提供了6个简易功能: 
 
 1. 语法解析器-代码生成
 2. 词法解析器-代码生成
@@ -52,8 +52,6 @@ $ ./test/test_syntax
 4. 语法解析器-立即测试
 5. yacc文件解析-词法解析器-立即测试
 6. yacc文件解析-词法解析器-代码生成
-7. 中间代码生成
-8. 汇编代码(mips)生成
 
 ```bash
 $ make test_codegen
@@ -80,8 +78,7 @@ $ make test_codegen
 
 ### test_minic
 
-`test_minic`是mini-C的词法/ 语法解析器测试程序, 在编译器的其他部分尚未完成之前, 你可以用它测试前端
-的解析的正确性. 
+`test_minic`是专门为mini-C设计的编译器, 你可以用它解析mini-C的代码, 生成中间代码, 以及产生mips代码。
 
 ```bash
 $ make test_minic
