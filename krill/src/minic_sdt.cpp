@@ -688,10 +688,18 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
     } else if (child[0].get()->id == syntax::IDENT && // get variable
                child.size() == 1) {
         // expr : IDENT
-        auto v_ident = parse_ident_as_variable(child[0].get());
-        auto v_dest  = assign_new_variable({.type = v_ident->type});
-        auto code_dest =
-            Code{{.op = Op::kLoad, .args_m = {.var = v_dest, .mem = v_ident}}};
+        Var* v_ident = parse_ident_as_variable(child[0].get());
+        Var* v_dest;
+        Code code_dest;
+
+        if (v_ident->type.shape.size() == 0) {
+            v_dest = assign_new_variable({.type = v_ident->type});
+            code_dest = Code{{.op = Op::kLoad, .args_m = {.var = v_dest, .mem = v_ident}}};
+        } else {
+            // is a pointer
+            v_dest = v_ident;
+            code_dest = {};
+        }
 
         return {v_dest, code_dest};
     } else if (child[0].get()->id == syntax::IDENT && // get array element

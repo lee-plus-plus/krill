@@ -227,7 +227,13 @@ void MipsGenerator::genExprCode(const QuadTuple &q) {
             int32_t fpOffset = v_src2->info.fpOffset.value();
             // bug: reg_dest can be the same as reg_src1
             // x genCode("addiu", reg_dest, "$fp", fpOffset);
-            genCode("addiu", "$t0", "$fp", fpOffset);
+            // bug: parameter passing pointer
+            if (fpOffset > 0 && v_src2->type.shape.size() > 0) {
+                // is pointer, and is parameter
+                genCode("lw", "$t0", "$fp", fpOffset);
+            } else {
+                genCode("addiu", "$t0", "$fp", fpOffset);
+            }
             genCode("addu", reg_dest, "$t0", reg_src1);
         } else if (v_src2->info.memName.has_value()) {
             // is memory-name
@@ -379,8 +385,31 @@ void MipsGenerator::genParamPut(const QuadTuple &q) {
 
     auto var = q.args_f.var;
     auto idx = q.args_f.idx;
-    assert(var->info.reg.has_value());
-    string reg_var = var->info.reg.value();
+    string reg_var;
+    if (var->info.reg.has_value()) {
+        reg_var = var->info.reg.value();
+    } else {
+        reg_var = "$t0";
+        if (var->info.fpOffset.has_value()) {
+            // is fp-offset
+            int32_t fpOffset = var->info.fpOffset.value();
+            if (fpOffset > 0 && var->type.shape.size() > 0) {
+                // is pointer, and is parameter
+                genCode("lw", reg_var, "$fp", fpOffset);
+            } else {
+                genCode("addiu", reg_var, "$fp", fpOffset);
+            }
+        } else if (var->info.memName.has_value()) {
+            // is memory-name
+            assert(var->info.memOffset.has_value());
+            int32_t memOffset = var->info.memOffset.value();
+            genCode("addiu", reg_var, "$zero", memOffset);
+        } else {
+            assert(false);
+        }
+    }
+
+    genCode("sw", reg_var, "$sp", -4 * idx);
 
     // TODO: pass param<0-3> by register
     // if (idx <= 3) {
@@ -389,7 +418,7 @@ void MipsGenerator::genParamPut(const QuadTuple &q) {
     // } else {
     //     genCode("addu", reg_dest, "$zero", reg_var);
     // }
-    genCode("sw", reg_var, "$sp", -4 * idx);
+    
 }
 
 void MipsGenerator::genBranch(const QuadTuple &q) {

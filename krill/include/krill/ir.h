@@ -99,6 +99,7 @@ struct Var {
         std::optional<int>    fpOffset;  // it's a offset relatived to $fp
         std::optional<int>    memOffset; // it's a data segment position
         std::optional<string> memName;   // it's a data segment label
+        std::optional<string> ptrReg;   // 
 
         std::optional<string> reg; // assigned register
     };
