@@ -475,13 +475,13 @@ IrOptimizer &IrOptimizer::assignRegs() {
         const string regName[19] = {"$t0", "$t1", "$t2", "$t3", "$t4", "$t5",
                                     "$t6", "$t7", "$t8", "$t9", "$s0", "$s1",
                                     "$s2", "$s3", "$s4", "$s5", "$s6", "$s7"};
-        set<string> regsSaved;
+        set<string>  regsSaved;
         for (auto[var, color] : varColors) {
             // 1-7: $t1 - $t7, 8-9: $t8 - $t9, 10- 17: $s0 - $s7
             // remain $t0 for immediate load use
             assert(1 <= color && color <= 17);
             // TODO: if color > 17, spilling
-            string reg = regName[color];
+            string reg    = regName[color];
             var->info.reg = {reg};
             regsSaved.insert(reg);
         }
@@ -785,7 +785,8 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
             assert(varNodes.count(var) == 0); // SSA
             // bind const value to DAG node (var)
             DagNode *node;
-            if (mem->info.fpOffset.has_value() || mem->info.memName.has_value()) {
+            if (mem->info.fpOffset.has_value() ||
+                mem->info.memName.has_value()) {
                 if (memNodes.count(mem)) {
                     // alreadly loaded in a variable
                     node = memNodes.at(mem);
@@ -801,7 +802,7 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
                 varNodes.at(mem)->assignUsed();
                 node = nodes.assign(DagNode{.var = var, .defined = {&q}});
             }
-            
+
             varNodes[var] = node;
 
             logger.debug("  node \033[33m{}\033[0m (load from {})",
@@ -817,13 +818,12 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
             node = varNodes.at(var);
 
             // var used
-            if (varNodes.count(mem) > 0) {
-                varNodes.at(mem)->assignUsed();
-            } 
+            if (varNodes.count(mem) > 0) { varNodes.at(mem)->assignUsed(); }
             node->assignUsed();
 
             // bind const value to DAG node (mem)
-            if (mem->info.fpOffset.has_value() || mem->info.memName.has_value()) {
+            if (mem->info.fpOffset.has_value() ||
+                mem->info.memName.has_value()) {
                 memNodes[mem] = node;
             }
 
@@ -898,9 +898,8 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
                      var_name(node->var),
                      node->op != Op::kNop ? enum_name(node->op) : "",
                      node->src1 != nullptr ? var_name(node->src1->var) : "",
-                     node->src2 != nullptr ? var_name(node->src2->var) : "", 
-                     node->used ? "used" : "unused"
-                     );
+                     node->src2 != nullptr ? var_name(node->src2->var) : "",
+                     node->used ? "used" : "unused");
         for (auto q : node->defined) {
             logger.debug("  - def: {}", to_string(*q));
         }
@@ -928,7 +927,7 @@ IrOptimizer &IrOptimizer::eliminateCommonSubExpr() {
         // build global Interference Graph (over basic blocks)
         // and assign colors for registers
         logger.debug("in {}: global", func_name(func));
-        
+
         auto optimizedCode = vector<Code>(blocks.size());
 
         for (auto &block : blocks) {
@@ -941,18 +940,14 @@ IrOptimizer &IrOptimizer::eliminateCommonSubExpr() {
             vector<QuadTuple *> uselessCode;
             for (const auto &node : nodes.elements()) {
                 if (node->used) {
-                    Appender{uselessCode}
-                        .append(slice(node->defined, 1));
+                    Appender{uselessCode}.append(slice(node->defined, 1));
                 } else {
-                    Appender{uselessCode}
-                        .append(slice(node->defined, 0));
+                    Appender{uselessCode}.append(slice(node->defined, 0));
                 }
             }
             set<QuadTuple *> uselessCodeSet = to_set(uselessCode);
             for (auto &q : code) {
-                if (uselessCodeSet.count(&q)) {
-                    q.op = Op::kNop;
-                }
+                if (uselessCodeSet.count(&q)) { q.op = Op::kNop; }
             }
             code = apply_filter(code,
                                 [](QuadTuple q) { return q.op != Op::kNop; });

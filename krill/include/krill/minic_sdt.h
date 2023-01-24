@@ -77,6 +77,7 @@ class SdtParser {
     pair<Var *, Code> sdt_expr(APTnode *node);
 
     void sdt_expr_stmt(APTnode *node, Code &code);
+    void sdt_block_stmt(APTnode *node, Code &code);
     void sdt_if_stmt(APTnode *node, Code &code);
     void sdt_while_stmt(APTnode *node, Code &code);
     void sdt_return_stmt(APTnode *node, Code &code);
