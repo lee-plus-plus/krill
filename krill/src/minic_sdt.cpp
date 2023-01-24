@@ -418,7 +418,7 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
             tail_code.emplace_back(QuadTuple{
                 .op = Op::kRetPut, .args_f = {.var = var_temp, .idx = i}});
         }
-        Appender{tail_code}.append({{.op = Op::kRet}});
+        Appender{tail_code}.append({{.op = Op::kRet, .args_f = {.func = func}}});
         return tail_code;
     };
     Code head_code = gen_head_code();

@@ -131,6 +131,7 @@ struct Func {
 
     struct Info {
         std::optional<int> spOffset; // local space
+        std::optional<vector<string>> regsSaved; // callee saved registers
     };
 
     string        name;
@@ -158,6 +159,8 @@ template <typename T> class PtrPool {
     PtrPool(PtrPool &&pool)      = default;
     PtrPool(const PtrPool &pool) = delete;
 
+    vector<unique_ptr<T>> &elements() { return pool_; }
+
     T *assign(const T base) {
         auto ownership = std::make_unique<T>(std::move(base));
         auto ptr       = ownership.get();
@@ -173,6 +176,7 @@ struct Ir {
     PtrPool<Var>  variables;
     PtrPool<Lbl>  labels;
     PtrPool<Func> functions;
+
     // main information
     vector<Var *>  globalVars;
     vector<Func *> globalFuncs;

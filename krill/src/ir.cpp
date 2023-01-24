@@ -130,7 +130,7 @@ Code Ir::code() {
             Appender{code}
             .append({{.op = Op::kFuncBegin, .args_f = {.func = func}}})
             .append(func->code.value())
-            .append({{.op = Op::kFuncEnd}});
+            .append({{.op = Op::kFuncEnd, .args_f = {.func = func}}});
         } else {
             // not linked yet
             // do nothing

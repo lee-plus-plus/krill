@@ -8,7 +8,8 @@
 #include <set>
 #include <stack>
 #include <vector>
-using std::pair, std::vector, std::map, std::set;
+#include <tuple>
+using std::pair, std::vector, std::map, std::set, std::tuple;
 
 namespace krill::ir {
 
@@ -30,10 +31,39 @@ struct InfGraph {
     EdgeSet<Var *> edges;
 };
 
+// DAG Node
+struct DagNode {
+    Op       op   = Op::kNop;
+    DagNode *src1 = nullptr;
+    DagNode *src2 = nullptr;
+
+    // the reserved one in all same-name-variabels
+    Var *var;
+    // record expression-related quad-tuples that defines this DAG node
+    vector<QuadTuple *> defined;
+    vector<QuadTuple *> referenced;
+    // used <=> write into memory
+    bool used = false;
+
+    void assignUsed() {
+        if (used) { return; }
+        if (src1 != nullptr) { src1->assignUsed(); }
+        if (src2 != nullptr) { src2->assignUsed(); }
+        used = true;
+
+        krill::log::logger.debug("    node \033[33m{}\033[0m used",
+                         var_name(var));
+    }
+};
+
 class IrOptimizer {
   private:
-    Ir &            ir_;
-    BasicBlockGraph blocks_;
+    using Expr = tuple<Op, DagNode *, DagNode *>;
+
+    Ir &             ir_;
+
+    // BasicBlockGraph  blocks_;
+    // PtrPool<DagNodeas> nodes;
 
     void livenessAnalysis(const QuadTuple &q, vector<Var *> &defs,
                           vector<Var *> &uses);
@@ -43,12 +73,15 @@ class IrOptimizer {
     InfGraph        getLocalInfGraph(const BasicBlock &block,
                                      const set<Var *> &globalRegVars);
     map<Var *, int> coloring(const InfGraph &infGraph);
+    PtrPool<DagNode> buildDAG(Code &code);
+    void updateToIr(Code &code, const BasicBlockGraph &blockGraph);
 
   public:
-    IrOptimizer(Ir &ir): ir_(ir) {};
+    IrOptimizer(Ir &ir) : ir_(ir){};
 
     IrOptimizer &annotateInfo();
     IrOptimizer &assignRegs();
+    IrOptimizer &eliminateCommonSubExpr();
 };
 
 } // namespace krill::ir

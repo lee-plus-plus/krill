@@ -151,6 +151,36 @@ void testIrGeneration() {
     cout << to_string(ir.code()) << "\n";
 }
 
+// intermediate code generation
+void testIrOptimization() {
+    auto parser = MinicParser();
+    cerr << "input characters (end with ^d): \n"
+            "e.g., int main(void) {\\n} \n";
+
+    // get annotated parsing tree
+    parser.parseAll(cin); 
+    shared_ptr<APTnode> root = parser.getAptNode(); 
+
+
+    // syntax-directed translation
+    auto sdtParser = krill::minic::SdtParser(root.get());
+    auto ir        = sdtParser.parse().get();
+    auto irCode    = ir.code();
+
+    // side-effect: record name for temporary variables
+    // good for debug
+    cout << to_string(ir.code()) << "\n";
+
+    auto irOptimizer = krill::ir::IrOptimizer(ir);
+    irOptimizer.annotateInfo();
+
+    krill::log::sink_cerr->set_level(spdlog::level::debug);
+    irOptimizer.eliminateCommonSubExpr();
+
+    // show intermediate representation code
+    cout << to_string(ir.code()) << "\n";
+}
+
 // mips code generation
 void testMipsGeneration() {
     auto parser = MinicParser();
@@ -173,7 +203,8 @@ void testMipsGeneration() {
 
     // optimization
     auto irOptimizer = krill::ir::IrOptimizer(ir);
-    irOptimizer.annotateInfo().assignRegs();
+    irOptimizer.annotateInfo().eliminateCommonSubExpr();
+    irOptimizer.assignRegs();
 
     // mips code generation
     auto mipsGenerator = krill::mips::MipsGenerator(ir);
@@ -190,6 +221,7 @@ const char usage[] = "usage: test_minic {-l|-L|-s}\n"
                      "        -s    syntax parsing test\n"
                      "        -Ls   lexical & syntax parsing test\n"
                      "        -I    intermediate code generation\n"
+                     "        -I1   intermediate code generation with optimization\n"
                      "        -S    mips code generation\n";
 
 int main(int argc, char **argv) {
@@ -212,6 +244,9 @@ int main(int argc, char **argv) {
         cerr << "done!\n";
     } else if (strcmp(argv[1], "-I") == 0) {
         testIrGeneration();
+        cerr << "done!\n";
+    } else if (strcmp(argv[1], "-I1") == 0) {
+        testIrOptimization();
         cerr << "done!\n";
     } else if (strcmp(argv[1], "-S") == 0) {
         testMipsGeneration();
