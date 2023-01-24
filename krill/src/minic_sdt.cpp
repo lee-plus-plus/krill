@@ -807,8 +807,12 @@ void SdtParser::sdt_expr_stmt(APTnode *node, Code &code) {
 
         auto[var_expr1, code_expr1] = sdt_expr(child[1].get());
         auto[var_expr3, code_expr3] = sdt_expr(child[3].get());
-        code.emplace_back(QuadTuple{
-            .op = Op::kStore, .args_m = {.var = var_expr3, .mem = var_expr1}});
+        Appender{code}
+            .append({code_expr1})
+            .append({code_expr3})
+            .append(
+                {QuadTuple{.op     = Op::kStore,
+                           .args_m = {.var = var_expr3, .mem = var_expr1}}});
         return;
     } else if (child[0].get()->id == syntax::IDENT && // function call
                child[2].get()->id == syntax::args_) {
@@ -817,9 +821,9 @@ void SdtParser::sdt_expr_stmt(APTnode *node, Code &code) {
 
         auto func = parse_ident_as_function(child[0].get());
 
-        auto code_args = Code{};
-        auto node_args = child[2].get();
-        auto var_args  = sdt_args(node_args, code_args);
+        auto code_args     = Code{};
+        auto node_args     = child[2].get();
+        auto var_args      = sdt_args(node_args, code_args);
         auto code_funccall = parse_function_call(func, var_args);
 
         Appender{code}.append(code_args).append(code_funccall);
