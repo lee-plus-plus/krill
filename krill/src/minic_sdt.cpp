@@ -72,14 +72,27 @@ int SdtParser::parse_int_literal(APTnode *node) {
     return constVal;
 }
 
-// type_spec : VOID | INT
+// init_list : init_list ',' int_literal | int_literal
+vector<int> SdtParser::parse_init_list(APTnode *node) {
+    assert(node->id == syntax::init_list);
+
+    if (node->child.size() == 3) {
+        auto result = parse_init_list(node->child[0].get());
+        result.emplace_back(parse_int_literal(node->child[2].get()));
+        return result;
+    } else {
+        return {parse_int_literal(node->child[0].get())};
+    }
+}
+
+// type_spec : VOID_ | INT_
 TypeSpec SdtParser::parse_basetype(APTnode *node) {
     assert(node->id == syntax::type_spec);
 
     auto child = node->child[0].get();
-    if (child->id == syntax::VOID) {
+    if (child->id == syntax::VOID_) {
         return TypeSpec::kVoid;
-    } else if (child->id == syntax::INT) {
+    } else if (child->id == syntax::INT_) {
         return TypeSpec::kInt32;
     } else {
         assert(false);
@@ -87,8 +100,10 @@ TypeSpec SdtParser::parse_basetype(APTnode *node) {
     }
 }
 
-// ? : type_spec IDENT ? | type_spec IDENT '[' int_literal ']' ?
-Var *SdtParser::parse_var_decl(APTnode *node) {
+// ? : type_spec IDENT ... | type_spec IDENT '[' int_literal ']' ... |
+//     type_spec IDENT '=' int_literal ... |
+//     type_spec IDENT '[' int_literal ']' '=' '{' init_list '}' ...
+pair<Var *, Code> SdtParser::parse_var_decl(APTnode *node) {
     assert(node->child[0].get()->id == syntax::type_spec);
     assert(node->child[1].get()->id == syntax::IDENT);
 
@@ -96,10 +111,15 @@ Var *SdtParser::parse_var_decl(APTnode *node) {
     auto varname  = node->child[1].get()->attr.Get<string>("lval");
     auto shape    = vector<int>{};
 
+    bool isArrayDecl =
+        (node->child.size() > 2 && node->child[2].get()->id == '[');
+    bool hasInitalVal =
+        isArrayDecl
+            ? (node->child.size() > 5 && node->child[5].get()->id == '=')
+            : (node->child.size() > 2 && node->child[2].get()->id == '=');
     // TODO: check previous declaration
 
-    if (node->child.size() > 2 && node->child[2].get()->id == '[' &&
-        node->child[3].get()->id == syntax::int_literal) {
+    if (isArrayDecl) {
         // is array declaration
         int dimSize = parse_int_literal(node->child[3].get());
         shape       = vector<int>{dimSize};
@@ -107,10 +127,72 @@ Var *SdtParser::parse_var_decl(APTnode *node) {
     auto type = Var::TypeDecl{.basetype = basetype, .shape = shape};
     auto var  = assign_new_variable({.name = varname, .type = type});
 
-    return var;
-}
+    auto code_init = Code{};
+    if (hasInitalVal) {
+        if (isArrayDecl) {
+            // type_spec IDENT '[' int_literal ']' '=' '{' init_list '}' ...
+            auto        node_init = node->child[7].get();
+            vector<int> init_list = parse_init_list(node_init);
 
-// params : param_list | VOID
+            if (type.shape[0] != init_list.size()) {
+                logger.error(
+                    "input:{}: {}: {}: unmatched size for intializer list {}, ",
+                    node_init->attr.Get<int>("row_st"),
+                    node_init->attr.Get<int>("col_st"), "\033[31merror\033[0m",
+                    varname);
+                throw runtime_error("unmatched size for intializer list");
+            }
+
+            auto width = var->type.baseSize();
+            for (int i = 0; i < init_list.size(); i++) {
+                auto var_idx =
+                    assign_new_variable({.type = {TypeSpec::kInt32}});
+                auto var_width =
+                    assign_new_variable({.type = {TypeSpec::kInt32}});
+                auto var_offset =
+                    assign_new_variable({.type = {TypeSpec::kInt32}});
+                auto var_addr =
+                    assign_new_variable({.type = {TypeSpec::kInt32}});
+                auto var_cval =
+                    assign_new_variable({.type = {TypeSpec::kInt32}});
+
+                Appender{code_init}.append({
+                    {.op = Op::kAssign, .args_i = {.var = var_idx, .cval = i}},
+                    {.op     = Op::kAssign,
+                     .args_i = {.var = var_width, .cval = width}},
+                    {.op     = Op::kMult,
+                     .args_e = {.dest = var_offset,
+                                .src1 = var_idx,
+                                .src2 = var_width}},
+                    {.op     = Op::kAdd,
+                     .args_e = {.dest = var_addr,
+                                .src1 = var,
+                                .src2 = var_offset}},
+                    {.op     = Op::kAssign,
+                     .args_i = {.var = var_cval, .cval = init_list[i]}},
+                    {.op     = Op::kStore,
+                     .args_m = {.var = var_cval, .mem = var_addr}},
+                });
+            }
+        } else {
+            // type_spec IDENT '=' int_literal ...
+            auto node_init = node->child[3].get();
+            int  init_val  = parse_int_literal(node_init);
+
+            auto var_cval = assign_new_variable({.type = {TypeSpec::kInt32}});
+
+            Appender{code_init}.append({
+                {.op     = Op::kAssign,
+                 .args_i = {.var = var_cval, .cval = init_val}},
+                {.op = Op::kStore, .args_m = {.var = var_cval, .mem = var}},
+            });
+        }
+    }
+
+    return {var, code_init};
+} // namespace krill::minic
+
+// params : param_list | VOID_
 // param_list : param_list ',' param | param
 // param : type_spec IDENT | type_spec IDENT '[' int_literal ']'
 vector<Var *> SdtParser::parse_params(APTnode *node) {
@@ -119,7 +201,7 @@ vector<Var *> SdtParser::parse_params(APTnode *node) {
         switch (node->child[0].get()->id) {
         case syntax::param_list:
             return parse_params(node->child[0].get());
-        case syntax::VOID:
+        case syntax::VOID_:
             return vector<Var *>{};
         default:
             assert(false);
@@ -134,7 +216,16 @@ vector<Var *> SdtParser::parse_params(APTnode *node) {
         return result;
     }
     case syntax::param: {
-        return vector<Var *>{parse_var_decl(node)};
+        auto[var, code_init] = parse_var_decl(node);
+
+        if (code_init.size() != 0) {
+            logger.error(
+                "input:{}: {}: {}: cannnit define initial value for parameters",
+                node->attr.Get<int>("row_st"), node->attr.Get<int>("col_st"),
+                "\033[31merror\033[0m");
+            throw runtime_error("cannnit define initial value for parameters");
+        }
+        return vector<Var *>{var};
     }
     default:
         assert(false);
@@ -272,9 +363,7 @@ void SdtParser::sdt_stmt(APTnode *node, Code &code) {
         break;
     case syntax::block_stmt:
         // block_stmt : '{' local_decls stmt_list '}' | '{' '}'
-        if (node->child[1].get()->id == syntax::local_decls) {
-            sdt_block_stmt(node, code);
-        }
+        sdt_block_stmt(node, code);
         break;
     case syntax::if_stmt:
         // if_stmt : IF '(' expr ')' stmt | IF '(' expr ')' stmt ELSE stmt
@@ -295,6 +384,8 @@ void SdtParser::sdt_stmt(APTnode *node, Code &code) {
     case syntax::break_stmt:
         // break_stmt : BREAK ';'
         sdt_break_stmt(node, code);
+        break;
+    case ';':
         break;
     default:
         assert(false);
@@ -330,11 +421,11 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
         if (prevDecl != nullptr) {
             if (prevDecl->type() != func->type()) {
                 logger.error(
-                    "input:{}: {}: conflict declaration of function {}, "
+                    "input:{}: {}: {}: conflict declaration of function {}, "
                     "previous declaration {}",
-                    "\033[31merror\033[0m", node->attr.Get<int>("row_st"),
-                    node->attr.Get<int>("col_st"), func_fullname(func),
-                    func_fullname(prevDecl));
+                    node->attr.Get<int>("row_st"),
+                    node->attr.Get<int>("col_st"), "\033[31merror\033[0m",
+                    func_fullname(func), func_fullname(prevDecl));
                 throw runtime_error("conflict declaration of function");
             }
             if (prevDecl->code.has_value() != false) {
@@ -369,6 +460,7 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
     auto q_return =
         QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_return}};
 
+    auto init_code = Code{}; // intialize local variables
     auto body_code = Code{};
 
     // make the return position visiable in the sub
@@ -379,16 +471,18 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
 
     var_domains_.emplace_back(&func->params);
     var_domains_.emplace_back(&func->localVars);
+    initializer_domains_.emplace_back(&init_code);
     // parse function definition codes
-    sdt_stmt(node->child[5].get(), body_code);
+    sdt_stmt(node->child[5].get(), body_code); // compound_stmt
     // recover
+    initializer_domains_.pop_back();
     var_domains_.pop_back();
     var_domains_.pop_back();
     // recover
     lbl_return_stack_.pop();
     var_returns_stack_.pop();
 
-    // head code: allocate local variables, intialize return value
+    // head code: allocate local variables
     auto gen_head_code = [func]() -> Code {
         auto head_code = Code{};
         for (const auto &var : func->returns) {
@@ -431,12 +525,13 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
     auto funcCode = Code{};
 
     Appender{funcCode}
-        .append({q_init})
-        .append(head_code)
-        .append({q_entry})
-        .append(body_code)
-        .append({q_return})
-        .append(tail_code);
+        .append({q_init})   //  .init:
+        .append(head_code)  //      allocate ...
+        .append(init_code)  //      initializer ...
+        .append({q_entry})  //  .entry:
+        .append(body_code)  //      ...
+        .append({q_return}) //  .return:
+        .append(tail_code); //      store retval ...
 
     func->code.emplace(std::move(funcCode));
 }
@@ -446,9 +541,11 @@ void SdtParser::sdt_global_var_decl(APTnode *node) {
     // var_decl : type_spec IDENT ';' | ...
     assert(node->id == syntax::var_decl);
 
-    auto var = parse_var_decl(node);
-    // add its declaration into domains
+    auto[var, code_init] = parse_var_decl(node);
+
+    // add its declaration, intializer code, into domains
     var_domains_.back()->emplace_back(var);
+    Appender{*initializer_domains_.back()}.append(code_init);
 }
 
 // in-function variable declarations
@@ -457,8 +554,11 @@ void SdtParser::sdt_local_var_decl(APTnode *node) {
     //              type_spec IDENT '[' int_literal ']' ';‘
     assert(node->id == syntax::local_decl);
 
-    auto var = parse_var_decl(node);
-    var_domains_.back()->emplace_back(var); // should be on local doamin
+    auto[var, code_init] = parse_var_decl(node);
+
+    // add its declaration, intializer code, into domains
+    var_domains_.back()->emplace_back(var);
+    Appender{*initializer_domains_.back()}.append(code_init);
 }
 
 // parse argument list
@@ -845,8 +945,13 @@ void SdtParser::sdt_block_stmt(APTnode *node, Code &code) {
     auto local_var_domain = vector<Var *>{};
 
     var_domains_.push_back(&local_var_domain);
-    sdt_decl(node->child[1].get());
+    initializer_domains_.push_back(&code);
+
+    sdt_decl(
+        node->child[1].get()); // intializer code will be appended into code
     sdt_stmt(node->child[2].get(), code);
+
+    initializer_domains_.pop_back();
     var_domains_.pop_back();
 
     Appender{func->localVars}.append(local_var_domain);
@@ -965,6 +1070,8 @@ void SdtParser::sdt_break_stmt(APTnode *node, Code &code) {
 SdtParser &SdtParser::parse() {
     // initialization
     ir_.clear();
+    auto globalInitalizer = Code{};
+
     var_domains_.clear();
     func_domains_.clear();
 
@@ -977,9 +1084,36 @@ SdtParser &SdtParser::parse() {
     // syntax directed translation
     var_domains_.emplace_back(&ir_.globalVars);
     func_domains_.emplace_back(&ir_.globalFuncs);
+    initializer_domains_.emplace_back(&globalInitalizer);
+
     sdt_decl(root_); // core
-    var_domains_.pop_back();
+
+    initializer_domains_.pop_back();
     func_domains_.pop_back();
+    var_domains_.pop_back();
+
+
+    auto gen_entry_point_func_code = [this](Code code) {
+        auto func = this->assign_new_function({.name = "entry.point.function"});
+        auto lbl_init = this->assign_new_label({.name = "entry.point.init"});
+        auto lbl_ret  = this->assign_new_label({.name = "entry.point.return"});
+        auto q_init_lbl =
+            QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_init}};
+        auto q_ret_lbl =
+            QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_ret}};
+        auto q_ret = QuadTuple{.op = Op::kRet, .args_f = {.func = func}};
+
+        auto result = Code{};
+        Appender{result}
+            .append({q_init_lbl})
+            .append(code)
+            .append({q_ret_lbl})
+            .append({q_ret});
+        func->code = result;
+        return func;
+    };
+    Func *entry_point_func = gen_entry_point_func_code(globalInitalizer);
+    ir_.globalFuncs.insert(ir_.globalFuncs.begin(), entry_point_func);
 
     logger.info("syntax-directed-translation complete successfully");
     return *this;

@@ -1,4 +1,4 @@
-%token IDENT VOID INT WHILE IF ELSE RETURN EQ NE LE GE AND OR DECNUM CONTINUE BREAK HEXNUM LSHIFT RSHIFT
+%token IDENT VOID_ INT_ WHILE IF ELSE RETURN EQ NE LE GE AND OR DECNUM CONTINUE BREAK HEXNUM LSHIFT RSHIFT FOR
 
 %left OR
 %left AND
@@ -32,15 +32,20 @@ decl
 
 var_decl
     : type_spec IDENT ';'
-
     | type_spec IDENT '[' int_literal ']' ';'
-
+    | type_spec IDENT '=' int_literal ';'
+    | type_spec IDENT '[' int_literal ']' '=' '{' init_list '}' ';'
     ;  /*变量包括简单变量和一维数组变量*/
 
+init_list
+    : init_list ',' int_literal
+    | int_literal
+    ; /* 定义时赋值 */
+
 type_spec
-    : VOID
-    | INT
-    ;  /*函数返回值类型或变量类型包括整型或 VOID*/
+    : VOID_
+    | INT_
+    ;  /*函数返回值类型或变量类型包括整型或 VOID_*/
 
 fun_decl
     : type_spec FUNCTION_IDENT '(' params ')' compound_stmt
@@ -54,7 +59,7 @@ FUNCTION_IDENT
 
 params
     : param_list
-    | VOID
+    | VOID_
     ;  /*函数参数个数可为 0 或多个*/
 
 param_list
@@ -77,9 +82,11 @@ stmt
     | block_stmt
     | if_stmt
     | while_stmt
+    | for_stmt
     | return_stmt
     | continue_stmt
     | break_stmt
+    | ';'
     ;
 
 
@@ -98,6 +105,10 @@ WHILE_IDENT
     : WHILE
     ; /*建立入口出口信息全局变量*/
 
+for_stmt
+    : FOR '(' stmt ';' stmt ';' stmt ')' stmt
+    ;
+
 block_stmt
     : '{' local_decls stmt_list '}'
     ;  /*语句块*/
@@ -114,6 +125,8 @@ local_decls
 local_decl
     : type_spec IDENT ';'
     | type_spec IDENT '[' int_literal ']' ';'
+    | type_spec IDENT '=' int_literal ';'
+    | type_spec IDENT '[' int_literal ']' '=' '{' init_list '}' ';'
     ;
 
 if_stmt
