@@ -1,4 +1,5 @@
 
+int fib[20];
 int glb;
 
 int add(int x, int y) {
@@ -9,7 +10,7 @@ int add(int x, int y) {
 
 int main(void) {
 	int len;
-	int fib[20];
+	
 	int i;
 
 	len = 20;

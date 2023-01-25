@@ -29,11 +29,7 @@ int32_t sign_extend(int16_t src) { return static_cast<int16_t>(src); }
 
 // ---------- one-line-mips code generate ----------
 
-void MipsGenerator::genSection(string src) {
-    mips_code_.push_back(to_string(fmt::format("{}", src)));
-}
-
-void MipsGenerator::genComment(string src) {
+void MipsGenerator::genAny(string src) {
     mips_code_.push_back(to_string(fmt::format("{} ", src)));
 }
 
@@ -96,19 +92,34 @@ void MipsGenerator::genLabel(string lblname) {
 void MipsGenerator::genFuncBegin(const QuadTuple &q) {
     auto func     = q.args_f.func;
     auto funcname = func->name;
-    auto spOffset = func->info.spOffset;
+    assert(func->info.spOffset.has_value());
+    assert(func->info.regsSaved.has_value());
+    auto spOffset = func->info.spOffset.value();
+    auto regsSaved = func->info.regsSaved.value();
 
-    genComment(to_string(fmt::format("# {}", func_fullname(func))));
+    genAny("");
+    genAny(to_string(fmt::format("# {}", func_fullname(func))));
     genLabel(funcname);
 
-    // assign stack space for local variables (example given below:)
+    // assign stack space for local variables (example given below: 
+
     // 8($fp) = param<1> (x)
     // 4($fp) = param<2> (y)
     // 0($fp) = $ra
     // -4($fp) = $fp_last
-    // $fp - 8 = $sp
-    assert(spOffset.has_value());
-    genCode("addiu", "$sp", "$fp", spOffset.value());
+    // $fp - 8 = $sp => $fp + spOffset (<0) = $sp
+    genCode("sw", "$ra", "$sp", 0);
+    genCode("sw", "$fp", "$sp", -4);
+    genCode("ori", "$fp", "$sp", 0);
+    genCode("addiu", "$sp", "$fp", spOffset);
+
+    // save caller registers
+    int spOffset2 = 0;
+    for (string reg : regsSaved) {
+        genCode("sw", reg, "$sp", spOffset2);
+        spOffset2 -= 4;
+    }
+    genCode("addiu", "$sp", "$sp", spOffset2);
 
     // gen comments for offset meanings
     vector<Var *> localVars;
@@ -118,27 +129,41 @@ void MipsGenerator::genFuncBegin(const QuadTuple &q) {
         .append(func->localVars);
     for (const auto &var : localVars) {
         auto varname  = var->name;
-        auto fpOffset = var->info.fpOffset;
+        assert(var->info.fpOffset.has_value());
+        auto fpOffset = var->info.fpOffset.value();
 
         assert(var->info.fpOffset.has_value());
-        genComment(
-            to_string(fmt::format("\t# {}: {}($fp)", varname, fpOffset.value())));
+        genAny(
+            to_string(fmt::format("\t# {}: {}($fp)", varname, fpOffset)));
     }
 }
 
 void MipsGenerator::genFuncRet(const QuadTuple &q) {
+    // recover caller registers
+    auto func = q.args_f.func;
+    assert(func->info.regsSaved.has_value());
+    auto regsSaved = func->info.regsSaved.value();
+    int spOffset2 = regsSaved.size() * +4;
+    for (string reg : regsSaved) {
+        genCode("lw", reg, "$sp", spOffset2);
+        spOffset2 -= 4;
+    }
+    genCode("addiu", "$sp", "$sp", regsSaved.size() * +4);
+
     // pop $sp, $ra, $fp
     genCode("ori", "$sp", "$fp", 0);
     genCode("lw", "$ra", "$fp", 0); // if no func call inside, can be ignored
     genCode("lw", "$fp", "$fp", -4);
     genCode("jr", "$ra");
     genCode("nop");
+
+
 }
 
 void MipsGenerator::genFuncEnd(const QuadTuple &q) {
-    // we assume that each function must has a RETURN
-    // and all the work is done when RETURNing
+    // we assume that all the work is done when RETURNing
     // so nothing to do at the end of function
+
     genCode("nop");
 }
 
@@ -149,18 +174,14 @@ void MipsGenerator::genFuncCall(const QuadTuple &q) {
     // mips conventions: assume parameters already pushed before
     genCode("addiu", "$sp", "$sp", -4 * func->params.size());
 
-    genComment(to_string(fmt::format("\t# call function {} begin", funcname)));
-    // push $sp, $ra, $fp
-    genCode("sw", "$ra", "$sp", 0);
-    genCode("sw", "$fp", "$sp", -4);
-    genCode("ori", "$fp", "$sp", 0);
+    genAny(to_string(fmt::format("\t# call function {} begin", funcname)));
 
     genCode("jal", funcname);
     genCode("nop");
 
-    genCode("lw", "$ra", "$sp", 0);
+    // genCode("lw", "$ra", "$sp", 0);
     genCode("addiu", "$sp", "$sp", +4 * func->params.size());
-    genComment(to_string(fmt::format("\t# call function {} end", funcname)));
+    genAny(to_string(fmt::format("\t# call function {} end", funcname)));
 }
 
 void MipsGenerator::genExprCode(const QuadTuple &q) {
@@ -204,12 +225,22 @@ void MipsGenerator::genExprCode(const QuadTuple &q) {
         if (v_src2->info.fpOffset.has_value()) {
             // is fp-offset
             int32_t fpOffset = v_src2->info.fpOffset.value();
-            genCode("addiu", reg_dest, "$fp", fpOffset);
-            genCode("addu", reg_dest, reg_dest, reg_src1);
+            // bug: reg_dest can be the same as reg_src1
+            // x genCode("addiu", reg_dest, "$fp", fpOffset);
+            // bug: parameter passing pointer
+            if (fpOffset > 0 && v_src2->type.shape.size() > 0) {
+                // is pointer, and is parameter
+                genCode("lw", "$t0", "$fp", fpOffset);
+            } else {
+                genCode("addiu", "$t0", "$fp", fpOffset);
+            }
+            genCode("addu", reg_dest, "$t0", reg_src1);
         } else if (v_src2->info.memName.has_value()) {
             // is memory-name
-            string memName = v_src2->info.memName.value();
-            genCode("addiu", reg_dest, reg_src1, memName);
+            // string memName = v_src2->info.memName.value();
+            assert(v_src2->info.memOffset.has_value());
+            auto memOffset = v_src2->info.memOffset.value();
+            genCode("addiu", reg_dest, reg_src1, memOffset);
         } else {
             assert(false);
         }
@@ -224,7 +255,7 @@ void MipsGenerator::genExprCode(const QuadTuple &q) {
         case Op::kAdd:
             genCode("addu", reg_dest, reg_src1, reg_src2);
             break;
-        case Op::kMinus:
+        case Op::kSub:
             genCode("subu", reg_dest, reg_src1, reg_src2);
             break;
         case Op::kMult:
@@ -354,8 +385,31 @@ void MipsGenerator::genParamPut(const QuadTuple &q) {
 
     auto var = q.args_f.var;
     auto idx = q.args_f.idx;
-    assert(var->info.reg.has_value());
-    string reg_var = var->info.reg.value();
+    string reg_var;
+    if (var->info.reg.has_value()) {
+        reg_var = var->info.reg.value();
+    } else {
+        reg_var = "$t0";
+        if (var->info.fpOffset.has_value()) {
+            // is fp-offset
+            int32_t fpOffset = var->info.fpOffset.value();
+            if (fpOffset > 0 && var->type.shape.size() > 0) {
+                // is pointer, and is parameter
+                genCode("lw", reg_var, "$fp", fpOffset);
+            } else {
+                genCode("addiu", reg_var, "$fp", fpOffset);
+            }
+        } else if (var->info.memName.has_value()) {
+            // is memory-name
+            assert(var->info.memOffset.has_value());
+            int32_t memOffset = var->info.memOffset.value();
+            genCode("addiu", reg_var, "$zero", memOffset);
+        } else {
+            assert(false);
+        }
+    }
+
+    genCode("sw", reg_var, "$sp", -4 * idx);
 
     // TODO: pass param<0-3> by register
     // if (idx <= 3) {
@@ -364,7 +418,7 @@ void MipsGenerator::genParamPut(const QuadTuple &q) {
     // } else {
     //     genCode("addu", reg_dest, "$zero", reg_var);
     // }
-    genCode("sw", reg_var, "$sp", -4 * idx);
+    
 }
 
 void MipsGenerator::genBranch(const QuadTuple &q) {
@@ -424,8 +478,15 @@ void MipsGenerator::genGlobal(const QuadTuple &q) {
 void MipsGenerator::genDirector() {
     // auto func_main = get_function_by_name("main").funcLbl.lbl;
     // genFuncCall(QuadTuple{Op::kCall, {.func = lbl_main, .argc = 0}});
+    genCode("ori", "$fp", "$zero", to_hex(stackBeginPosition));
+    genCode("ori", "$sp", "$zero", to_hex(stackBeginPosition));
     // call main
-    genCode("j", "main");
+    genCode("jal", "main");
+    genCode("nop");
+
+    genLabel("global.end.loop");
+    genCode("j", "global.end.loop");
+    genCode("nop");
     genCode("nop");
 }
 
@@ -433,6 +494,7 @@ void MipsGenerator::genDirector() {
 
 // dispatcher
 void MipsGenerator::genCodes(const QuadTuple &q) {
+    // genAny(to_string(fmt::format("\t# {}", to_string(q))));
     // clang-format off
     switch (q.op) {
         case Op::kNop:
@@ -441,7 +503,7 @@ void MipsGenerator::genCodes(const QuadTuple &q) {
         case Op::kAssign:
             genAssign(q);
             break;
-        case Op::kAdd:      case Op::kMinus:    case Op::kMult: 
+        case Op::kAdd:      case Op::kSub:    case Op::kMult: 
         case Op::kDiv:      case Op::kMod:  
         case Op::kAnd:      case Op::kOr:       case Op::kXor:  case Op::kNor:
         case Op::kLShift:   case Op::kRShift:
@@ -516,12 +578,13 @@ MipsGenerator &MipsGenerator::parse() {
         }
     }
 
-    genSection(".DATA");
+    genAny(to_string(fmt::format(".DATA {}", to_hex(dataBeginPosition))));
     for (const auto &ir : dataCode) { genCodes(ir); }
-    genSection(".TEXT");
+    genAny(to_string(fmt::format(".TEXT {}", to_hex(textBeginPosition))));
     genDirector(); // direct to main
     for (const auto &ir : textCode) { genCodes(ir); }
 
+    logger.info("mips code generation complete successfully");
     return *this;
 }
 

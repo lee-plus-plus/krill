@@ -23,7 +23,7 @@ enum class Op {
     // clang-format off
     kNop, 
     kAssign, /* .args_i (var, cval) */
-    kAdd, kMinus, kMult, kDiv, kMod,/* .args_e (dest, src1, src2) */
+    kAdd, kSub, kMult, kDiv, kMod,/* .args_e (dest, src1, src2) */
     kAnd, kOr, kXor, kNor,          /* .args_e (dest, src1, src2) */
     kLShift, kRShift,               /* .args_e (dest, src1, src2) */
     kEq, kNeq, kLeq, kLt,           /* .args_e (dest, src1, src2) */
@@ -95,9 +95,11 @@ struct Var {
     };
     struct Info {
         // exclusive
-        std::optional<int>    constVal; // it's a const value
-        std::optional<int>    fpOffset; // it's a offset relatived to $fp
-        std::optional<string> memName;  // it's a data segment label
+        std::optional<int>    constVal;  // it's a const value
+        std::optional<int>    fpOffset;  // it's a offset relatived to $fp
+        std::optional<int>    memOffset; // it's a data segment position
+        std::optional<string> memName;   // it's a data segment label
+        std::optional<string> ptrReg;   // 
 
         std::optional<string> reg; // assigned register
     };
@@ -130,6 +132,7 @@ struct Func {
 
     struct Info {
         std::optional<int> spOffset; // local space
+        std::optional<vector<string>> regsSaved; // callee saved registers
     };
 
     string        name;
@@ -157,6 +160,8 @@ template <typename T> class PtrPool {
     PtrPool(PtrPool &&pool)      = default;
     PtrPool(const PtrPool &pool) = delete;
 
+    vector<unique_ptr<T>> &elements() { return pool_; }
+
     T *assign(const T base) {
         auto ownership = std::make_unique<T>(std::move(base));
         auto ptr       = ownership.get();
@@ -172,6 +177,7 @@ struct Ir {
     PtrPool<Var>  variables;
     PtrPool<Lbl>  labels;
     PtrPool<Func> functions;
+
     // main information
     vector<Var *>  globalVars;
     vector<Func *> globalFuncs;

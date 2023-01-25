@@ -1,4 +1,5 @@
 #include "krill/minic.h"
+#include "fmt/color.h"
 #include "fmt/format.h"
 #include "krill/automata.h"
 #include "krill/defs.h"
@@ -14,6 +15,7 @@
 using namespace std;
 using namespace krill::type;
 using namespace krill::utils;
+using krill::log::logger;
 
 using krill::runtime::AptNodeFunc;
 
@@ -30,7 +32,7 @@ namespace krill::minic::syntax {
 
 ActionTable actionTable = {
     // clang-format off
-	{{0, 259}, {AT0, 1}},     {{0, 260}, {AT0, 2}},
+    {{0, 259}, {AT0, 1}},     {{0, 260}, {AT0, 2}},
     {{0, 278}, {AT2, 3}},     {{0, 279}, {AT2, 4}},
     {{0, 280}, {AT2, 5}},     {{0, 281}, {AT2, 6}},
     {{0, 282}, {AT2, 7}},     {{1, 258}, {AT1, 7}},
@@ -929,7 +931,7 @@ ActionTable actionTable = {
 
 map<int, string> symbolNames = {
     {-1, "ζ"},
-    {0, "ε"},
+    {0,  "ε"},
     {33, "'!'"},
     {36, "'$'"},
     {37, "'%'"},
@@ -1317,14 +1319,14 @@ namespace krill::minic {
 
 void MinicParser::count(char c) {
     if (c == '\n') {
-        row_ += 1;
-        col_ = 1;
+        row_lex_ += 1;
+        col_lex_ = 1;
     } else if (c == '\t') {
         // col_ = ((col_ + 3) / 4) * 4 + 1; // bad
-        col_ += 1;
-        while (col_ % 8 != 1) { col_ += 1; } // good
+        col_lex_ += 1;
+        while (col_lex_ % 8 != 1) { col_lex_ += 1; } // good
     } else {
-        col_ += 1;
+        col_lex_ += 1;
     }
     // update source, by the way
     source_ << c;
@@ -1339,8 +1341,8 @@ void MinicParser::count(char c) {
 APTnode MinicParser::tokenToNode(Token token, istream &input, bool &drop) {
     APTnode node;
     node.attr.Set<string>("lval", token.lval);
-    node.attr.Set<int>("col_st", col_);
-    node.attr.Set<int>("row_st", row_);
+    node.attr.Set<int>("col_st", col_lex_);
+    node.attr.Set<int>("row_st", row_lex_);
 
     if (token.id == 43) { // 43: /\*
         bool match1 = false, match2 = false;
@@ -1511,8 +1513,8 @@ APTnode MinicParser::tokenToNode(Token token, istream &input, bool &drop) {
         drop = false;
     }
 
-    node.attr.Set<int>("col_ed", col_);
-    node.attr.Set<int>("row_ed", row_);
+    node.attr.Set<int>("col_ed", col_lex_);
+    node.attr.Set<int>("row_ed", row_lex_);
     return node;
 }
 
@@ -1524,8 +1526,9 @@ string MinicParser::getLocatedSource(int colSt, int rowSt, int colEd,
         string rowStr    = sourceLines_[row - 1].str();
         int    currColSt = (row > rowSt) ? 0 : (colSt - 1);
         int    currColEd = (row < rowSt) ? rowStr.size() : (colEd - 1);
-        ss << fmt::format("{}\n{}{}\n", rowStr, string(currColSt, ' '),
-                          string(currColEd - currColSt, '~'));
+        ss << fmt::format("{}\n{}\033[33m{}{}\033[0m", rowStr,
+                          string(currColSt, ' '), "^",
+                          string(currColEd - currColSt - 1, '~'));
         break; // only print one line
     }
     return ss.str();
@@ -1534,43 +1537,42 @@ string MinicParser::getLocatedSource(int colSt, int rowSt, int colEd,
 void MinicParser::parseStep(istream &input) {
     if (root_.get() != nullptr) { return; }
     bool    drop  = false;
-    Token   token = lexicalParser_.parseStep(cin);
-    APTnode node  = tokenToNode(token, cin, drop);
+    Token   token = lexicalParser_.parseStep(input);
+    APTnode node  = tokenToNode(token, input, drop);
 
     if (!drop) {
         nodes_.push_back(node);
         syntaxParser_.parseStep(node);
     }
 
-    if (token == END_TOKEN) {
-        root_ = syntaxParser_.getAPT();
-        // root_ = shared_ptr<APTnode>(new APTnode());
+    if (token == END_TOKEN) { 
+        root_ = syntaxParser_.getAPT(); 
     }
 }
 
 void MinicParser::parseAll(istream &input) {
-    while (root_.get() == nullptr) { parseStep(input); }
+    while (this->root_.get() == nullptr) { 
+        parseStep(input); 
+    }
 }
 
 shared_ptr<APTnode> MinicParser::getAptNode() const { return root_; }
 
-vector<APTnode> MinicParser::getNodes()  const { return nodes_; }
+vector<APTnode> MinicParser::getNodes() const { return nodes_; }
 
-MinicParser::MinicParser(SyntaxParser  minicSynParser,
-                         LexicalParser minicLexParser)
-    : syntaxParser_(minicSynParser), lexicalParser_(minicLexParser) {
-
+MinicParser::MinicParser():
+    root_(nullptr) {
     // add location attributes for every APT node
-    int         col, row; // closure variable
-    AptNodeFunc minicActionFunc = [&col, &row](APTnode &node) {
+
+    AptNodeFunc minicActionFunc = [this](APTnode &node) {
         assert(node.attr.Has<int>("col_st"));
         assert(node.attr.Has<int>("row_st"));
         assert(node.attr.Has<int>("col_ed"));
-        assert(node.attr.Has<int>("row_st"));
-        col = node.attr.Get<int>("col_ed");
-        row = node.attr.Get<int>("row_ed");
+        assert(node.attr.Has<int>("row_ed"));
+        this->col_syn_ = node.attr.Get<int>("col_ed"); // bug!
+        this->row_syn_ = node.attr.Get<int>("row_ed"); // bug!
     };
-    AptNodeFunc minicReduceFunc = [&col, &row](APTnode &node) {
+    AptNodeFunc minicReduceFunc = [this](APTnode &node) {
         if (node.child.size() != 0) {
             node.attr.RefN<int>("col_st") =
                 node.child.front().get()->attr.Get<int>("col_st");
@@ -1582,10 +1584,10 @@ MinicParser::MinicParser(SyntaxParser  minicSynParser,
                 node.child.back().get()->attr.Get<int>("row_ed");
         } else {
             // empty production (local_decl <- )
-            node.attr.RefN<int>("col_st") = col;
-            node.attr.RefN<int>("row_st") = row;
-            node.attr.RefN<int>("col_ed") = col;
-            node.attr.RefN<int>("row_ed") = row;
+            node.attr.RefN<int>("col_st") = this->col_syn_;
+            node.attr.RefN<int>("row_st") = this->row_syn_;
+            node.attr.RefN<int>("col_ed") = this->col_syn_;
+            node.attr.RefN<int>("row_ed") = this->row_syn_;
         }
     };
     AptNodeFunc minicErrorFunc = [this](APTnode &node) {
@@ -1594,9 +1596,11 @@ MinicParser::MinicParser(SyntaxParser  minicSynParser,
         int col_ed = node.attr.Get<int>("col_ed");
         int row_ed = node.attr.Get<int>("row_ed");
 
-        cerr << fmt::format(
-            "error:{}: {}\n{}", row_st, col_st,
-            this->getLocatedSource(col_st, row_st, col_ed, row_ed));
+        auto errorMsg =
+            fmt::format("input:{}:{}: {}: {}\n{}", row_st, col_st,
+                        "\033[31merror\033[0m", "unexpected token",
+                        this->getLocatedSource(col_st, row_st, col_ed, row_ed));
+        logger.error(errorMsg);
     };
     syntaxParser_.actionFunc_ = minicActionFunc;
     syntaxParser_.reduceFunc_ = minicReduceFunc;
@@ -1605,9 +1609,18 @@ MinicParser::MinicParser(SyntaxParser  minicSynParser,
 
 // ---------- minic parser instance ----------
 
-Grammar      minicGrammar = krill::minic::syntax::grammar;
-SyntaxParser minicSyntaxParser(minicGrammar, krill::minic::syntax::actionTable);
-LexicalParser minicLexicalParser(krill::minic::lexical::dfa);
-MinicParser   minicParser(minicSyntaxParser, minicLexicalParser);
+Grammar minicGrammar = krill::minic::syntax::grammar;
+
+MinicSyntaxParser::MinicSyntaxParser()
+    : SyntaxParser(krill::minic::syntax::grammar,
+                   krill::minic::syntax::actionTable){};
+
+MinicLexicalParser::MinicLexicalParser()
+    : LexicalParser(krill::minic::lexical::dfa){};
+
+// SyntaxParser  minicSyntaxParser(minicGrammar,
+// krill::minic::syntax::actionTable); LexicalParser
+// minicLexicalParser(krill::minic::lexical::dfa); MinicParser
+// minicParser(minicSyntaxParser, minicLexicalParser);
 
 } // namespace krill::minic

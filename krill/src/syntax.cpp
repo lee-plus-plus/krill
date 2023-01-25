@@ -55,7 +55,7 @@ void SyntaxParser::parse() {
                 shared_ptr<APTnode> nextNode(new APTnode(input));
                 nextNode.get()->pidx = -1;
                 // ACTION action
-                actionFunc_(*nextNode.get());
+                actionFunc_(*nextNode.get()); // bug!
                 
                 nodes_.push(nextNode);
 
@@ -74,9 +74,11 @@ void SyntaxParser::parse() {
                 deque<shared_ptr<APTnode>> childNodes;
 
                 auto poped_states = get_top(states_, r.right.size());
+                assert(nodes_.size() >= r.right.size());
                 for (int j = 0; (int) j < r.right.size(); j++) {
                     states_.pop();
                     symbols_.pop();
+
                     childNodes.push_front(nodes_.top());
                     nodes_.pop();
                 }
@@ -244,15 +246,15 @@ string SyntaxParser::getErrorMessage() {
         grammar_.symbolNames.at(tokenWithAttr.id),
         unescape(tokenWithAttr.attr.Get<string>("lval")));
 
-    logger.error("{}", errorMsg);
-    logger.error("  history_: \"{}\"", history_);
-    logger.error("  look: {} \"{}\"", grammar_.symbolNames.at(tokenWithAttr.id),
+    logger.debug("{}", errorMsg);
+    logger.debug("  history_: \"{}\"", history_);
+    logger.debug("  look: {} \"{}\"", grammar_.symbolNames.at(tokenWithAttr.id),
                  unescape(tokenWithAttr.attr.Get<string>("lval")));
-    logger.error(
+    logger.debug(
         "  symbols: [{}]",
         fmt::join(apply_map(to_vector(symbols_), grammar_.symbolNames), ","));
-    logger.error("  states: [{}]", fmt::join(to_vector(states_), ","));
-    logger.error("Current AST: \n{}", getASTstr());
+    logger.debug("  states: [{}]", fmt::join(to_vector(states_), ","));
+    logger.debug("Current AST: \n{}", getASTstr());
 
     return errorMsg;
 }

@@ -130,7 +130,7 @@ Code Ir::code() {
             Appender{code}
             .append({{.op = Op::kFuncBegin, .args_f = {.func = func}}})
             .append(func->code.value())
-            .append({{.op = Op::kFuncEnd}});
+            .append({{.op = Op::kFuncEnd, .args_f = {.func = func}}});
         } else {
             // not linked yet
             // do nothing
@@ -188,7 +188,7 @@ string to_string(const QuadTuple &q) {
                               enum_name(q.op), int(q.args_i.cval));
             break;
         case Op::kAdd:
-        case Op::kMinus:
+        case Op::kSub:
         case Op::kMult:
         case Op::kDiv:
         case Op::kMod:

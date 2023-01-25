@@ -11,48 +11,57 @@
 #include <sstream>
 #include <stack>
 #include <string>
-// using krill::ir::Func, krill::ir::Var;
-using std::stringstream;
 using krill::runtime::SyntaxParser, krill::runtime::LexicalParser;
 using krill::type::Grammar;
 using std::shared_ptr;
+using std::stringstream;
 
 namespace krill::minic {
 
+class MinicSyntaxParser : public SyntaxParser {
+  public:
+    MinicSyntaxParser();
+};
+
+class MinicLexicalParser : public LexicalParser {
+  public:
+    MinicLexicalParser();
+};
+
 class MinicParser {
   private:
-    SyntaxParser  syntaxParser_;
-    LexicalParser lexicalParser_;
+    MinicSyntaxParser  syntaxParser_;
+    MinicLexicalParser lexicalParser_;
 
-    int col_ = 1;
-    int row_ = 1;
-
+    int col_lex_ = 1;
+    int row_lex_ = 1;
+    int col_syn_ = 1;
+    int row_syn_ = 1;
+    
     stringstream         source_;
     vector<stringstream> sourceLines_;
 
-    
+    shared_ptr<APTnode> root_; // magic, don't touch
     vector<APTnode> nodes_;
 
     void    count(char c);
     APTnode tokenToNode(Token token, istream &input, bool &drop);
 
   public:
-    shared_ptr<APTnode> root_; // magic, don't touch
-    
-    MinicParser(SyntaxParser minicSynParser, LexicalParser minicLexParser);
-    shared_ptr<APTnode> getAptNode() const;
-    vector<APTnode>     getNodes() const;
+    MinicParser();
 
     string getLocatedSource(int colSt, int rowSt, int colEd, int rowEd);
-    void   parseStep(istream &input);
     void   parseAll(istream &input);
+    void   parseStep(istream &input);
 
+    shared_ptr<APTnode> getAptNode() const;
+    vector<APTnode>     getNodes() const;
 };
 
 extern Grammar       minicGrammar;
-extern SyntaxParser  minicSyntaxParser;
-extern LexicalParser minicLexicalParser;
-extern MinicParser   minicParser;
+// extern SyntaxParser  minicSyntaxParser;
+// extern LexicalParser minicLexicalParser;
+// extern MinicParser   minicParser;
 
 } // namespace krill::minic
 

@@ -7,9 +7,7 @@
 #include <stdexcept>
 #include <vector>
 using namespace std;
-// using namespace krill::type;
 using namespace krill::utils;
-// using namespace krill::runtime;
 using namespace krill::minic;
 using namespace krill::ir;
 
@@ -210,9 +208,9 @@ Code SdtParser::parse_function_call(Func *func, const vector<Var *> &var_args) {
     auto extract_type = [](Var *var) { return var->type; };
     if (apply_map(func->params, extract_type) !=
         apply_map(var_args, extract_type)) {
-        logger.error("error: input parameters' type are not match to "
+        logger.error("input parameters' type are not match to "
                      "the declaration of function {}",
-                     func->name);
+                     func_fullname(func));
         throw runtime_error("error: parameters type do not match");
     }
 
@@ -331,12 +329,16 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
         auto prevDecl = find_function_by_name(funcname);
         if (prevDecl != nullptr) {
             if (prevDecl->type() != func->type()) {
-                logger.error("error: conflict declaration of function {}, "
-                             "previous declaration {}",
-                             func->type().str(), prevDecl->type().str());
+                logger.error("input:{}: {}: conflict declaration of function {}, "
+                             "previous declaration {}", 
+                             "\033[31merror\033[0m", 
+                             node->attr.Get<int>("row_st"), 
+                             node->attr.Get<int>("col_st"), 
+                             func_fullname(func), func_fullname(prevDecl));
+                throw runtime_error("conflict declaration of function");
             }
             if (prevDecl->code.has_value() != false) {
-                logger.error("error: re-definition of function {}",
+                logger.error("re-definition of function {}",
                              func->type().str());
             }
             func = prevDecl;
@@ -399,10 +401,10 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
                           .args_d = {.var = var, .size = var->type.size()}});
         }
         // set default value for retval
-        for (const auto &var : func->returns) {
-            head_code.emplace_back(QuadTuple{
-                .op = Op::kStore, .args_m = {.var = var_zero, .mem = var}});
-        }
+        // for (const auto &var : func->returns) {
+        //     head_code.emplace_back(QuadTuple{
+        //         .op = Op::kStore, .args_m = {.var = var_zero, .mem = var}});
+        // }
         return head_code;
     };
     // tail code: only one return point
@@ -416,7 +418,7 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
             tail_code.emplace_back(QuadTuple{
                 .op = Op::kRetPut, .args_f = {.var = var_temp, .idx = i}});
         }
-        Appender{tail_code}.append({{.op = Op::kRet}});
+        Appender{tail_code}.append({{.op = Op::kRet, .args_f = {.func = func}}});
         return tail_code;
     };
     Code head_code = gen_head_code();
@@ -598,7 +600,7 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
                      .args_e = {.dest = v_dest, .src1 = v_lhs, .src2 = v_rhs}};
                 break;
             case '-':
-                q = {.op     = Op::kMinus,
+                q = {.op     = Op::kSub,
                      .args_e = {.dest = v_dest, .src1 = v_lhs, .src2 = v_rhs}};
                 break;
             case '*':
@@ -649,7 +651,7 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
         QuadTuple q;
         switch (oprt) {
             case '-':
-                q = {.op     = Op::kMinus,
+                q = {.op     = Op::kSub,
                      .args_e = {
                          .dest = v_dest, .src1 = v_src, .src2 = var_zero}};
                 break;
@@ -686,10 +688,18 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
     } else if (child[0].get()->id == syntax::IDENT && // get variable
                child.size() == 1) {
         // expr : IDENT
-        auto v_ident = parse_ident_as_variable(child[0].get());
-        auto v_dest  = assign_new_variable({.type = v_ident->type});
-        auto code_dest =
-            Code{{.op = Op::kLoad, .args_m = {.var = v_dest, .mem = v_ident}}};
+        Var* v_ident = parse_ident_as_variable(child[0].get());
+        Var* v_dest;
+        Code code_dest;
+
+        if (v_ident->type.shape.size() == 0) {
+            v_dest = assign_new_variable({.type = v_ident->type});
+            code_dest = Code{{.op = Op::kLoad, .args_m = {.var = v_dest, .mem = v_ident}}};
+        } else {
+            // is a pointer
+            v_dest = v_ident;
+            code_dest = {};
+        }
 
         return {v_dest, code_dest};
     } else if (child[0].get()->id == syntax::IDENT && // get array element
@@ -888,7 +898,7 @@ void SdtParser::sdt_while_stmt(APTnode *node, Code &code) {
                              .addr2 = lbl_end}}})
         .append({{.op = Op::kLabel, .args_j = {.addr1 = lbl_body}}})
         .append(code_stmt)
-        .append({{.op = Op::kGoto, .args_j = {.addr1 = lbl_end}}})
+        .append({{.op = Op::kGoto, .args_j = {.addr1 = lbl_cond}}})
         .append({{.op = Op::kLabel, .args_j = {.addr1 = lbl_end}}});
 }
 
@@ -932,8 +942,6 @@ void SdtParser::sdt_break_stmt(APTnode *node, Code &code) {
 // ---------- public ----------
 
 SdtParser &SdtParser::parse() {
-    logger.info("syntax directed translation begin");
-
     // initialization
     ir_.clear();
     var_domains_.clear();
@@ -952,7 +960,7 @@ SdtParser &SdtParser::parse() {
     var_domains_.pop_back();
     func_domains_.pop_back();
 
-    logger.info("syntax directed translation complete successfully");
+    logger.info("syntax-directed-translation complete successfully");
     return *this;
 }
 

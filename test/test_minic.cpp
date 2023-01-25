@@ -19,22 +19,11 @@ using namespace krill::minic;
 
 using krill::log::logger;
 
-extern APTnode tokenToNode(Token token, istream &input, bool &drop);
-// minic_parser.cpp
-extern void initSyntaxParser();
-// minic_sdt.cpp
-// extern void    syntax_directed_translation(shared_ptr<APTnode> &node);
-// extern string  get_ir_str();
-// // minic_backend.cpp
-// extern void    varsNamingTest();
-// extern void    initVarInfo();
-// extern string  get_ir_str2();
-// extern string  getMipsCodeStr();
-
+// lexical parsing test
 void testLexicalParsing() {
-    auto &lexicalParser = minicLexicalParser;
+    auto lexicalParser = MinicLexicalParser();
     cerr << "input characters (end with ^d): \n"
-            "e.g., int main() {\\n} \n";
+            "e.g., int main(void) {\\n} \n";
 
     vector<Token> tokens = lexicalParser.parseAll(cin);
     for (auto token : tokens) {
@@ -45,9 +34,10 @@ void testLexicalParsing() {
     cout << "\n";
 }
 
+// lexical parsing test (full)
 void testSyntaxParsing() {
-    Grammar &     grammar      = minicGrammar;
-    SyntaxParser &syntaxParser = minicSyntaxParser;
+    auto grammar       = minicGrammar;
+    auto syntaxParser = MinicSyntaxParser();
 
     cerr << "terminal set of grammar:\n  ";
     for (int i : grammar.terminalSet) {
@@ -93,11 +83,12 @@ void testSyntaxParsing() {
     }
 }
 
+// syntax parsing test
 void testFullLexicalParsing() {
-    MinicParser &parser  = minicParser;
-    Grammar &    grammar = minicGrammar;
+    auto parser = MinicParser();
+    auto grammar = minicGrammar;
     cerr << "input characters (end with ^d): \n"
-            "e.g., int main() {\\n} \n";
+            "e.g., int main(void) {\\n} \n";
 
     parser.parseAll(cin);
 
@@ -111,11 +102,12 @@ void testFullLexicalParsing() {
     cout << "\n";
 }
 
+// lexical & syntax parsing test
 void testFullLexicalSyntaxParsing() {
-    MinicParser &parser  = krill::minic::minicParser;
-    Grammar &    grammar = krill::minic::minicGrammar;
+    auto parser = MinicParser();
+    auto grammar = minicGrammar;
     cerr << "input characters (end with ^d): \n"
-            "e.g., int main() {\\n} \n";
+            "e.g., int main(void) {\\n} \n";
 
     parser.parseAll(cin);
 
@@ -131,10 +123,11 @@ void testFullLexicalSyntaxParsing() {
     cout << "\n";
 }
 
+// intermediate code generation
 void testIrGeneration() {
-    MinicParser &parser = krill::minic::minicParser;
+    auto parser = MinicParser();
     cerr << "input characters (end with ^d): \n"
-            "e.g., int main() {\\n} \n";
+            "e.g., int main(void) {\\n} \n";
 
     // get annotated parsing tree
     parser.parseAll(cin); 
@@ -147,21 +140,57 @@ void testIrGeneration() {
     auto ir        = sdtParser.parse().get();
     auto irCode    = ir.code();
 
+    // side-effect: record name for temporary variables
+    // good for debug
+    to_string(ir.code());
+
+    auto irOptimizer = krill::ir::IrOptimizer(ir);
+    irOptimizer.annotateInfo();
+
     // show intermediate representation code
-    cout << to_string(irCode) << "\n";
+    cout << to_string(ir.code()) << "\n";
 }
 
-void testMipsGeneration() {
-    MinicParser &parser = minicParser;
+// intermediate code generation
+void testIrOptimization() {
+    auto parser = MinicParser();
     cerr << "input characters (end with ^d): \n"
-            "e.g., int main() {\\n} \n";
+            "e.g., int main(void) {\\n} \n";
 
     // get annotated parsing tree
-    minicParser.parseAll(cin); // here is a critical bug
-    auto root1 = minicParser.root_; // magic, don't remove
-    auto root = minicParser.getAptNode();
+    parser.parseAll(cin); 
+    shared_ptr<APTnode> root = parser.getAptNode(); 
+
+
+    // syntax-directed translation
+    auto sdtParser = krill::minic::SdtParser(root.get());
+    auto ir        = sdtParser.parse().get();
+    auto irCode    = ir.code();
+
+    // side-effect: record name for temporary variables
+    // good for debug
+    cout << to_string(ir.code()) << "\n";
+
+    auto irOptimizer = krill::ir::IrOptimizer(ir);
+    irOptimizer.annotateInfo();
 
     krill::log::sink_cerr->set_level(spdlog::level::debug);
+    irOptimizer.eliminateCommonSubExpr();
+
+    // show intermediate representation code
+    cout << to_string(ir.code()) << "\n";
+}
+
+// mips code generation
+void testMipsGeneration() {
+    auto parser = MinicParser();
+    cerr << "input characters (end with ^d): \n"
+            "e.g., int main(void) {\\n} \n";
+
+    // get annotated parsing tree
+    parser.parseAll(cin); // here is a critical bug
+    // auto root1 = parser.root_; // magic, don't remove
+    auto root = parser.getAptNode();
 
     // syntax-directed translation
     auto sdtParser = krill::minic::SdtParser(root.get());
@@ -174,7 +203,8 @@ void testMipsGeneration() {
 
     // optimization
     auto irOptimizer = krill::ir::IrOptimizer(ir);
-    irOptimizer.annotateInfo().assignRegs();
+    irOptimizer.annotateInfo().eliminateCommonSubExpr();
+    irOptimizer.assignRegs();
 
     // mips code generation
     auto mipsGenerator = krill::mips::MipsGenerator(ir);
@@ -191,7 +221,8 @@ const char usage[] = "usage: test_minic {-l|-L|-s}\n"
                      "        -s    syntax parsing test\n"
                      "        -Ls   lexical & syntax parsing test\n"
                      "        -I    intermediate code generation\n"
-                     "        -m    mips code generation\n";
+                     "        -I1   intermediate code generation with optimization\n"
+                     "        -S    mips code generation\n";
 
 int main(int argc, char **argv) {
     if (argc != 2) {
@@ -214,7 +245,10 @@ int main(int argc, char **argv) {
     } else if (strcmp(argv[1], "-I") == 0) {
         testIrGeneration();
         cerr << "done!\n";
-    } else if (strcmp(argv[1], "-m") == 0) {
+    } else if (strcmp(argv[1], "-I1") == 0) {
+        testIrOptimization();
+        cerr << "done!\n";
+    } else if (strcmp(argv[1], "-S") == 0) {
         testMipsGeneration();
         cerr << "done!\n";
     } else {
