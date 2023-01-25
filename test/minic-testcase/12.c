@@ -3,12 +3,8 @@ int a = 3;
 int b[3] = {1, 2, 3};
 
 int main(void) {
-    int a;
-    int b;
-
-    for (1 + 2;;) {
-
-    }
+    int c = 4;
+    int d[1] = {5};
 
     return 0;
 }
