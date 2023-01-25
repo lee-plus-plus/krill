@@ -1,0 +1,47 @@
+name: cpp-build
+on: [push]
+
+
+jobs:
+  ubuntu-job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          - xmake-version: latest
+      - name: configure
+        run: cd ${{ github.workspace }} && xmake f -y
+      - name: build
+        run: xmake b -w
+      - name: run-test-cases-10
+        run: xmake r test_minic -Ls < test/minic-testcase/10.c
+        
+  unix-job:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          - xmake-version: latest
+      - name: configure
+        run: cd ${{ github.workspace }} && xmake f -y
+      - name: build
+        run: xmake b -w
+      - name: run-test-cases-10
+        run: xmake r test_minic -Ls < test/minic-testcase/10.c
+ 
+  windows-job:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          - xmake-version: latest
+      - name: configure
+        run: cd ${{ github.workspace }} && xmake f -y
+      - name: build
+        run: xmake b -w
+      - name: run-test-cases-10
+        run: xmake r test_minic -Ls < test/minic-testcase/10.c
+
