@@ -53,7 +53,7 @@ vector<Prod> getSymbolIdAssigned(const vector<vector<string>> &prodSymbolStrs,
     }
     symbolIds["ζ"] = END_SYMBOL;
     symbolIds["ε"] = EMPTY_SYMBOL;
-    spdlog::debug("symbolId after: {}", ToString{}(symbolIds));
+    logger.trace("symbolId after: {}", ToString{}(symbolIds));
     return prods;
 }
 
@@ -375,8 +375,8 @@ LR1Automata getLR1automata(Grammar grammar) {
     logger.info("begin generating LR1 Automata");
     auto firstSets  = getFirstSets(grammar);
     auto followSets = getFollowSets(grammar, firstSets); // unused 
-    logger.debug("first-sets: \n{}", to_string(firstSets, grammar));
-    logger.debug("follow-sets: \n{}", to_string(followSets, grammar));
+    logger.trace("first-sets: \n{}", to_string(firstSets, grammar));
+    logger.trace("follow-sets: \n{}", to_string(followSets, grammar));
 
     // cache, really speed it up
     map<LR1State, LR1State> cache;
@@ -430,7 +430,7 @@ LR1Automata getLR1automata(Grammar grammar) {
     logger.info(
         "complete generating LR1 Automata (num_states={}, num_edges={})",
         states.size(), edgeTable.size());
-    logger.debug("LR1 Automata: \n{}", to_string(lr1Automata, grammar));
+    logger.trace("LR1 Automata: \n{}", to_string(lr1Automata, grammar));
     return lr1Automata;
 }
 
@@ -583,7 +583,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
 
                 // REDUCE / ACTION conflict
                 assert(theirAction.type == Action::Type::kAction);
-                logger.info("item p{}: {}", r + 1, to_string(item, grammar));
+                logger.info("  item p{}: {}", r + 1, to_string(item, grammar));
 
                 int a;
                 for (a = 0; a < prods.size(); a++) {
@@ -600,14 +600,14 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                     bool useOurs = (rPrior < aPrior);
                     actionTable[{i, item.search}] =
                         useOurs ? ourAction : theirAction;
-                    logger.info("conflict resolved: {} (priority r={}, a={})",
+                    logger.info("  conflict resolved: {} (priority r={}, a={})",
                                 (useOurs ? "REDUCE" : "ACTION"), rPrior,
                                 aPrior);
                     if (min(rPrior, aPrior) >= 0) {
                         // resolved by default priority, dangerous!
-                        logger.critical("conflit resolved by default "
+                        logger.warn("  conflit resolved by default "
                                         "priority, may not be what you want");
-                        logger.info("summary of state s{}: \n{}", i,
+                        logger.info("  summary of state s{}: \n{}", i,
                                     to_string(states[i], grammar));
                     }
                 } else if (asso != Associate::kNone) {
@@ -622,9 +622,9 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                     // no associativity (resolve failed), FORCING reduce
                     // dangerous!
                     actionTable[{i, item.search}] = ourAction;
-                    logger.critical(
+                    logger.warn(
                         "failed to resolve by priority or associacity");
-                    logger.critical("conflit resolved by FORCING reduce, may "
+                    logger.warn("conflit resolved by FORCING reduce, may "
                                     "not be what you want");
                     logger.info("summary of state s{}: \n{}", i,
                                 to_string(states[i], grammar));
@@ -635,7 +635,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
 
     logger.info("complete generating LR1 Action Table (size={})",
                 actionTable.size());
-    logger.debug("LR1 ActionTable: \n{}", to_string(actionTable, grammar));
+    logger.trace("LR1 ActionTable: \n{}", to_string(actionTable, grammar));
     return actionTable;
 }
 
@@ -701,7 +701,7 @@ LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata) {
                 "(num_states={} -> {}, num_edges={} -> {})",
                 states.size(), resStates.size(), edgeTable.size(),
                 resEdgeTable.size());
-    logger.debug("LALR1 Automata: \n{}", to_string(lalr1Automata, grammar));
+    logger.trace("LALR1 Automata: \n{}", to_string(lalr1Automata, grammar));
     return lalr1Automata;
 }
 

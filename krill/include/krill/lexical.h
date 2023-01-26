@@ -34,6 +34,7 @@ class LexicalParser {
 
     Token         parseStep(istream &input);
     vector<Token> parseAll(istream &input);
+    void clear();
 
   protected:
     DFA    dfa_;

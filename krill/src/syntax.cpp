@@ -47,74 +47,73 @@ void SyntaxParser::parse() {
         Action action = actionTable_[{states_.top(), input.id}];
 
         switch (action.type) {
-            case Action::Type::kAction: {
-                logger.debug("  ACTION push s{}", action.tgt);
-                states_.push(action.tgt);
-                symbols_.push(input.id);
+        case Action::Type::kAction: {
+            logger.debug("  ACTION push s{}", action.tgt);
+            states_.push(action.tgt);
+            symbols_.push(input.id);
 
-                shared_ptr<APTnode> nextNode(new APTnode(input));
-                nextNode.get()->pidx = -1;
-                // ACTION action
-                actionFunc_(*nextNode.get()); // bug!
-                
-                nodes_.push(nextNode);
+            shared_ptr<APTnode> nextNode(new APTnode(input));
+            nextNode.get()->pidx = -1;
+            // ACTION action
+            actionFunc_(*nextNode.get()); // bug!
 
-                // very stupid history stack, may be improved in the future
-                history_ += " ";
-                history_ += input.attr.Get<string>("lval");
-                if (history_.size() > 50) {
-                    history_ = history_.substr(history_.size() - 50);
-                }
+            nodes_.push(nextNode);
 
-                offset_++;
-                break;
+            // very stupid history stack, may be improved in the future
+            history_ += " ";
+            history_ += input.attr.Get<string>("lval");
+            if (history_.size() > 50) {
+                history_ = history_.substr(history_.size() - 50);
             }
-            case Action::Type::kReduce: {
-                Prod                       r = prods_[action.tgt];
-                deque<shared_ptr<APTnode>> childNodes;
 
-                auto poped_states = get_top(states_, r.right.size());
-                assert(nodes_.size() >= r.right.size());
-                for (int j = 0; (int) j < r.right.size(); j++) {
-                    states_.pop();
-                    symbols_.pop();
+            offset_++;
+            break;
+        }
+        case Action::Type::kReduce: {
+            Prod                       r = prods_[action.tgt];
+            deque<shared_ptr<APTnode>> childNodes;
 
-                    childNodes.push_front(nodes_.top());
-                    nodes_.pop();
-                }
+            auto poped_states = get_top(states_, r.right.size());
+            assert(nodes_.size() >= r.right.size());
+            for (int j = 0; (int) j < r.right.size(); j++) {
+                states_.pop();
+                symbols_.pop();
 
-                assert(actionTable_.count({states_.top(), r.symbol}) != 0);
-                Action action2 = actionTable_[{states_.top(), r.symbol}];
-                assert(action2.type == Action::Type::kGoto);
-                states_.push(action2.tgt);
-                symbols_.push(r.symbol);
-                assert(0 <= action.tgt && action.tgt < prods_.size());
-
-                logger.debug("  REDUCE r{} pop [{}] GOTO {}", action.tgt + 1,
-                             fmt::join(poped_states, ","), action2.tgt);
-
-                shared_ptr<APTnode> nextNode(
-                    new APTnode({.id    = r.symbol,
-                                 .pidx  = action.tgt,
-                                 .attr  = {},
-                                 .child = childNodes}));
-                // REDUCE action
-                reduceFunc_(*nextNode.get());
-
-                nodes_.push(nextNode);
-                break;
+                childNodes.push_front(nodes_.top());
+                nodes_.pop();
             }
-            case Action::Type::kAccept: {
-                logger.debug("  ACCEPT");
-                logger.info("syntax parsing complete successfully");
-                logger.debug("Current AST: \n{}", getASTstr());
-                isAccepted_ = true;
-                break;
-            }
-            default: {
-                assert(false);
-                break;
-            }
+
+            assert(actionTable_.count({states_.top(), r.symbol}) != 0);
+            Action action2 = actionTable_[{states_.top(), r.symbol}];
+            assert(action2.type == Action::Type::kGoto);
+            states_.push(action2.tgt);
+            symbols_.push(r.symbol);
+            assert(0 <= action.tgt && action.tgt < prods_.size());
+
+            logger.debug("  REDUCE r{} pop [{}] GOTO {}", action.tgt + 1,
+                         fmt::join(poped_states, ","), action2.tgt);
+
+            shared_ptr<APTnode> nextNode(new APTnode({.id    = r.symbol,
+                                                      .pidx  = action.tgt,
+                                                      .attr  = {},
+                                                      .child = childNodes}));
+            // REDUCE action
+            reduceFunc_(*nextNode.get());
+
+            nodes_.push(nextNode);
+            break;
+        }
+        case Action::Type::kAccept: {
+            logger.debug("  ACCEPT");
+            logger.info("syntax parsing complete successfully");
+            logger.debug("Current AST: \n{}", getASTstr());
+            isAccepted_ = true;
+            break;
+        }
+        default: {
+            assert(false);
+            break;
+        }
         }
     }
 }
@@ -161,9 +160,9 @@ void SyntaxParser::parseAll(vector<APTnode> tokensWithAttr) {
 }
 
 shared_ptr<APTnode> SyntaxParser::getAPT() {
-    if (!isAccepted_) { 
+    if (!isAccepted_) {
         assert(false);
-        return {nullptr}; 
+        return {nullptr};
     }
     assert(nodes_.size() == 1);
 
@@ -242,9 +241,12 @@ string SyntaxParser::getASTstr() {
 string SyntaxParser::getErrorMessage() {
     auto & tokenWithAttr = inputs_.at(offset_);
     string errorMsg      = fmt::format(
-        "syntax parsing error: unexpected token <{} \"{}\">",
-        grammar_.symbolNames.at(tokenWithAttr.id),
-        unescape(tokenWithAttr.attr.Get<string>("lval")));
+        "syntax parsing error: unexpected {}",
+        tokenWithAttr.id == END_SYMBOL
+            ? "end of input"
+            : fmt::format(" <token {}> \"{}\"",
+                          grammar_.symbolNames.at(tokenWithAttr.id),
+                          unescape(tokenWithAttr.attr.Get<string>("lval"))));
 
     logger.debug("{}", errorMsg);
     logger.debug("  history_: \"{}\"", history_);
@@ -254,7 +256,7 @@ string SyntaxParser::getErrorMessage() {
         "  symbols: [{}]",
         fmt::join(apply_map(to_vector(symbols_), grammar_.symbolNames), ","));
     logger.debug("  states: [{}]", fmt::join(to_vector(states_), ","));
-    logger.debug("Current AST: \n{}", getASTstr());
+    logger.debug("Current APT: \n{}", getAPTstr());
 
     return errorMsg;
 }

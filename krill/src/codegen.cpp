@@ -25,17 +25,16 @@ void genActionTable(const ActionTable &actionTable, ostream &oss) {
     }
     def_actionTable << "}";
 
-    oss << "\n"
-           "#define AT0 Action::Type::kAction\n"
-           "#define AT1 Action::Type::kReduce\n"
-           "#define AT2 Action::Type::kGoto\n"
-           "#define AT3 Action::Type::kAccept\n"
-           "\n";
     oss << "struct Action {\n"
            "  enum Type { kAction = 0, kReduce = 1, kGoto = 2, kAccept = 3 };\n"
            "  TYPE type; int tgt;\n"
            "};\n";
-    oss << "using ActionTable = map<pair<int, int>, Action>;\n";
+    oss << "using ActionTable = map<pair<int, int>, Action>;\n\n";
+    oss << "#define AT0 Action::Type::kAction\n"
+           "#define AT1 Action::Type::kReduce\n"
+           "#define AT2 Action::Type::kGoto\n"
+           "#define AT3 Action::Type::kAccept\n"
+           "\n";
     oss << fmt::format("ActionTable actionTable = {};\n",
                        def_actionTable.str());
 }
@@ -46,8 +45,8 @@ void genGrammar(const Grammar &grammar, ostream &oss) {
     // define of symbols
     stringstream def_symbols;
     for (auto[id, name] : grammar.symbolNames) {
-        if (0 <= id && id < 256) { continue; }
-        def_symbols << fmt::format("#define {} {}\n", name, id);
+        if (id < 256) { continue; }
+        def_symbols << fmt::format("constexpr int {} = {};\n", name, id);
     }
 
     // symbol names
@@ -82,12 +81,12 @@ void genGrammar(const Grammar &grammar, ostream &oss) {
     stringstream def_prods;
     def_prods << "{\n";
     for (int i = 0; i < grammar.prods.size(); i++) {
-        def_prods << fmt::format("/* {:2d} */", i);
+        def_prods << fmt::format("  /* {:2d} */", i);
         const auto &prod = grammar.prods[i];
         // def_prods << symbolNames.at(prod.symbol) << " -> ";
         // for (int r : prod.right) { def_prods << symbolNames.at(r) << " "; }
         // def_prods << "*/\n";
-        def_prods << "  { " << symbolNames.at(prod.symbol) << ", {";
+        def_prods << " { " << symbolNames.at(prod.symbol) << ", {";
         for (int j = 0; j < prod.right.size(); j++) {
             def_prods << symbolNames.at(prod.right[j])
                       << ((j + 1 < prod.right.size()) ? ", " : "");
@@ -98,7 +97,7 @@ void genGrammar(const Grammar &grammar, ostream &oss) {
 
     // prodsPriority
     stringstream def_prodsPriority;
-    def_prodsPriority << fmt::format("{{{}}}", fmt::join(grammar.prodsPriority, ", "));
+    def_prodsPriority << fmt::format("{{\n  {}\n}}", fmt::join(grammar.prodsPriority, ", "));
 
     // prodsAssociate
     // enum class Associate {kNone = 0, kLeft = 1, kRight = 2};
@@ -107,26 +106,26 @@ void genGrammar(const Grammar &grammar, ostream &oss) {
                                        {Associate::kLeft, "AS1"},
                                        {Associate::kRight, "AS2"}};
     def_prodsAssociate << fmt::format(
-        "{{{}}}", fmt::join(apply_map(grammar.prodsAssociate, assoName), ", "));
+        "{{\n  {}\n}}", fmt::join(apply_map(grammar.prodsAssociate, assoName), ", "));
 
     oss << fmt::format("{}\n", def_symbols.str());
     oss << "struct Prod { int symbol; vector<int> right; };\n";
     oss << "enum class Associate {kNone = 0, kLeft = 1, kRight = 2};\n"
-           "struct Grammar { set<int> terminalSet; set<int> nonterminalSet; "
-           "vector<Prod> prods; map<int, string> symbolNames; vector<int> "
-           "prodsPriority; vector<Associate> prodsAssociate; };\n"
+           "struct Grammar {\n  set<int> terminalSet;\n  set<int> nonterminalSet;\n"
+           "  vector<Prod> prods;\n  map<int, string> symbolNames;\n  vector<int> "
+           "prodsPriority;\n  vector<Associate> prodsAssociate;\n};\n\n"
            "#define AS0 Associate::kNone\n"
            "#define AS1 Associate::kLeft\n"
-           "#define AS2 Associate::kRight\n";
+           "#define AS2 Associate::kRight\n\n"; 
 
     oss << fmt::format("map<int, string> symbolNames = {};\n\n",
                        def_symbolnames.str());
-    oss << fmt::format("set<int> terminalSet = {};\n\n", def_terminals.str());
-    oss << fmt::format("set<int> nonterminalSet = {};\n\n",
+    oss << fmt::format("set<int> terminalSet = {};\n", def_terminals.str());
+    oss << fmt::format("set<int> nonterminalSet = {};\n",
                        def_nonterminals.str());
     oss << fmt::format("vector<int> prodsPriority = {};\n", def_prodsPriority.str());
     oss << fmt::format("vector<Associate> prodsAssociate = {};\n", def_prodsAssociate.str());
-    oss << def_prods_comment.str();
+    oss << "\n" << def_prods_comment.str() << "\n";
     oss << fmt::format("vector<Prod> prods = {};\n\n", def_prods.str());
     oss << "Grammar grammar({\n"
            "  .terminalSet=terminalSet,\n"
@@ -164,7 +163,7 @@ void genDFA(const DFA &dfa, ostream &oss) {
     }
     def_finality << "\n}";
 
-    oss << "const int EMPTY_SYMBOL = 0;\n"
+    oss << "constexpr int EMPTY_SYMBOL = 0;\n"
         << "using DFAgraph = map<int, map<int, int>>;\n"
         << "struct DFA { DFAgraph graph; map<int, int> finality; };\n"
         << fmt::format("const DFAgraph graph = {};\n\n", def_dfa_graph.str());
@@ -180,45 +179,12 @@ void genSyntaxParser(const Grammar &grammar, ostream &oss) {
 
     oss << "// Action Table\n";
     genActionTable(actionTable, oss);
+    oss << "\n";
 
     oss << "// Grammar\n";
     genGrammar(grammar, oss);
 
-    stringstream def_lambda;
-    def_lambda << "// Actions\n";
-    def_lambda << "using Rfunc = std::function<void(AttrDict &next, "
-                  "deque<AttrDict> &child)>;\n"
-                  "using Afunc = std::function<void(AttrDict &next, const "
-                  "Token &token)>;\n";
-    def_lambda
-        << "// Afunc afunc_  = defaultActionFunc;\n"
-           "// Rfunc rfunc_0 = defaultReduceFunc;\n"
-           "// syntax ACTION\n"
-           "Afunc afunc_ = [](AttrDict &next, const Token &token) {\n"
-           "next.Set<string>(\"lval\", token.lval); // DIY\n"
-           "};\n";
-
-    const auto &symbolNames = grammar.symbolNames;
-    for (int i = 0; i < grammar.prods.size(); i++) {
-        def_lambda << "// " << i << ": ";
-        const auto &prod = grammar.prods[i];
-        def_lambda << symbolNames.at(prod.symbol) << " -> ";
-        for (int r : prod.right) { def_lambda << symbolNames.at(r) << " "; }
-        def_lambda << fmt::format(
-            "\n"
-            "Rfunc rfunc_{} = [](AttrDict &next, deque<AttrDict> &child) {{\n"
-            "  // DIY\n"
-            "}};\n\n",
-            i);
-    }
-    def_lambda << "vector<Rfunc> r_funcs_ = {\n  ";
-    for (int i = 0; i < grammar.prods.size(); i++) {
-        def_lambda << fmt::format("{}rfunc_{}", (i == 0) ? "" : ", ", i);
-    }
-    def_lambda << "\n};";
-
-    oss << "\n\n" << def_lambda.str() << "\n";
-    oss << "SyntaxParser syntaxParser(grammar, actionTable, afunc_, r_funcs_);\n";
+    oss << "SyntaxParser syntaxParser(grammar, actionTable);\n";
 }
 
 void genLexicalParser(const vector<string> &regexs, ostream &oss) {
@@ -239,8 +205,7 @@ void genLexicalParser(const vector<string> &regexs, ostream &oss) {
     def_func << "  switch (token.id) {\n";
     for (int i = 0; i < regexs.size(); i++) {
         def_func << fmt::format(
-            "    // {:2d}: {}\n    case {:d}:\n      return 0; // DIY\n", i,
-            regexs[i], i);
+            "    case {:d}: // {:2d}: {}\n      return 0; // DIY\n", i, i, regexs[i]);
     }
     def_func << "    default:\n      assert(false);\n"; def_func << "}\n";
 

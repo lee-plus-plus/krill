@@ -103,4 +103,9 @@ vector<Token> LexicalParser::parseAll(istream &input) {
     return tokens;
 }
 
+void LexicalParser::clear() {
+    state_ = 0;
+    history_ = "";
+}
+
 } // namespace krill::runtime
