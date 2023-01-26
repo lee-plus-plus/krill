@@ -66,10 +66,10 @@ Token LexicalParser::parseStep(istream &input) {
 
             // assert(dfa_.finality.at(state_) != 0); // failed
             if (dfa_.finality.at(state_) == 0) {
-                logger.error("lexical error: unmatched \"{}\" in \"{}\"\n",
+                logger.debug("lexical error: unmatched \"{}\" in \"{}\"",
                                 buffer.str() + c, unescape(history_ + c));
                 throw runtime_error(
-                    fmt::format("lexical error: unmatched \"{}\" in \"{}\"\n",
+                    fmt::format("lexical error: unmatched \"{}\" in \"{}\"",
                                 buffer.str() + c, unescape(history_ + c)));
             }
             int    tokenId       = dfa_.finality.at(state_) - 1;

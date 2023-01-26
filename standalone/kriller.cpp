@@ -150,7 +150,7 @@ void parse_syntax(istream &input, ostream &output, bool is_syntax_yacc,
             string line;
             getline(input, line);
             trim(line);
-            if (input.eof()) { break; }
+            if (line.size() == 0) { continue; }
             strs.push_back(line);
         }
         grammar = Grammar(strs);
@@ -214,7 +214,7 @@ void parse_lexical(istream &input, ostream &output, bool is_lexical,
         string line;
         getline(input, line);
         trim(line);
-        if (input.eof()) { break; }
+        if (line.size() == 0) { continue; }
         regexs.push_back(line);
     }
     spdlog::info("start generate lexical parser ...");
