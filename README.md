@@ -22,31 +22,31 @@ kriller 是一个DFA的词法解析器、LALR(1)语法解析器的生成器。
 
 简单来说, 它可以把这样格式的文法规则 (简易形式)
 
-![](README/README6.png)
+<img src=README/README6.png width=500em />
 
 进行解析 (有二义性)
 
-![](README/README7.png)
+<img src=README/README7.png width=500em />
 
 或者以yacc格式的文法规则 (繁琐一点)
 
-![](README/README9.png)
+<img src=README/README9.png width=500em />
 
 进行解析 (通过定义结合性和优先级消除了二义性)
 
-![](README/README10.png)
+<img src=README/README10.png width=500em />
 
 并产生相应的LALR(1)语法分析器，使得你可以像这样即时地解析
 
-![](README/README8.png)
+<img src=README/README8.png width=500em />
 
 并且，允许你把这样格式的词法规则 (正则表达式) 
 
-![](README/README11.png)
+<img src=README/README11.png width=500em />
 
 解析，并产生相应的DFA词法分析器，使得你可以这样即时解析
 
-![](README/README12.png)
+<img src=README/README12.png width=500em />
 
 并且提供生成上述的词法、语法分析器代码的功能，使得你可以将生成的解析器用于任何地方
 
@@ -59,7 +59,7 @@ $ cd build
 $ ./standalone/kriller --help
 ```
 
-![](README/README0.png)
+<img src=README/README0.png width=500em />
 
 读取一个包含若干条正则表达式的文件，得到词法解析器 (`-l`)，并立即进行交互测试 (`-t`): 
 
@@ -140,19 +140,19 @@ mico 是专门为minisys（seu的一门课，设计编译器、汇编器和cpu�
 
 简单来说, 它可以将这样的mini-c代码文件 (一个阉割版的c)
 
-![](README/README13.png)
+<img src=README/README13.png width=500em />
 
 解析成这样的抽象语法树
 
-![](README/README14.png)
+<img src=README/README14.png width=500em />
 
 然后生成中间表示（SSA, 对llvm拙劣的效仿）, 进行机器无关优化（公共子表达式消除） 
 
-![](README/README15.png)
+<img src=README/README15.png width=500em />
 
 最后生成mips的代码（图染色寄存器分配）
 
-![](README/README16.png)
+<img src=README/README16.png width=500em />
 
 ## Quick Start
 
@@ -163,7 +163,7 @@ $ cd build
 $ ./standalone/mico --help
 ```
 
-![](README/README17.png)
+<img src=README/README17.png width=500em />
 
 解析 mini-c 代码文件 `06.c` , 打印AST (`-A`). 
 
