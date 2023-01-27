@@ -52,18 +52,19 @@ void parse(istream &input, ostream &output, int opt_level, bool ast_only,
 
     if (opt_level >= 1) {
         irOptimizer.propagateConstValue();
-        if (ir_only) {
-            output << to_string(ir.code()) << "\n";
-            exit(0);
-        }
+    }
+    if (opt_level == 1 && ir_only) {
+        output << to_string(ir.code()) << "\n";
+        exit(0);
     }
     if (opt_level >= 2) {
         irOptimizer.eliminateCommonSubExpr();
-        if (ir_only) {
-            output << to_string(ir.code()) << "\n";
-            exit(0);
-        }
     }
+    if (opt_level == 2 && ir_only) {
+        output << to_string(ir.code()) << "\n";
+        exit(0);
+    }
+
     irOptimizer.assignRegs();
 
     // mips code generation

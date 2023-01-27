@@ -198,8 +198,8 @@ void genLexicalParser(const vector<string> &regexs, ostream &oss) {
     oss << "\n";
 
     genDFA(dfai, oss);
-    oss << "\n\n";
-    oss << "LexicalParser lexicalParser(dfa);\n";
+    oss << "\n";
+    oss << "LexicalParser lexicalParser(dfa);\n\n";
 
     stringstream def_func;
     def_func << "  switch (token.id) {\n";
