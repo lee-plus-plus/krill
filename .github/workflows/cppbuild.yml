@@ -14,9 +14,31 @@ jobs:
         run: cd ${{ github.workspace }} && xmake f -y --toolchain=clang
       - name: build
         run: xmake b -v
+      - name: run-test-cases-01
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/01.c
+      - name: run-test-cases-02
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/02.c
+      - name: run-test-cases-03
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/03.c
+      - name: run-test-cases-04
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/04.c
+      - name: run-test-cases-05
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/05.c
+      - name: run-test-cases-06
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/06.c
+      - name: run-test-cases-07
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/07.c
+      - name: run-test-cases-08
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/08.c
+      - name: run-test-cases-09
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/09.c
       - name: run-test-cases-10
-        run: xmake r test_minic -Ls < test/minic-testcase/10.c
-        
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/10.c
+      - name: run-test-cases-11
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/11.c
+      - name: run-test-cases-12
+        run: xmake run --workdir=`pwd` mico -i test/minic-testcase/12.c
+
   windows-job:
     runs-on: windows-latest
     steps:
@@ -28,4 +50,27 @@ jobs:
         run: cd ${{ github.workspace }} && xmake f -y --toolchain=clang
       - name: build
         run: xmake b -v
-
+      - name: run-test-cases-01
+        run: xmake run --workdir=. mico -i test/minic-testcase/01.c
+      - name: run-test-cases-02
+        run: xmake run --workdir=. mico -i test/minic-testcase/02.c
+      - name: run-test-cases-03
+        run: xmake run --workdir=. mico -i test/minic-testcase/03.c
+      - name: run-test-cases-04
+        run: xmake run --workdir=. mico -i test/minic-testcase/04.c
+      - name: run-test-cases-05
+        run: xmake run --workdir=. mico -i test/minic-testcase/05.c
+      - name: run-test-cases-06
+        run: xmake run --workdir=. mico -i test/minic-testcase/06.c
+      - name: run-test-cases-07
+        run: xmake run --workdir=. mico -i test/minic-testcase/07.c
+      - name: run-test-cases-08
+        run: xmake run --workdir=. mico -i test/minic-testcase/08.c
+      - name: run-test-cases-09
+        run: xmake run --workdir=. mico -i test/minic-testcase/09.c
+      - name: run-test-cases-10
+        run: xmake run --workdir=. mico -i test/minic-testcase/10.c
+      - name: run-test-cases-11
+        run: xmake run --workdir=. mico -i test/minic-testcase/11.c
+      - name: run-test-cases-12
+        run: xmake run --workdir=. mico -i test/minic-testcase/12.c
