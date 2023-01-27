@@ -1,10 +1,13 @@
-# Krill: parser generator and compiler
+# Krill: parser generator and Mico: compiler
 
 <div align="center">
-<img src=README/krill.png width=100em />
+<a href="#kriller"><img src=README/krill.png width=100em/></a>
+<a href="#mico"><img src=README/mico.png width=100em /></a>
 </div>
 
-## 运行环境要求
+
+
+## 如何运行
 
 - cmake 3.16
 - g++9.0 / clang++9.0
@@ -14,6 +17,8 @@
 $ cd build
 $ cmake ..
 $ make -j4
+$ ./standalone/kriller
+$ ./standalone/mico
 ```
 
 # kriller
@@ -76,7 +81,7 @@ $ ./standalone/kriller -s -t ../test/grammar/calculator.syntax
 ```
 
 > 这里报warning是因为给定的文法规则中有冲突，默认按照定义的先后顺序决定优先顺序，但更推荐地是通过二义性或者显式地定义优先级来彻底消除该隐患。
-> 通过查看日志或者要求显示更详细的中间信息 (`-v`) 来查看冲突的是哪些文法规则。
+> 通过查看日志 (`krill.log`) 或者要求显示更详细的中间信息 (`-v`) 来查看冲突的是哪些文法规则。
 
 读取一个yacc格式的文法规则文件，得到LALR(1)语法解析器 (`-s`)，并立即进行交互测试 (`-t`): 
 
@@ -129,7 +134,7 @@ $ ./standalone/kriller -v -S -g ../test/grammar/minic.syntax.yacc -o a.out
    解析一个c99子集的文法就要花费超过10分钟的时间, 解析完之后编译又要花10分钟, 那是真正的灾难. 
    在krill上面我们避开了那些失败的设计, --> 我们对算法核心部分进行profile, 对高频纯函数添加了缓存优化,
    使得原本需要10分钟的工作只需10秒即可完成. （虽然距离秒出还有距离，我猜是因为我们先建立LR(1)分析表再将其转为LALR(1), 而不是直接建立LALR(1), 但这个速度我们觉得也很酷!） 
-5. **友好的调试信息**: krill接入了spdlog，不仅做了一些简单的错误定位, 还允许你查看日志文件以定位错误
+5. **友好的调试信息**: krill接入了spdlog，不仅做了一些简单的错误定位, 还允许你查看日志文件 (`krill.log`)以定位错误
    所在. 为了便于检查解析结果, 你还可以打印Abstract Parsing Tree看看是否符合预期. 
 6. **饱经测试**: krill不仅写了一大堆`assert`以确保不会出现意外, 也准备了许多测试用例. 你可以信任它的正确性. 
 7. **名字很帅**. 
@@ -265,8 +270,3 @@ krill试图在二者之间寻找一个平衡:
 11. - [ ] 支持for
 12. - [ ] 消除全局数据段偏移使用，方便链接
 
-
-
-
-logo
-[README/logo.png]: 
