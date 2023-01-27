@@ -125,6 +125,7 @@ Code Ir::code() {
             .op = Op::kGlobal, .args_d = {.var = var, .size = var->type.size()}
         });
     }
+
     for (auto &func : globalFuncs) {
         if (func->code.has_value()) {
             Appender{code}

@@ -33,6 +33,7 @@ class SdtParser {
     // notice: declarations will be directly appended onto the back of domain
     vector<vector<Var *> *>  var_domains_;
     vector<vector<Func *> *> func_domains_;
+    vector<Code *> initializer_domains_;
 
     // for backpatching
     std::stack<Lbl *>         lbl_continue_stack_;
@@ -57,8 +58,9 @@ class SdtParser {
 
     // simple parsing
     int           parse_int_literal(APTnode *node);
+    vector<int>   parse_init_list(APTnode *node);
     TypeSpec      parse_basetype(APTnode *node);
-    Var *         parse_var_decl(APTnode *node);
+    pair<Var *, Code> parse_var_decl(APTnode *node);
     vector<Var *> parse_params(APTnode *node);
     Var *         parse_ident_as_variable(APTnode *node);
     Func *        parse_ident_as_function(APTnode *node);
@@ -77,7 +79,9 @@ class SdtParser {
     pair<Var *, Code> sdt_expr(APTnode *node);
 
     void sdt_expr_stmt(APTnode *node, Code &code);
+    void sdt_block_stmt(APTnode *node, Code &code);
     void sdt_if_stmt(APTnode *node, Code &code);
+    void sdt_for_stmt(APTnode *node, Code &code);
     void sdt_while_stmt(APTnode *node, Code &code);
     void sdt_return_stmt(APTnode *node, Code &code);
     void sdt_continue_stmt(APTnode *node, Code &code);

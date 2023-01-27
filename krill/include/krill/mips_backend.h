@@ -13,8 +13,8 @@ class MipsGenerator {
     vector<string> mips_code_;
 
     int stackBeginPosition = 0x8000;
-    int dataBeginPosition = 0x0000;
-    int textBeginPosition = 0x0000;
+    // int dataBeginPosition = 0x0000;
+    // int textBeginPosition = 0x0000;
 
     void genAny(string src);
     void genData(string src, int size);

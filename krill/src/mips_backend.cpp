@@ -481,6 +481,8 @@ void MipsGenerator::genDirector() {
     genCode("ori", "$fp", "$zero", to_hex(stackBeginPosition));
     genCode("ori", "$sp", "$zero", to_hex(stackBeginPosition));
     // call main
+    genCode("jal", "entry.point.function");
+    genCode("nop");
     genCode("jal", "main");
     genCode("nop");
 
@@ -578,9 +580,11 @@ MipsGenerator &MipsGenerator::parse() {
         }
     }
 
-    genAny(to_string(fmt::format(".DATA {}", to_hex(dataBeginPosition))));
+    // genAny(to_string(fmt::format(".DATA {}", to_hex(dataBeginPosition))));
+    genAny(to_string(fmt::format(".DATA")));
     for (const auto &ir : dataCode) { genCodes(ir); }
-    genAny(to_string(fmt::format(".TEXT {}", to_hex(textBeginPosition))));
+    // genAny(to_string(fmt::format(".TEXT {}", to_hex(textBeginPosition))));
+    genAny(to_string(fmt::format(".TEXT")));
     genDirector(); // direct to main
     for (const auto &ir : textCode) { genCodes(ir); }
 
