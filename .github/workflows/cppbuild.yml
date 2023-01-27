@@ -47,7 +47,7 @@ jobs:
         with:
           xmake-version: latest
       - name: configure
-        run: cd ${{ github.workspace }} && xmake f -y
+        run: cd ${{ github.workspace }} && xmake f -y --toolchain=clang
       - name: build
         run: xmake b -v
       - name: run-test-cases-01
