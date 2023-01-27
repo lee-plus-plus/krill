@@ -107,11 +107,7 @@ int main(int argc, char **argv) {
         exit(0);
     }
 
-    if (result.count("input") == 0) {
-        // do not use stdin as input
-        std::cerr << "mico: \033[31mfatal error:\033[0m no input files\n";
-        exit(1);
-    } 
+    bool is_legal = true;
 
     int    opt_level       = result["Opt"].as<int>();
     bool   ast_only        = result["Ast"].as<bool>();
@@ -121,8 +117,8 @@ int main(int argc, char **argv) {
     string output_filename = result["output"].as<string>();
     bool   verbose         = result["verbose"].as<bool>();
 
-    ifstream input_file(input_filename);
-    ofstream output_file(output_filename);
+    ifstream input_file;
+    ofstream output_file;
     istream *input = nullptr;
     ostream *output = nullptr;
 
@@ -133,31 +129,38 @@ int main(int argc, char **argv) {
         krill::log::sink_cerr->set_level(spdlog::level::warn);
     }
 
-    if (!input_file) {
-        std::cerr << fmt::format(
-            "mico: \033[31merror:\033[0m {}: No such file or directory\n",
-            input_filename);
-        exit(1);
+    if (result.count("input") == 0) {
+        std::cerr << "mico: \033[31mfatal error:\033[0m no input files\n";
+        is_legal = false;
     } else {
+        input_file = ifstream(input_filename);
+        if (!input_file) {
+            std::cerr << fmt::format("mico: \033[31merror:\033[0m {}: No "
+                                     "such file or directory\n",
+                                     input_filename);
+            is_legal = false;
+        }
         input = &input_file;
-        logger.info("use {} as input", input_filename);
+        spdlog::debug("Input: {}", input_filename);
     }
 
     if (output_filename == "stdout") {
         output = &std::cout;
-        logger.info("use {} as output", "stdout");
+        logger.info("Output: {}", "stdout");
     } else {
         if (!output_file) {
             std::cerr << fmt::format(
                 "mico: \033[31merror:\033[0m {}: No such file or directory\n",
                 output_filename);
-            std::cerr << "compilation terminated.\n";
-            exit(1);
+            is_legal = false;
         } else {
+            output_file = ofstream(output_filename);
             output = &output_file;
-            logger.info("use {} as output", output_filename);
+            logger.info("Output: {}", output_filename);
         }
     }
+
+    if (!is_legal) { exit(1); }
 
     parse(*input, *output, opt_level, ast_only, ir_only, compile_only);
 

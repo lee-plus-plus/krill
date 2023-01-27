@@ -342,7 +342,7 @@ int main(int argc, char **argv) {
     if (is_syntax_yacc + is_syntax + is_lexical != 1) {
         std::cerr << fmt::format(
             "kriller: \033[31merror:\033[0m: must specify one "
-            "Pattern in syntax-yacc, syntax and "
+            "PATTERN in syntax-yacc, syntax and "
             "lexical\n");
         is_legal = false;
     }
@@ -352,6 +352,7 @@ int main(int argc, char **argv) {
             "MODE in test and generator\n");
         is_legal = false;
     }
+
     if (!is_legal) { exit(1); }
 
     if (is_syntax_yacc) {
@@ -366,12 +367,6 @@ int main(int argc, char **argv) {
         spdlog::debug("Mode: test");
     } else if (gen_mode) {
         spdlog::debug("Mode: generator");
-    }
-
-    if (test_mode + gen_mode != 1) {
-        std::cerr << fmt::format("kriller: \033[31merror:\033[0m: specify one "
-                                 "MODE in test and generator\n");
-        is_legal = false;
     }
 
     if (is_syntax_yacc || is_syntax) {
