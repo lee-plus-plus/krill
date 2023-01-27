@@ -4,6 +4,6 @@ set_warnings('allextra') -- -Wall
 add_rules("mode.debug", "mode.release")
 
 includes(
-  'krill', 'test'
+  'krill', 'test', 'standalone'
 )
 

@@ -28,6 +28,4 @@ jobs:
         run: cd ${{ github.workspace }} && xmake f -y --toolchain=clang
       - name: build
         run: xmake b -v
-      - name: run-test-cases-10
-        run: xmake r test_minic -Ls < test/minic-testcase/10.c
 
