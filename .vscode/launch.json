@@ -1,0 +1,13 @@
+{
+  "configurations": [
+  {
+     "name": "XMake Debug",
+      "type": "xmake",
+      "request": "launch",
+      "target": "mico",
+      "stopAtEntry": true,
+      "cwd": "${workspaceFolder}",
+      "args": ["-v", "-i", "test/minic-testcase/06.c"]
+  }
+]
+}
