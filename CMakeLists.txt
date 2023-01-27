@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_STANDARD 17)
 
 # use g++9.0, clang++9.0 above
+# cmake .. -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 
 project(KRILL)
 
@@ -19,6 +20,7 @@ set(CMAKE_BUILD_TYPE  "Debug")
 
 add_subdirectory(krill)
 add_subdirectory(test)
+add_subdirectory(standalone)
 
 
 

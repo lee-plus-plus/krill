@@ -92,7 +92,7 @@ GrammarNode syntaxParser(vector<int> tokens, vector<char> lexValues) {
         // look tokens[i], state => next_state, action
         assert(actionTable.count({states.top(), tokens[i]}) != 0);
 
-        Action action = actionTable[{states.top(), tokens[i]}];
+        Action action = actionTable.at({states.top(), tokens[i]});
         switch (action.type) {
             case ACTION: {
                 states.push(action.tgt);
@@ -110,7 +110,7 @@ GrammarNode syntaxParser(vector<int> tokens, vector<char> lexValues) {
                 }
 
                 assert(actionTable.count({states.top(), r.symbol}) != 0);
-                Action action2 = actionTable[{states.top(), r.symbol}];
+                Action action2 = actionTable.at({states.top(), r.symbol});
                 assert(action2.type == GOTO);
                 states.push(action2.tgt);
 

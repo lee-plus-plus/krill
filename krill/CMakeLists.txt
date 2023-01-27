@@ -25,9 +25,17 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(magic_enum)
 message("Fetching Complete!")
 
+# Use magic_enum to support static reflection for enums.
+message("Fetching cxxopts")
+FetchContent_Declare(
+  cxxopts URL https://codeload.github.com/jarro2783/cxxopts/tar.gz/refs/tags/v3.0.0
+)
+FetchContent_MakeAvailable(cxxopts)
+message("Fetching Complete!")
+
 file (GLOB_RECURSE KRILL_HEADER include/*.h)
 file (GLOB_RECURSE KRILL_SRC    src/*.cpp)
 
 add_library(krill ${KRILL_SRC} ${KRILL_HEADER})
 target_link_libraries(krill PUBLIC fmt)
-target_link_libraries(krill PUBLIC spdlog::spdlog magic_enum::magic_enum)
+target_link_libraries(krill PUBLIC spdlog::spdlog magic_enum::magic_enum cxxopts::cxxopts)

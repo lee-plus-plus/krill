@@ -80,6 +80,7 @@ class IrOptimizer {
     IrOptimizer(Ir &ir) : ir_(ir){};
 
     IrOptimizer &annotateInfo();
+    IrOptimizer &propagateConstValue();
     IrOptimizer &assignRegs();
     IrOptimizer &eliminateCommonSubExpr();
 };

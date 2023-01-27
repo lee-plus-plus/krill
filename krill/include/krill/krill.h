@@ -11,7 +11,6 @@
 #include "krill/syntax.h"
 #include "krill/grammar.h "
 #include "krill/utils.h"
-#include "krill/minic.h"
 
 #endif //KRILL_H
 

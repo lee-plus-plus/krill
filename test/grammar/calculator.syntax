@@ -1,0 +1,10 @@
+Q -> P
+P -> T
+T -> ( P )
+T -> T * T
+T -> T / T
+P -> P + T
+P -> P - T
+P- > T
+T -> - T
+T -> d

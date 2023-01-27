@@ -634,6 +634,35 @@ IrOptimizer &IrOptimizer::annotateInfo() {
             for (auto &q : func->code.value()) {
                 // set var info
                 switch (q.op) {
+                case Op::kAssign:
+                    q.args_i.var->info = Var::Info{.constVal = {q.args_i.cval}};
+                    break;
+                case Op::kLoad:
+                    q.args_m.var->info = Var::Info{};
+                    break;
+                case Op::kRetGet:
+                    q.args_f.var->info = Var::Info{};
+                    break;
+                default:
+                    if (isOpExpr(q.op)) { q.args_e.dest->info = Var::Info{}; }
+                    break;
+                }
+            }
+        }
+    }
+    return *this;
+}
+
+// ---------- const value propagatation ----------
+
+IrOptimizer &IrOptimizer::propagateConstValue() {
+    for (auto &func : ir_.globalFuncs) {
+        // assign const value for temporal variables
+        map<Var *, QuadTuple *> cvalCode;
+        if (func->code.has_value()) {
+            for (auto &q : func->code.value()) {
+                // set var info
+                switch (q.op) {
                 case Op::kAlloca:
                 case Op::kGlobal:
                     // pass
@@ -694,6 +723,8 @@ IrOptimizer &IrOptimizer::annotateInfo() {
     return *this;
 }
 
+
+
 // ---------- Common Sub-expression Eliminatation ----------
 
 PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
@@ -726,7 +757,7 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
             cvalNodes[cval] = node;
             varNodes[var]   = node;
 
-            logger.debug("  node \033[33m{}\033[0m: (constval {})",
+            logger.debug("  node {}: (constval {})",
                          var_name(node->var), cval);
 
         } else if (isOpExpr(op)) { // set, use
@@ -772,8 +803,8 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
                 q.args_e.src2 = node->src2->var;
             }
 
-            logger.debug("  node \033[33m{}\033[0m ({}, node \033[33m{}\033[0m "
-                         ", node \033[33m{}\033[0m)",
+            logger.debug("  node {} ({}, node {} "
+                         ", node {})",
                          var_name(node->var), enum_name(op),
                          var_name(node->src1->var), var_name(node->src2->var));
 
@@ -805,7 +836,7 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
 
             varNodes[var] = node;
 
-            logger.debug("  node \033[33m{}\033[0m (load from {})",
+            logger.debug("  node {} (load from {})",
                          var_name(node->var), var_name(mem));
 
         } else if (op == Op::kStore) { // use, (set mem)
@@ -829,7 +860,7 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
 
             // node->referenced.push_back(&q);
 
-            logger.debug("  node \033[33m{}\033[0m: (store to {})",
+            logger.debug("  node {}: (store to {})",
                          var_name(node->var), var_name(mem));
 
             // replace used var
@@ -894,7 +925,7 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
 
     logger.debug("DAG nodes:");
     for (auto &node : nodes.elements()) {
-        logger.debug("  node \033[33m{}\033[0m: ({} {} {}) {}",
+        logger.debug("  node {}: ({} {} {}) {}",
                      var_name(node->var),
                      node->op != Op::kNop ? enum_name(node->op) : "",
                      node->src1 != nullptr ? var_name(node->src1->var) : "",
