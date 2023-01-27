@@ -1,4 +1,4 @@
-
+// calculate the sum of fiboonaci[1 ... 20]
 int fib[20];
 int glb;
 
@@ -10,7 +10,6 @@ int add(int x, int y) {
 
 int main(void) {
 	int len;
-	
 	int i;
 
 	len = 20;
@@ -28,6 +27,7 @@ int main(void) {
 		glb = add(glb, fib[i]);
 		i = i + 1;
 	}
-
 	return 0;
 }
+
+
