@@ -1,2 +1,9 @@
 build/*
 
+.DS_Store
+.cache
+.xmake
+**/krill.log
+
+**/compile_commands.json
+

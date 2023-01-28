@@ -66,9 +66,9 @@ int SdtParser::parse_int_literal(APTnode *node) {
     case syntax::HEXNUM:
         // std::stol on windows do not accpet hexical begin with "0x" or "0X"
         if (lval.substr(0, 2) == "0x" || lval.substr(0, 2) == "0X") {
-            constVal = stol(lval.substr(2), nullptr, 16); // hexadecimal
+            constVal = stoll(lval.substr(2), nullptr, 16); // hexadecimal
         } else {
-            constVal = stol(lval, nullptr, 16); // hexadecimal
+            constVal = stoll(lval, nullptr, 16); // hexadecimal
         }
         break;
     default:
