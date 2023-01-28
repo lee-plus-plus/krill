@@ -5,20 +5,20 @@
 <a href="#mico"><img src=README/mico.png width=100em /></a>
 </div>
 
-
-
 ## 如何运行
 
-- cmake 3.16
+- cmake 3.16 / xmake
 - g++9.0 / clang++9.0
 - std=c++17
+
+(下面的示例仅介绍以cmake作为构建系统的使用方法)
 
 ```bash
 $ cd build
 $ cmake ..
 $ make -j4
-$ ./standalone/kriller
-$ ./standalone/mico
+$ ./standalone/kriller --help
+$ ./standalone/mico --help
 ```
 
 # kriller
@@ -269,4 +269,5 @@ krill试图在二者之间寻找一个平衡:
 10. - [x] 支持变量定义时初始化
 11. - [ ] 支持for
 12. - [ ] 消除全局数据段偏移使用，方便链接
+13. - [ ] 英文readme
 
