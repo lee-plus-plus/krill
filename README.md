@@ -1,23 +1,59 @@
-# Krill: parser generator and compiler
+# Krill: parser generator and Mico: compiler
 
-## 运行环境要求
+<div align="center">
+<a href="#kriller"><img src=README/krill.png width=100em/></a>
+<a href="#mico"><img src=README/mico.png width=100em /></a>
+</div>
 
-- Cmake 3.16 above
-- g++9.0 / clang++9.0 above
-- std=c++17 above
+
+
+## 如何运行
+
+- cmake 3.16
+- g++9.0 / clang++9.0
+- std=c++17
 
 ```bash
 $ cd build
 $ cmake ..
 $ make -j4
+$ ./standalone/kriller
+$ ./standalone/mico
 ```
 
 # kriller
 
-kriller 是一个LALR(1)的词法/语法解析器生成器, 它既可以解析用户输入的正则表达式组, 以生成词法解析器, 
-并生成词法解析器的核心跳转表(DFA)的代码, 也可以解析用户输入的BNF文法, 以生成语法解析器, 
-并生成语法解析器的核心跳转表(ActionTable)的代码. 你可能以为编译原理的算法部分是它的硬核所在, 
-但其实 「如何划分功能交界面」, 「如何设计更好的接口」, 「如何给出更有价值的提示信息」才是真正的难点. 
+kriller 是一个DFA的词法解析器、LALR(1)语法解析器的生成器。
+
+简单来说, 它可以把这样格式的文法规则 (简易形式)
+
+<img src=README/README6.png width=500em />
+
+进行解析 (有二义性)
+
+<img src=README/README7.png width=500em />
+
+或者以yacc格式的文法规则 (繁琐一点)
+
+<img src=README/README9.png width=500em />
+
+进行解析 (通过定义结合性和优先级消除了二义性)
+
+<img src=README/README10.png width=500em />
+
+并产生相应的LALR(1)语法分析器，使得你可以像这样即时地解析
+
+<img src=README/README8.png width=500em />
+
+并且，允许你把这样格式的词法规则 (正则表达式) 
+
+<img src=README/README11.png width=500em />
+
+解析，并产生相应的DFA词法分析器，使得你可以这样即时解析
+
+<img src=README/README12.png width=500em />
+
+并且提供生成上述的词法、语法分析器代码的功能，使得你可以将生成的解析器用于任何地方
 
 ## Quick Start
 
@@ -27,6 +63,8 @@ kriller 是一个LALR(1)的词法/语法解析器生成器, 它既可以解析�
 $ cd build
 $ ./standalone/kriller --help
 ```
+
+<img src=README/README0.png width=500em />
 
 读取一个包含若干条正则表达式的文件，得到词法解析器 (`-l`)，并立即进行交互测试 (`-t`): 
 
@@ -42,6 +80,9 @@ $ ./standalone/kriller -s -t ../test/grammar/calculator.syntax
 > d + d * d
 ```
 
+> 这里报warning是因为给定的文法规则中有冲突，默认按照定义的先后顺序决定优先顺序，但更推荐地是通过二义性或者显式地定义优先级来彻底消除该隐患。
+> 通过查看日志 (`krill.log`) 或者要求显示更详细的中间信息 (`-v`) 来查看冲突的是哪些文法规则。
+
 读取一个yacc格式的文法规则文件，得到LALR(1)语法解析器 (`-s`)，并立即进行交互测试 (`-t`): 
 
 ```bash
@@ -55,11 +96,15 @@ $ ./standalone/kriller -S -t ../test/grammar/minic.syntax.yacc
 $ ./standalone/kriller -S -g ../test/grammar/minic.syntax.yacc
 ```
 
+> 如何使用生成的解析器代码, 见 [下一章节](#how-to-use-parser-code)
+
 将结果写入到文件而不是输出到屏幕上 (`-o file`), 并显示更详细的中间信息 (`-v`). 
 
 ```bash
 $ ./standalone/kriller -v -S -g ../test/grammar/minic.syntax.yacc -o a.out
 ```
+
+<span id="how-to-use-parser-code"></span>
 
 ### 解析器代码如何封装使用
 
@@ -85,19 +130,34 @@ $ ./standalone/kriller -v -S -g ../test/grammar/minic.syntax.yacc -o a.out
    `krill::runtime::LexicalParser`也行，想自己撸一个零依赖的, 功能更多的解析器也很简单. 
 3. **学习成本低**: lex和yacc的学习成本太高了, 我们定义了一套更简单的语法规则, 简单到你连`%token`都不需要
    预先定义. 不知道左右结合也没有关系, 全部用默认的就好, 如果发生二义性我们再提醒你. 
-4. **解析速度快**: kriller没有yacc快. 但我们曾经写过另一个很糟糕的解析器生成器(seu-lex-yacc), 
+4. **解析速度快**: <!-- kriller没有yacc快. 但我们曾经写过另一个很糟糕的解析器生成器(seu-lex-yacc), 
    解析一个c99子集的文法就要花费超过10分钟的时间, 解析完之后编译又要花10分钟, 那是真正的灾难. 
-   在krill上面我们避开了那些失败的设计, 对算法核心部分进行profile, 对高频纯函数添加了缓存优化,
-   使得原本需要10分钟的工作只需10秒即可完成(yacc只需要0.1s). 虽然距离秒出还有距离
-   (我猜是因为我们先建立LR(1)分析表再将其转为LALR(1), 而不是直接建立LALR(1)), 但这个速度我们觉得也很酷! 
-5. **友好的调试信息**: krill接入了spdlog，不仅做了一些简单的错误定位, 还允许你查看日志文件以定位错误
+   在krill上面我们避开了那些失败的设计, --> 我们对算法核心部分进行profile, 对高频纯函数添加了缓存优化,
+   使得原本需要10分钟的工作只需10秒即可完成. （虽然距离秒出还有距离，我猜是因为我们先建立LR(1)分析表再将其转为LALR(1), 而不是直接建立LALR(1), 但这个速度我们觉得也很酷!） 
+5. **友好的调试信息**: krill接入了spdlog，不仅做了一些简单的错误定位, 还允许你查看日志文件 (`krill.log`)以定位错误
    所在. 为了便于检查解析结果, 你还可以打印Abstract Parsing Tree看看是否符合预期. 
 6. **饱经测试**: krill不仅写了一大堆`assert`以确保不会出现意外, 也准备了许多测试用例. 你可以信任它的正确性. 
 7. **名字很帅**. 
 
 # mico
 
-mico 是专门为minisys设计的编译器, 你可以用它解析mini-c的代码, 生成中间表示, 施加机器无关优化, 以及产生mips代码. 
+mico 是专门为minisys（seu的一门课，设计编译器、汇编器和cpu令其协同工作）设计的编译器, 你可以用它解析mini-c的代码, 生成中间表示, 施加机器无关优化, 以及产生mips代码. 
+
+简单来说, 它可以将这样的mini-c代码文件 (一个阉割版的c)
+
+<img src=README/README13.png width=500em />
+
+解析成这样的抽象语法树
+
+<img src=README/README14.png width=500em />
+
+然后生成中间表示（SSA, 对llvm拙劣的效仿）, 进行机器无关优化（公共子表达式消除） 
+
+<img src=README/README15.png width=500em />
+
+最后生成mips的代码（图染色寄存器分配）
+
+<img src=README/README16.png width=500em />
 
 ## Quick Start
 
@@ -107,6 +167,8 @@ mico 是专门为minisys设计的编译器, 你可以用它解析mini-c的代码
 $ cd build
 $ ./standalone/mico --help
 ```
+
+<img src=README/README17.png width=500em />
 
 解析 mini-c 代码文件 `06.c` , 打印AST (`-A`). 
 
@@ -181,6 +243,8 @@ krill试图在二者之间寻找一个平衡:
 这一步的工作特别少, 因为寄存器分配的信息已经存储在中间代码上了，只需要执行近似于一对一的翻译即可. 
 主要的难点在于过程调用的寄存器现场恢复. 
 
+生成的mips代码在MARS(一个mips模拟器)上通过了测试。
+
 ## 链接
 
 如果需要合并两个汇编代码文件，有以下问题需要注意: 
@@ -205,8 +269,4 @@ krill试图在二者之间寻找一个平衡:
 10. - [x] 支持变量定义时初始化
 11. - [ ] 支持for
 12. - [ ] 消除全局数据段偏移使用，方便链接
-
-
-
-
 
