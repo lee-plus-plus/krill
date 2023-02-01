@@ -195,7 +195,7 @@ void RegexParser::lexicalParse() {
 
     // assert(isEscape == false);
     if (isEscape) {
-        ERR_LOG("Regex Parsing Error: unmatched escape '\\' in \"{}\"", regex_);
+        ERR_LOG("Regex Parsing Error: unmatched escape '\\' in ‘{}’", regex_);
     }
 }
 
@@ -203,7 +203,7 @@ void RegexParser::lexicalParse() {
 void RegexParser::syntaxParse() {
     // assert(tokens.size() > 0);
     if (tokens_.size() == 0) {
-        ERR_LOG("Regex Parsing Error: do not accpet empty regex \"{}\"",
+        ERR_LOG("Regex Parsing Error: do not accpet empty regex ‘{}’",
                 regex_);
     }
     if (tokens_[tokens_.size() - 1].id != -1) { tokens_.push_back({-1, ""}); }
@@ -217,13 +217,13 @@ void RegexParser::syntaxParse() {
         // assert(actionTable.count({states_.top(), tokens_[i].id}) != 0);
         if (actionTable.count({states_.top(), tokens_[i].id}) == 0) {
             if (nodes_.size() == 0) {
-                ERR_LOG("Regex Parsing Error: unmatched symbol \"{}\"\n"
-                        "\"{}\"\n {}",
+                ERR_LOG("Regex Parsing Error: unmatched symbol ‘{}’\n"
+                        "‘{}’\n {}",
                         tokens_[i].lval, regex_,
                         string(tokens_[i].ed - tokens_[i].st + 1, '^'));
             } else {
-                ERR_LOG("Regex Parsing Error: unmatched symbol \"{}\"\n"
-                        "\"{}\"\n {}",
+                ERR_LOG("Regex Parsing Error: unmatched symbol ‘{}’\n"
+                        "‘{}’\n {}",
                         tokens_[i].lval, regex_,
                         string(nodes_.top().st, ' ') +
                             string(nodes_.top().ed - nodes_.top().st + 1, '~') +
@@ -263,8 +263,8 @@ void RegexParser::syntaxParse() {
                 // assert(actionTable.count({states_.top(), r.symbol}) != 0);
                 if (actionTable.count({states_.top(), r.symbol}) == 0) {
                     ERR_LOG(
-                        "Regex Parsing Error: unmatched symbol \"{}\"\n"
-                        "\"{}\"\n{}",
+                        "Regex Parsing Error: unmatched symbol ‘{}’\n"
+                        "‘{}’\n{}",
                         tokens_[i].lval, regex_,
                         string(' ', nodes_.top().st) +
                             string(' ', nodes_.top().st) +
@@ -510,7 +510,7 @@ void RegexParser::syntaxParse() {
                     }
                 }
 
-                // fmt::print("[{} \"{}\"]", symbolNames.at(nextNode.id),
+                // fmt::print("[{} ‘{}’]", symbolNames.at(nextNode.id),
                 //            nextNode.lval);
 
                 nodes_.push(nextNode);

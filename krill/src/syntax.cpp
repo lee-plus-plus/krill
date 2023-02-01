@@ -244,13 +244,13 @@ string SyntaxParser::getErrorMessage() {
         "syntax parsing error: unexpected {}",
         tokenWithAttr.id == END_SYMBOL
             ? "end of input"
-            : fmt::format(" <token {}> \"{}\"",
+            : fmt::format(" <token {}> ‘{}’",
                           grammar_.symbolNames.at(tokenWithAttr.id),
                           unescape(tokenWithAttr.attr.Get<string>("lval"))));
 
     logger.debug("{}", errorMsg);
-    logger.debug("  history_: \"{}\"", history_);
-    logger.debug("  look: {} \"{}\"", grammar_.symbolNames.at(tokenWithAttr.id),
+    logger.debug("  history_: ‘{}’", history_);
+    logger.debug("  look: {} ‘{}’", grammar_.symbolNames.at(tokenWithAttr.id),
                  unescape(tokenWithAttr.attr.Get<string>("lval")));
     logger.debug(
         "  symbols: [{}]",
