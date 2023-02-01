@@ -21,6 +21,30 @@ using namespace krill::minic;
 
 using krill::log::logger;
 
+void parse_example(istream &input, ostream &output) {
+    // mini-C parsing
+    auto parser  = krill::minic::MinicParser();
+    parser.parseAll(input);
+    auto aptRoot = parser.getAptNode();
+    // syntax-directed translation
+    auto sdtParser = krill::minic::SdtParser(aptRoot.get());
+    auto ir        = sdtParser.parse().get();
+
+    // optimization
+    auto irOptimizer = krill::ir::IrOptimizer(ir);
+    irOptimizer
+    .annotateInfo()
+    .propagateConstValue()
+    .eliminateCommonSubExpr()
+    .assignRegs();
+
+    // mips code generation
+    auto mipsGenerator = krill::mips::MipsGenerator(ir);
+    mipsGenerator.parse();
+    // output mips code
+    output << mipsGenerator.gen() << "\n";
+}
+
 // mips code generation
 void parse(istream &input, ostream &output, int opt_level, bool ast_only,
            bool ir_only, bool compile_only) {

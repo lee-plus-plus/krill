@@ -2204,6 +2204,10 @@ MinicParser::MinicParser() : root_(nullptr) {
 
 Grammar minicGrammar = krill::minic::syntax::grammar;
 
+MinicGrammar::MinicGrammar() {
+    new (this) Grammar(krill::minic::syntax::grammar);
+};
+
 MinicSyntaxParser::MinicSyntaxParser()
     : SyntaxParser(krill::minic::syntax::grammar,
                    krill::minic::syntax::actionTable){};

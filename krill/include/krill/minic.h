@@ -18,6 +18,11 @@ using std::stringstream;
 
 namespace krill::minic {
 
+class MinicGrammar : public Grammar {
+  public:
+    MinicGrammar();
+};
+
 class MinicSyntaxParser : public SyntaxParser {
   public:
     MinicSyntaxParser();

@@ -579,8 +579,8 @@ IrOptimizer &IrOptimizer::annotateInfo() {
     // initialize global variable info
     for (const auto &var : ir_.globalVars) {
         var->info = Var::Info{
-            .memOffset = {memOffset},
             .memName   = {var->name},
+            .memOffset = {memOffset},
         };
         memOffset += var->type.size();
     }

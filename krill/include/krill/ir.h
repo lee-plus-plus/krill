@@ -41,38 +41,25 @@ enum class Op {
 };
 
 // intermediate code (quad-tuple)
+// clang-format off
 struct QuadTuple {
     Op op;
     union {
-        struct { // immediate: assign
-            Var *   var;
-            int32_t cval;
-        } args_i;
-        struct { // declaration: allocate,  global
-            Var *   var;
-            int32_t size;
-        } args_d;
-        struct { // expresstion: 2-op / 1-op calculate
-            Var *dest;
-            Var *src1;
-            Var *src2;
-        } args_e;
-        struct { // memory: mem load/store
-            Var *var;
-            Var *mem;
-        } args_m;
-        struct { // jump: jump, branch
-            Var *var;
-            Lbl *addr1;
-            Lbl *addr2;
-        } args_j;
-        struct { // function: call / param / RetPut
-            Var *   var;
-            Func *  func;
-            int32_t idx;
-        } args_f;
+        // immediate: assign
+        struct { Var *var;  int32_t cval; } args_i;
+        // declaration: allocate,  global
+        struct { Var *var;  int32_t size; } args_d;
+        // expresstion: 2-op / 1-op calculate
+        struct { Var *dest; Var *src1;  Var *src2; } args_e;
+        // memory: mem load/store
+        struct { Var *var;  Var *mem; } args_m;
+        // jump: jump, branch
+        struct { Var *var;  Lbl *addr1; Lbl *addr2; } args_j;
+        // function: call / param / RetPut
+        struct { Var *var;  Func *  func;   int32_t idx; } args_f;
     };
 };
+// clang-format on
 
 using Code = vector<QuadTuple>;
 
@@ -95,17 +82,18 @@ struct Var {
     };
     struct Info {
         // exclusive
-        std::optional<int>    constVal;  // it's a const value
-        std::optional<int>    fpOffset;  // it's a offset relatived to $fp
-        std::optional<int>    memOffset; // it's a data segment position
-        std::optional<string> memName;   // it's a data segment label
-        std::optional<string> ptrReg;    //
+        std::optional<int>    constVal; // it's a const value
+        std::optional<int>    fpOffset; // it's a offset relatived to $fp
+        std::optional<string> memName;  // it's a data segment label
+        std::optional<int>    memOffset;
 
         std::optional<string> reg; // assigned register
     };
 
     string   name;
     TypeDecl type;
+
+    std::optional<vector<int>> initVal;
     // for optimization use
     Info info;
 

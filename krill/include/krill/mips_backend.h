@@ -17,7 +17,9 @@ class MipsGenerator {
     // int textBeginPosition = 0x0000;
 
     void genAny(string src);
-    void genData(string src, int size);
+    void genData(string src);
+    void genDataElem(int val);
+    void genDataSpace(int size);
     void genCode(string op);
     void genCode(string op, string src1);
     void genCode(string op, string src1, string src2);

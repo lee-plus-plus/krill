@@ -108,7 +108,7 @@ TypeSpec SdtParser::parse_basetype(APTnode *node) {
 // ? : type_spec IDENT ... | type_spec IDENT '[' int_literal ']' ... |
 //     type_spec IDENT '=' int_literal ... |
 //     type_spec IDENT '[' int_literal ']' '=' '{' init_list '}' ...
-pair<Var *, Code> SdtParser::parse_var_decl(APTnode *node) {
+Var *SdtParser::parse_var_decl(APTnode *node) {
     assert(node->child[0].get()->id == syntax::type_spec);
     assert(node->child[1].get()->id == syntax::IDENT);
 
@@ -132,7 +132,6 @@ pair<Var *, Code> SdtParser::parse_var_decl(APTnode *node) {
     auto type = Var::TypeDecl{.basetype = basetype, .shape = shape};
     auto var  = assign_new_variable({.name = varname, .type = type});
 
-    auto code_init = Code{};
     if (hasInitalVal) {
         if (isArrayDecl) {
             // type_spec IDENT '[' int_literal ']' '=' '{' init_list '}' ...
@@ -147,54 +146,17 @@ pair<Var *, Code> SdtParser::parse_var_decl(APTnode *node) {
                     varname);
                 throw runtime_error("unmatched size for intializer list");
             }
-
-            auto width = var->type.baseSize();
-            for (int i = 0; i < init_list.size(); i++) {
-                auto var_idx =
-                    assign_new_variable({.type = {TypeSpec::kInt32}});
-                auto var_width =
-                    assign_new_variable({.type = {TypeSpec::kInt32}});
-                auto var_offset =
-                    assign_new_variable({.type = {TypeSpec::kInt32}});
-                auto var_addr =
-                    assign_new_variable({.type = {TypeSpec::kInt32}});
-                auto var_cval =
-                    assign_new_variable({.type = {TypeSpec::kInt32}});
-
-                Appender{code_init}.append({
-                    {.op = Op::kAssign, .args_i = {.var = var_idx, .cval = i}},
-                    {.op     = Op::kAssign,
-                     .args_i = {.var = var_width, .cval = width}},
-                    {.op     = Op::kMult,
-                     .args_e = {.dest = var_offset,
-                                .src1 = var_idx,
-                                .src2 = var_width}},
-                    {.op     = Op::kAdd,
-                     .args_e = {.dest = var_addr,
-                                .src1 = var,
-                                .src2 = var_offset}},
-                    {.op     = Op::kAssign,
-                     .args_i = {.var = var_cval, .cval = init_list[i]}},
-                    {.op     = Op::kStore,
-                     .args_m = {.var = var_cval, .mem = var_addr}},
-                });
-            }
+            var->initVal = {init_list};
         } else {
             // type_spec IDENT '=' int_literal ...
             auto node_init = node->child[3].get();
             int  init_val  = parse_int_literal(node_init);
 
-            auto var_cval = assign_new_variable({.type = {TypeSpec::kInt32}});
-
-            Appender{code_init}.append({
-                {.op     = Op::kAssign,
-                 .args_i = {.var = var_cval, .cval = init_val}},
-                {.op = Op::kStore, .args_m = {.var = var_cval, .mem = var}},
-            });
+            var->initVal = {vector<int>{init_val}};
         }
     }
 
-    return {var, code_init};
+    return var;
 } // namespace krill::minic
 
 // params : param_list | VOID_
@@ -221,9 +183,9 @@ vector<Var *> SdtParser::parse_params(APTnode *node) {
         return result;
     }
     case syntax::param: {
-        auto[var, code_init] = parse_var_decl(node);
+        auto var = parse_var_decl(node);
 
-        if (code_init.size() != 0) {
+        if (var->initVal.has_value()) {
             logger.error(
                 "input:{}: {}: {}: cannnit define initial value for parameters",
                 node->attr.Get<int>("row_st"), node->attr.Get<int>("col_st"),
@@ -318,6 +280,53 @@ Code SdtParser::parse_function_call(Func *func, const vector<Var *> &var_args) {
         QuadTuple{.op = Op::kCall, .args_f = {.func = func}});
 
     return code_dest;
+}
+
+Code SdtParser::parse_local_init_code(Var *var) {
+    if (!var->initVal.has_value()) { return {}; }
+
+    auto code_init = Code{};
+    if (var->type.shape.size() > 0) {
+        // is array
+        vector<int> init_list = var->initVal.value();
+        int         width     = var->type.baseSize();
+
+        for (int i = 0; i < init_list.size(); i++) {
+            auto var_idx    = assign_new_variable({.type = {TypeSpec::kInt32}});
+            auto var_width  = assign_new_variable({.type = {TypeSpec::kInt32}});
+            auto var_offset = assign_new_variable({.type = {TypeSpec::kInt32}});
+            auto var_addr   = assign_new_variable({.type = {TypeSpec::kInt32}});
+            auto var_cval   = assign_new_variable({.type = {TypeSpec::kInt32}});
+
+            Appender{code_init}.append({
+                {.op = Op::kAssign, .args_i = {.var = var_idx, .cval = i}},
+                {.op     = Op::kAssign,
+                 .args_i = {.var = var_width, .cval = width}},
+                {.op     = Op::kMult,
+                 .args_e = {.dest = var_offset,
+                            .src1 = var_idx,
+                            .src2 = var_width}},
+                {.op     = Op::kAdd,
+                 .args_e = {.dest = var_addr, .src1 = var, .src2 = var_offset}},
+                {.op     = Op::kAssign,
+                 .args_i = {.var = var_cval, .cval = init_list[i]}},
+                {.op     = Op::kStore,
+                 .args_m = {.var = var_cval, .mem = var_addr}},
+            });
+        }
+    } else {
+        // is int
+        assert(var->initVal.value().size() == 1);
+        int init_val = var->initVal.value()[0];
+
+        auto var_cval = assign_new_variable({.type = {TypeSpec::kInt32}});
+
+        Appender{code_init}.append({
+            {.op = Op::kAssign, .args_i = {.var = var_cval, .cval = init_val}},
+            {.op = Op::kStore, .args_m = {.var = var_cval, .mem = var}},
+        });
+    }
+    return code_init;
 }
 
 // ---------- dispatcher ----------
@@ -546,11 +555,15 @@ void SdtParser::sdt_global_var_decl(APTnode *node) {
     // var_decl : type_spec IDENT ';' | ...
     assert(node->id == syntax::var_decl);
 
-    auto[var, code_init] = parse_var_decl(node);
+    auto var = parse_var_decl(node);
 
     // add its declaration, intializer code, into domains
     var_domains_.back()->emplace_back(var);
-    Appender{*initializer_domains_.back()}.append(code_init);
+    
+    if (var->initVal.has_value()) {
+        // do nothing
+        // the backend will deal with it
+    }
 }
 
 // in-function variable declarations
@@ -559,11 +572,15 @@ void SdtParser::sdt_local_var_decl(APTnode *node) {
     //              type_spec IDENT '[' int_literal ']' ';‘
     assert(node->id == syntax::local_decl);
 
-    auto[var, code_init] = parse_var_decl(node);
+    auto var = parse_var_decl(node);
 
     // add its declaration, intializer code, into domains
     var_domains_.back()->emplace_back(var);
-    Appender{*initializer_domains_.back()}.append(code_init);
+
+    if (var->initVal.has_value()) {
+        auto code_init = parse_local_init_code(var);
+        Appender{*initializer_domains_.back()}.append(code_init);
+    }
 }
 
 // parse argument list
@@ -1075,7 +1092,7 @@ void SdtParser::sdt_break_stmt(APTnode *node, Code &code) {
 SdtParser &SdtParser::parse() {
     // initialization
     ir_.clear();
-    auto globalInitalizer = Code{};
+    auto globalInitalizer = Code{}; // should not be used
 
     var_domains_.clear();
     func_domains_.clear();
@@ -1097,28 +1114,7 @@ SdtParser &SdtParser::parse() {
     func_domains_.pop_back();
     var_domains_.pop_back();
 
-
-    auto gen_entry_point_func_code = [this](Code code) {
-        auto func = this->assign_new_function({.name = "entry.point.function"});
-        auto lbl_init = this->assign_new_label({.name = "entry.point.init"});
-        auto lbl_ret  = this->assign_new_label({.name = "entry.point.return"});
-        auto q_init_lbl =
-            QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_init}};
-        auto q_ret_lbl =
-            QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_ret}};
-        auto q_ret = QuadTuple{.op = Op::kRet, .args_f = {.func = func}};
-
-        auto result = Code{};
-        Appender{result}
-            .append({q_init_lbl})
-            .append(code)
-            .append({q_ret_lbl})
-            .append({q_ret});
-        func->code = result;
-        return func;
-    };
-    Func *entry_point_func = gen_entry_point_func_code(globalInitalizer);
-    ir_.globalFuncs.insert(ir_.globalFuncs.begin(), entry_point_func);
+    assert(globalInitalizer.size() == 0);
 
     logger.info("syntax-directed-translation complete successfully");
     return *this;

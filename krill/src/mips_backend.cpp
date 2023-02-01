@@ -1,5 +1,5 @@
-#include "fmt/format.h"
 #include "krill/mips_backend.h"
+#include "fmt/format.h"
 #include "krill/utils.h"
 #include <cstdlib>
 #include <iostream>
@@ -33,8 +33,16 @@ void MipsGenerator::genAny(string src) {
     mips_code_.push_back(to_string(fmt::format("{} ", src)));
 }
 
-void MipsGenerator::genData(string src, int size) {
-    mips_code_.push_back(to_string(fmt::format("\t{}: .space {}", src, size)));
+void MipsGenerator::genData(string src) {
+    mips_code_.push_back(to_string(fmt::format("\t{}:", src)));
+}
+
+void MipsGenerator::genDataSpace(int size) {
+    mips_code_.push_back(to_string(fmt::format("\t\t.space {}", size)));
+}
+
+void MipsGenerator::genDataElem(int val) {
+    mips_code_.push_back(to_string(fmt::format("\t\t.word {}", val)));
 }
 
 void MipsGenerator::genCode(string op) {
@@ -70,21 +78,8 @@ void MipsGenerator::genCode(string op, string src1, string src2, int src3) {
     }
 }
 
-// void MipsGenerator::genOffsetCode(string op, string src1, string addr,
-//                                   string offset) {
-//     mips_code_.push_back(
-//         to_string(fmt::format("\t{} \t{}, {}({}) ", op, src1, offset, addr)));
-// }
-
-// void MipsGenerator::genOffsetCode(string op, string src1, string addr,
-//                                   int offset) {
-//     mips_code_.push_back(
-//         to_string(fmt::format("\t{} \t{}, {}({}) ", op, src1, offset, addr)));
-// }
-
 void MipsGenerator::genLabel(string lblname) {
-   mips_code_.push_back(
-        to_string(fmt::format("{}:", lblname))); 
+    mips_code_.push_back(to_string(fmt::format("{}:", lblname)));
 }
 
 // ---------- translate quad-tuple into mips ----------
@@ -94,15 +89,19 @@ void MipsGenerator::genFuncBegin(const QuadTuple &q) {
     auto funcname = func->name;
     assert(func->info.spOffset.has_value());
     assert(func->info.regsSaved.has_value());
-    auto spOffset = func->info.spOffset.value();
+    auto spOffset  = func->info.spOffset.value();
     auto regsSaved = func->info.regsSaved.value();
 
     genAny("");
     genAny(to_string(fmt::format("# {}", func_fullname(func))));
     genLabel(funcname);
 
-    // assign stack space for local variables (example given below: 
+    if (funcname == "main") {
+        genCode("ori", "$fp", "$zero", to_hex(stackBeginPosition));
+        genCode("ori", "$sp", "$zero", to_hex(stackBeginPosition - 8));
+    } 
 
+    // assign stack space for local variables (example given below:
     // 8($fp) = param<1> (x)
     // 4($fp) = param<2> (y)
     // 0($fp) = $ra
@@ -128,13 +127,12 @@ void MipsGenerator::genFuncBegin(const QuadTuple &q) {
         .append(func->returns)
         .append(func->localVars);
     for (const auto &var : localVars) {
-        auto varname  = var->name;
+        auto varname = var->name;
         assert(var->info.fpOffset.has_value());
         auto fpOffset = var->info.fpOffset.value();
 
         assert(var->info.fpOffset.has_value());
-        genAny(
-            to_string(fmt::format("\t# {}: {}($fp)", varname, fpOffset)));
+        genAny(to_string(fmt::format("\t# {}: {}($fp)", varname, fpOffset)));
     }
 }
 
@@ -143,7 +141,7 @@ void MipsGenerator::genFuncRet(const QuadTuple &q) {
     auto func = q.args_f.func;
     assert(func->info.regsSaved.has_value());
     auto regsSaved = func->info.regsSaved.value();
-    int spOffset2 = regsSaved.size() * +4;
+    int  spOffset2 = regsSaved.size() * +4;
     for (string reg : regsSaved) {
         genCode("lw", reg, "$sp", spOffset2);
         spOffset2 -= 4;
@@ -156,8 +154,6 @@ void MipsGenerator::genFuncRet(const QuadTuple &q) {
     genCode("lw", "$fp", "$fp", -4);
     genCode("jr", "$ra");
     genCode("nop");
-
-
 }
 
 void MipsGenerator::genFuncEnd(const QuadTuple &q) {
@@ -237,10 +233,9 @@ void MipsGenerator::genExprCode(const QuadTuple &q) {
             genCode("addu", reg_dest, "$t0", reg_src1);
         } else if (v_src2->info.memName.has_value()) {
             // is memory-name
-            // string memName = v_src2->info.memName.value();
-            assert(v_src2->info.memOffset.has_value());
-            auto memOffset = v_src2->info.memOffset.value();
-            genCode("addiu", reg_dest, reg_src1, memOffset);
+            assert(v_src2->info.memName.has_value());
+            auto memName = v_src2->info.memName.value();
+            genCode("addiu", reg_dest, reg_src1, memName);
         } else {
             assert(false);
         }
@@ -383,8 +378,8 @@ void MipsGenerator::genParamPut(const QuadTuple &q) {
     // nop                  # call func2 (end)
     //                      # $fp, $sp should be recoverd
 
-    auto var = q.args_f.var;
-    auto idx = q.args_f.idx;
+    auto   var = q.args_f.var;
+    auto   idx = q.args_f.idx;
     string reg_var;
     if (var->info.reg.has_value()) {
         reg_var = var->info.reg.value();
@@ -401,9 +396,10 @@ void MipsGenerator::genParamPut(const QuadTuple &q) {
             }
         } else if (var->info.memName.has_value()) {
             // is memory-name
-            assert(var->info.memOffset.has_value());
-            int32_t memOffset = var->info.memOffset.value();
-            genCode("addiu", reg_var, "$zero", memOffset);
+            assert(var->info.memName.has_value());
+            auto memName = var->info.memName.value();
+            genCode("addiu", reg_var, "$zero", memName);
+
         } else {
             assert(false);
         }
@@ -418,7 +414,6 @@ void MipsGenerator::genParamPut(const QuadTuple &q) {
     // } else {
     //     genCode("addu", reg_dest, "$zero", reg_var);
     // }
-    
 }
 
 void MipsGenerator::genBranch(const QuadTuple &q) {
@@ -471,24 +466,28 @@ void MipsGenerator::genGlobal(const QuadTuple &q) {
     auto varname = var->name;
     assert(var->type.size() == q.args_d.size);
 
-    genData(varname, var->type.size());
+    if (var->initVal.has_value()) {
+        genData(varname);
+        for (int val : var->initVal.value()) { genDataElem(val); }
+    } else {
+        genData(varname);
+        genDataSpace(var->type.size());
+    }
 }
 
 // entry of the whole program, make preparation, jump to the main
 void MipsGenerator::genDirector() {
     // auto func_main = get_function_by_name("main").funcLbl.lbl;
     // genFuncCall(QuadTuple{Op::kCall, {.func = lbl_main, .argc = 0}});
-    genCode("ori", "$fp", "$zero", to_hex(stackBeginPosition));
-    genCode("ori", "$sp", "$zero", to_hex(stackBeginPosition));
+    // genCode("ori", "$fp", "$zero", to_hex(stackBeginPosition));
+    // genCode("ori", "$sp", "$zero", to_hex(stackBeginPosition));
     // call main
-    genCode("jal", "entry.point.function");
-    genCode("nop");
     genCode("jal", "main");
     genCode("nop");
 
-    genLabel("global.end.loop");
-    genCode("j", "global.end.loop");
-    genCode("nop");
+    // genLabel("exit.point");
+    // genCode("j", "exit.point");
+    // genCode("nop");
     genCode("nop");
 }
 
@@ -527,6 +526,9 @@ void MipsGenerator::genCodes(const QuadTuple &q) {
             genFuncRet(q);
             break;
         case Op::kLabel:
+            if (q.args_j.addr1->name.substr(0, 5) == "init.") {
+                break; // init.x must be empty label, eliminate it
+            }
             genLabel(q.args_j.addr1->name);
             break;
         case Op::kGoto:
@@ -563,6 +565,7 @@ void MipsGenerator::genCodes(const QuadTuple &q) {
 MipsGenerator &MipsGenerator::parse() {
     Code dataCode;
     Code textCode;
+
     for (auto &var : ir_.globalVars) {
         dataCode.emplace_back(
             QuadTuple{.op     = Op::kGlobal,
@@ -585,7 +588,17 @@ MipsGenerator &MipsGenerator::parse() {
     for (const auto &ir : dataCode) { genCodes(ir); }
     // genAny(to_string(fmt::format(".TEXT {}", to_hex(textBeginPosition))));
     genAny(to_string(fmt::format(".TEXT")));
-    genDirector(); // direct to main
+
+
+    bool hasMain =
+        apply_filter(
+            ir_.globalFuncs,
+            [](Func *f) { return f->code.has_value() && f->name == "main"; })
+            .size() > 0;
+    if (hasMain) {
+        genDirector(); // direct to main
+    }
+
     for (const auto &ir : textCode) { genCodes(ir); }
 
     logger.info("mips code generation complete successfully");
@@ -593,6 +606,5 @@ MipsGenerator &MipsGenerator::parse() {
 }
 
 string MipsGenerator::gen() {
-    return
-        to_string(fmt::format("{}", fmt::join(mips_code_, "\n")));
+    return to_string(fmt::format("{}", fmt::join(mips_code_, "\n")));
 }
