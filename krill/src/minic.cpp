@@ -15,6 +15,7 @@
 using namespace std;
 using namespace krill::type;
 using namespace krill::utils;
+using krill::error::parse_error;
 using krill::log::logger;
 
 using krill::runtime::AptNodeFunc;
@@ -1950,7 +1951,8 @@ APTnode MinicParser::tokenToNode(Token token, istream &input, bool &drop) {
             if (match2) { break; }
         }
         if (!match2) {
-            throw runtime_error("error: unclosed block comment /*\n");
+            throw parse_error(col_lex_, row_lex_,
+                              "unclosed block comment ‘/*’");
         }
         drop = true;
     } else if (token.id == 42) { // 42: //[^\n\r]*
@@ -2105,8 +2107,10 @@ APTnode MinicParser::tokenToNode(Token token, istream &input, bool &drop) {
         case 45:
             node.id = syntax::FOR;
         default:
-            throw runtime_error(to_string(
-                fmt::format("unknown lexical token id={}", token.id)));
+            throw parse_error(
+                col_lex_, row_lex_,
+                to_string(fmt::format("unknown lexical token_id {} ‘{}’",
+                                      token.id, token.lval)));
         }
         drop = false;
     }
@@ -2184,16 +2188,20 @@ MinicParser::MinicParser() : root_(nullptr) {
         }
     };
     AptNodeFunc minicErrorFunc = [this](APTnode &node) {
-        int col_st = node.attr.Get<int>("col_st");
-        int row_st = node.attr.Get<int>("row_st");
-        int col_ed = node.attr.Get<int>("col_ed");
-        int row_ed = node.attr.Get<int>("row_ed");
+        int  col_st = node.attr.Get<int>("col_st");
+        int  row_st = node.attr.Get<int>("row_st");
+        int  col_ed = node.attr.Get<int>("col_ed");
+        int  row_ed = node.attr.Get<int>("row_ed");
+        auto lval   = node.attr.Get<string>("lval");
 
         auto errorMsg =
             fmt::format("input:{}:{}: {}: {}\n{}", row_st, col_st,
                         "\033[31merror\033[0m", "unexpected token",
                         this->getLocatedSource(col_st, row_st, col_ed, row_ed));
-        logger.error(errorMsg);
+        // logger.error(errorMsg);
+        throw parse_error(
+            row_st, col_st,
+            to_string(fmt::format("unexpected token ‘{}’", lval)));
     };
     syntaxParser_.actionFunc_ = minicActionFunc;
     syntaxParser_.reduceFunc_ = minicReduceFunc;

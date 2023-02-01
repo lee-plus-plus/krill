@@ -65,10 +65,10 @@ class SdtParser {
     Var *         parse_ident_as_variable(APTnode *node);
     Func *        parse_ident_as_function(APTnode *node);
 
-    Code parse_function_call(Func *func, const vector<Var *> &var_args);
+    Code parse_function_call(APTnode *node, Func *func, const vector<Var *> &var_args);
     Code parse_local_init_code(Var *var);
 
-    pair<Var *, Code> parse_array_element(Var *var_ident, Var *var_idx);
+    pair<Var *, Code> parse_array_element(APTnode *node, Var *var_ident, Var *var_idx);
 
     // complex parsing
     void          sdt_decl(APTnode *node);

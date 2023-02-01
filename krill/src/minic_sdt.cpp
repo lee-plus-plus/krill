@@ -11,6 +11,7 @@ using namespace krill::utils;
 using namespace krill::minic;
 using namespace krill::ir;
 
+using krill::error::parse_error;
 using krill::log::logger;
 using std::make_shared, std::shared_ptr;
 
@@ -139,12 +140,10 @@ Var *SdtParser::parse_var_decl(APTnode *node) {
             vector<int> init_list = parse_init_list(node_init);
 
             if (type.shape[0] != init_list.size()) {
-                logger.error(
-                    "input:{}: {}: {}: unmatched size for intializer list {}, ",
-                    node_init->attr.Get<int>("row_st"),
-                    node_init->attr.Get<int>("col_st"), "\033[31merror\033[0m",
-                    varname);
-                throw runtime_error("unmatched size for intializer list");
+                int row = node_init->attr.Get<int>("row_st");
+                int col = node_init->attr.Get<int>("col_st");
+                throw parse_error(row, col,
+                                  "unmatched size for intializer list");
             }
             var->initVal = {init_list};
         } else {
@@ -186,11 +185,10 @@ vector<Var *> SdtParser::parse_params(APTnode *node) {
         auto var = parse_var_decl(node);
 
         if (var->initVal.has_value()) {
-            logger.error(
-                "input:{}: {}: {}: cannnit define initial value for parameters",
-                node->attr.Get<int>("row_st"), node->attr.Get<int>("col_st"),
-                "\033[31merror\033[0m");
-            throw runtime_error("cannnit define initial value for parameters");
+            int row = node->attr.Get<int>("row_st");
+            int col = node->attr.Get<int>("col_st");
+            throw parse_error(row, col,
+                              "cannot define initial value for parameters");
         }
         return vector<Var *>{var};
     }
@@ -209,8 +207,11 @@ Var *SdtParser::parse_ident_as_variable(APTnode *node) {
 
     // check exsistance of declaration
     if (var_ident == nullptr) {
-        logger.error("error: using undeclared variable {}", name_ident);
-        throw runtime_error("error: using undeclared variable");
+        int row = node->attr.Get<int>("row_st");
+        int col = node->attr.Get<int>("col_st");
+        throw parse_error(row, col,
+                          to_string(fmt::format(
+                              "using undeclared variable ‘{}’", name_ident)));
     }
     return var_ident;
 }
@@ -224,22 +225,29 @@ Func *SdtParser::parse_ident_as_function(APTnode *node) {
 
     // check exsistance of declaration
     if (func_ident == nullptr) {
-        logger.error("error: using undeclared function {}", name_ident);
-        throw runtime_error("error: using undeclared function");
+        int row = node->attr.Get<int>("row_st");
+        int col = node->attr.Get<int>("col_st");
+        throw parse_error(row, col,
+                          to_string(fmt::format(
+                              "using undeclared function ‘{}’", name_ident)));
     }
     return func_ident;
 }
 
 // ? <- IDENT '[' expr ']' ...
-pair<Var *, Code> SdtParser::parse_array_element(Var *var_ident, Var *var_idx) {
+pair<Var *, Code> SdtParser::parse_array_element(APTnode *node, Var *var_ident,
+                                                 Var *var_idx) {
     assert(var_ident != nullptr);
     assert(var_idx != nullptr);
 
     // check array type
     if (var_ident->type.shape.size() < 1) {
-        logger.error("error: try to access {} by subscript",
-                     var_ident->type.str());
-        throw runtime_error("error: access non-array variable by subscript");
+        int    row        = node->attr.Get<int>("row_st");
+        int    col        = node->attr.Get<int>("col_st");
+        string name_ident = var_ident->type.str();
+        throw parse_error(row, col,
+                          to_string(fmt::format(
+                              "try to access ‘{}’ by subscript", name_ident)));
     }
 
     auto code_dest = Code{};
@@ -260,15 +268,19 @@ pair<Var *, Code> SdtParser::parse_array_element(Var *var_ident, Var *var_idx) {
     return {var_addr, code_dest};
 }
 
-Code SdtParser::parse_function_call(Func *func, const vector<Var *> &var_args) {
+Code SdtParser::parse_function_call(APTnode *node, Func *func,
+                                    const vector<Var *> &var_args) {
     // check params type matching
     auto extract_type = [](Var *var) { return var->type; };
     if (apply_map(func->params, extract_type) !=
         apply_map(var_args, extract_type)) {
-        logger.error("input parameters' type are not match to "
-                     "the declaration of function {}",
-                     func_fullname(func));
-        throw runtime_error("error: parameters type do not match");
+        int row = node->attr.Get<int>("row_st");
+        int col = node->attr.Get<int>("col_st");
+        throw parse_error(
+            row, col,
+            to_string(fmt::format("input parameters' type are not match to "
+                                  "the declaration of function ‘{}’",
+                                  func->name)));
     }
 
     auto code_dest = Code{};
@@ -434,17 +446,22 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
         auto prevDecl = find_function_by_name(funcname);
         if (prevDecl != nullptr) {
             if (prevDecl->type() != func->type()) {
-                logger.error(
-                    "input:{}: {}: {}: conflict declaration of function {}, "
-                    "previous declaration {}",
-                    node->attr.Get<int>("row_st"),
-                    node->attr.Get<int>("col_st"), "\033[31merror\033[0m",
-                    func_fullname(func), func_fullname(prevDecl));
-                throw runtime_error("conflict declaration of function");
+                int row = node->attr.Get<int>("row_st");
+                int col = node->attr.Get<int>("col_st");
+                throw parse_error(
+                    row, col,
+                    to_string(fmt::format(
+                        "conflict declaration of function ‘{}’, "
+                        "previous declaration ‘{}’",
+                        func_fullname(func), func_fullname(prevDecl))));
             }
             if (prevDecl->code.has_value() != false) {
-                logger.error("re-definition of function {}",
-                             func->type().str());
+                int row = node->attr.Get<int>("row_st");
+                int col = node->attr.Get<int>("col_st");
+                throw parse_error(
+                    row, col,
+                    to_string(fmt::format("re-definition of function ‘{}’",
+                                          func->name)));
             }
             func = prevDecl;
         }
@@ -559,7 +576,7 @@ void SdtParser::sdt_global_var_decl(APTnode *node) {
 
     // add its declaration, intializer code, into domains
     var_domains_.back()->emplace_back(var);
-    
+
     if (var->initVal.has_value()) {
         // do nothing
         // the backend will deal with it
@@ -648,21 +665,28 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
 
         // type check
         if (v_lhs->type != v_rhs->type) {
-            logger.error("error: operands are not in same type");
-            throw runtime_error("error: operator doesn't have same type");
+            int row = node->attr.Get<int>("row_st");
+            int col = node->attr.Get<int>("col_st");
+            throw parse_error(row, col, "operands are not in same type");
         }
 
         // cast int operands into bool
         if (is_bool_oprt(oprt)) {
             if (v_lhs->type.shape.size() != 0) {
-                logger.error("error: try to cast {} into bool",
-                             v_lhs->type.str());
-                throw runtime_error("error: try to cast array into bool");
+                int    row       = node->attr.Get<int>("row_st");
+                int    col       = node->attr.Get<int>("col_st");
+                string name_type = v_lhs->type.str();
+                throw parse_error(row, col,
+                                  to_string(fmt::format(
+                                      "try to cast {} into bool ", name_type)));
             }
             if (v_rhs->type.shape.size() != 0) {
-                logger.error("error: try to cast {} into bool",
-                             v_rhs->type.str());
-                throw runtime_error("error: try to cast array into bool");
+                int    row       = node->attr.Get<int>("row_st");
+                int    col       = node->attr.Get<int>("col_st");
+                string name_type = v_rhs->type.str();
+                throw parse_error(row, col,
+                                  to_string(fmt::format(
+                                      "try to cast {} into bool ", name_type)));
             }
 
             auto v_bool_lhs = assign_new_variable(
@@ -828,9 +852,10 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
         // expr : IDENT '[' expr ']'
         assert(child[2].get()->id == syntax::expr);
 
-        auto var_ident              = parse_ident_as_variable(child[0].get());
-        auto[var_idx, code_idx]     = sdt_expr(child[2].get());
-        auto[var_array, code_array] = parse_array_element(var_ident, var_idx);
+        auto var_ident          = parse_ident_as_variable(child[0].get());
+        auto[var_idx, code_idx] = sdt_expr(child[2].get());
+        auto[var_array, code_array] =
+            parse_array_element(child[0].get(), var_ident, var_idx);
 
         auto var_dest = assign_new_variable(
             {.type = Var::TypeDecl{.basetype = var_ident->type.basetype,
@@ -852,16 +877,20 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
         auto func = parse_ident_as_function(child[0].get());
         // check return type
         if (func->returns.size() != 1) {
-            logger.error(
-                "error: return value number of function {} do not match",
-                func->name);
-            throw runtime_error("error: return value number do not match");
+            int row = node->attr.Get<int>("row_st");
+            int col = node->attr.Get<int>("col_st");
+            throw parse_error(
+                row, col,
+                to_string(fmt::format(
+                    "return value number of function ‘{}’ do not match",
+                    func->name)));
         }
 
-        auto code_args     = Code{};
-        auto node_args     = child[2].get();
-        auto var_args      = sdt_args(node_args, code_args);
-        auto code_funccall = parse_function_call(func, var_args);
+        auto code_args = Code{};
+        auto node_args = child[2].get();
+        auto var_args  = sdt_args(node_args, code_args);
+        auto code_funccall =
+            parse_function_call(child[2].get(), func, var_args);
 
         auto var_ret   = assign_new_variable({.type = func->returns[0]->type});
         auto code_dest = Code{};
@@ -910,10 +939,11 @@ void SdtParser::sdt_expr_stmt(APTnode *node, Code &code) {
         assert(child[2].get()->id == syntax::expr);
         assert(child[5].get()->id == syntax::expr);
 
-        auto var_ident              = parse_ident_as_variable(child[0].get());
-        auto[var_idx, code_idx]     = sdt_expr(child[2].get());
-        auto[var_array, code_array] = parse_array_element(var_ident, var_idx);
-        auto[var_expr, code_expr]   = sdt_expr(child[5].get());
+        auto var_ident          = parse_ident_as_variable(child[0].get());
+        auto[var_idx, code_idx] = sdt_expr(child[2].get());
+        auto[var_array, code_array] =
+            parse_array_element(child[0].get(), var_ident, var_idx);
+        auto[var_expr, code_expr] = sdt_expr(child[5].get());
 
         Appender{code}
             .append(code_idx)
@@ -943,10 +973,11 @@ void SdtParser::sdt_expr_stmt(APTnode *node, Code &code) {
 
         auto func = parse_ident_as_function(child[0].get());
 
-        auto code_args     = Code{};
-        auto node_args     = child[2].get();
-        auto var_args      = sdt_args(node_args, code_args);
-        auto code_funccall = parse_function_call(func, var_args);
+        auto code_args = Code{};
+        auto node_args = child[2].get();
+        auto var_args  = sdt_args(node_args, code_args);
+        auto code_funccall =
+            parse_function_call(child[2].get(), func, var_args);
 
         Appender{code}.append(code_args).append(code_funccall);
         return;

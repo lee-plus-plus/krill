@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 using krill::log::logger;
+using krill::error::parse_error;
 using namespace krill::type;
 using namespace std;
 using krill::automata::getDFAintegrated;
@@ -66,10 +67,10 @@ Token LexicalParser::parseStep(istream &input) {
 
             // assert(dfa_.finality.at(state_) != 0); // failed
             if (dfa_.finality.at(state_) == 0) {
-                logger.debug("lexical error: unmatched \"{}\" in \"{}\"",
+                logger.debug("lexical error: unmatched ‘{}’ in ‘{}’",
                                 buffer.str() + c, unescape(history_ + c));
                 throw runtime_error(
-                    fmt::format("lexical error: unmatched \"{}\" in \"{}\"",
+                    fmt::format("lexical error: unmatched ‘{}’ in ‘{}’",
                                 buffer.str() + c, unescape(history_ + c)));
             }
             int    tokenId       = dfa_.finality.at(state_) - 1;
