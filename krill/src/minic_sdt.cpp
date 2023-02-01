@@ -484,13 +484,13 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
     for (auto &ret : func->returns) {
         ret->name = counter_.assign_unique_name("retval");
     }
-    auto lbl_init =
-        assign_new_label({.name = counter_.assign_unique_name("init")});
+    // auto lbl_init =
+    //     assign_new_label({.name = counter_.assign_unique_name("init")});
     auto lbl_entry =
         assign_new_label({.name = counter_.assign_unique_name("entry")});
     auto lbl_return =
         assign_new_label({.name = counter_.assign_unique_name("return")});
-    auto q_init  = QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_init}};
+    // auto q_init  = QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_init}};
     auto q_entry = QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_entry}};
     auto q_return =
         QuadTuple{.op = Op::kLabel, .args_j = {.addr1 = lbl_return}};
@@ -560,7 +560,7 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
     auto funcCode = Code{};
 
     Appender{funcCode}
-        .append({q_init})   //  .init:
+        // .append({q_init})   //  .init:
         .append(head_code)  //      allocate ...
         .append(init_code)  //      initializer ...
         .append({q_entry})  //  .entry:

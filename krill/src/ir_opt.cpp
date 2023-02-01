@@ -14,10 +14,16 @@ using namespace krill::ir;
 
 using krill::log::logger;
 
-
 namespace krill::ir {
 
 // ---------- utils function ----------
+
+string block_name(const BasicBlock &b) { return lbl_name(b.lbl); };
+
+string lbl_edge_name(const pair<Lbl *, Lbl *> &p) {
+    return krill::utils::to_string(
+        fmt::format("<{}, {}>", lbl_name(p.first), lbl_name(p.second)));
+};
 
 // string var_name(Var *var) { return var->name; }
 
@@ -25,6 +31,7 @@ namespace krill::ir {
 
 // ---------- IrOptimizer ----------
 
+// simply split blocks by label
 BasicBlockGraph IrOptimizer::getBasicBlocks(const Code &funcCode) {
     vector<BasicBlock> blocks;
     EdgeSet<int>       blockEdges;
@@ -35,6 +42,11 @@ BasicBlockGraph IrOptimizer::getBasicBlocks(const Code &funcCode) {
     map<Lbl *, int> toBlockIdx;
     for (int i = 0; i < funcCode.size(); i++) {
         const auto &q = funcCode[i];
+        if (i == 0 && q.op != Op::kLabel) {
+            currLbl             = ir_.labels.assign({.name = "."});
+            toBlockIdx[currLbl] = blocks.size();
+            blocks.push_back(BasicBlock{.lbl = currLbl, .code = {}});
+        }
         if (q.op == Op::kLabel) {
             currLbl             = q.args_j.addr1;
             toBlockIdx[currLbl] = blocks.size();
@@ -59,17 +71,54 @@ BasicBlockGraph IrOptimizer::getBasicBlocks(const Code &funcCode) {
         blockEdges.insert({toBlockIdx.at(fromLbl), toBlockIdx.at(toLbl)});
     }
 
-    auto block_name    = [](BasicBlock b) { return lbl_name(b.lbl); };
-    auto lbl_edge_name = [](pair<Lbl *, Lbl *> p) {
-        return fmt::format("<{}, {}>", lbl_name(p.first), lbl_name(p.second));
-    };
     logger.debug("basic blocks(num={}): {}", blocks.size(),
                  fmt::join(apply_map(blocks, block_name), ", "));
     logger.debug(
-        "basic block edges(num={}): {}", blocks.size(),
+        "basic block edges(num={}): {}", blockEdges.size(),
         fmt::join(apply_map(to_vector(lblEdges), lbl_edge_name), ", "));
 
     return BasicBlockGraph{.blocks = blocks, .edges = blockEdges};
+}
+
+// combine attached basic block
+BasicBlockGraph IrOptimizer::simplifyBasicBlocks(const BasicBlockGraph &blockGraph) {
+    const auto &blocks = blockGraph.blocks;
+    const auto &blockEdges = blockGraph.edges;
+
+    vector<set<int>> inEdges(blocks.size());
+    vector<int>      isAttached(blocks.size());
+    fill(isAttached.begin(), isAttached.end(), true);
+    for (const auto & [ from, to ] : blockEdges) {
+        inEdges[to].insert(from);
+        if (from != to - 1) { isAttached[to] = false; }
+    }
+
+    vector<int> attachedIdx(blocks.size());
+    for (int i = 0, aidx = 0; i < blocks.size(); i++) {
+        if (!attachedIdx[i]) { aidx++; }
+        if (i == 0) { aidx = 0; }
+        attachedIdx[i] = aidx;
+        if (i != 0 && attachedIdx[i]) {
+            logger.debug("block {} is attached to block {}", lbl_fullname(blocks[i].lbl), lbl_fullname(blocks[i-1].lbl));
+        }
+    }
+
+    vector<BasicBlock> blocks2;
+    for (int i = 0; i < blocks.size(); i++) {
+        if (!isAttached[i] || i == 0) {
+            blocks2.push_back(blocks[i]);
+        } else {
+            Appender{blocks2.back().code}.append(blocks[i].code);
+        }
+    }
+    EdgeSet<int> blockEdges2;
+    for (auto[from, to] : blockEdges) {
+        if (!isAttached[to]) {
+            blockEdges2.insert({attachedIdx[from], attachedIdx[to]});
+        }
+    }
+
+    return BasicBlockGraph{.blocks = blocks2, .edges = blockEdges2};    
 }
 
 void IrOptimizer::livenessAnalysis(const QuadTuple &q, vector<Var *> &defs,
@@ -413,7 +462,7 @@ IrOptimizer &IrOptimizer::assignRegs() {
         const auto &code = func->code.value();
         // build basic block graph
         logger.debug("in {}:", func_fullname(func));
-        auto  blockGraph = getBasicBlocks(code);
+        auto  blockGraph = simplifyBasicBlocks(getBasicBlocks(code));
         auto &blocks     = blockGraph.blocks;
 
         // build global Interference Graph (over basic blocks)
@@ -757,8 +806,7 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
             cvalNodes[cval] = node;
             varNodes[var]   = node;
 
-            logger.debug("  node {}: (constval {})",
-                         var_name(node->var), cval);
+            logger.debug("  node {}: (constval {})", var_name(node->var), cval);
 
         } else if (isOpExpr(op)) { // set, use
             // (dest, src1, src2)
@@ -836,8 +884,8 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
 
             varNodes[var] = node;
 
-            logger.debug("  node {} (load from {})",
-                         var_name(node->var), var_name(mem));
+            logger.debug("  node {} (load from {})", var_name(node->var),
+                         var_name(mem));
 
         } else if (op == Op::kStore) { // use, (set mem)
             // (var, mem)
@@ -860,8 +908,8 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
 
             // node->referenced.push_back(&q);
 
-            logger.debug("  node {}: (store to {})",
-                         var_name(node->var), var_name(mem));
+            logger.debug("  node {}: (store to {})", var_name(node->var),
+                         var_name(mem));
 
             // replace used var
             if (q.args_m.var != node->var) {
@@ -925,8 +973,7 @@ PtrPool<DagNode> IrOptimizer::buildDAG(Code &code) {
 
     logger.debug("DAG nodes:");
     for (auto &node : nodes.elements()) {
-        logger.debug("  node {}: ({} {} {}) {}",
-                     var_name(node->var),
+        logger.debug("  node {}: ({} {} {}) {}", var_name(node->var),
                      node->op != Op::kNop ? enum_name(node->op) : "",
                      node->src1 != nullptr ? var_name(node->src1->var) : "",
                      node->src2 != nullptr ? var_name(node->src2->var) : "",
@@ -952,7 +999,7 @@ IrOptimizer &IrOptimizer::eliminateCommonSubExpr() {
 
         // build basic block graph
         logger.debug("in {}:", func_fullname(func));
-        auto  blockGraph = getBasicBlocks(funcCode);
+        auto  blockGraph = simplifyBasicBlocks(getBasicBlocks(funcCode));
         auto &blocks     = blockGraph.blocks;
 
         // build global Interference Graph (over basic blocks)

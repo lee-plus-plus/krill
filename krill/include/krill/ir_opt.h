@@ -51,7 +51,7 @@ struct DagNode {
         if (src2 != nullptr) { src2->assignUsed(); }
         used = true;
 
-        krill::log::logger.debug("    node \033[33m{}\033[0m used",
+        krill::log::logger.debug("    node {} used",
                          var_name(var));
     }
 };
@@ -69,6 +69,7 @@ class IrOptimizer {
                           vector<Var *> &uses);
 
     BasicBlockGraph getBasicBlocks(const Code &code);
+    BasicBlockGraph simplifyBasicBlocks(const BasicBlockGraph &blockGraph);
     InfGraph        getGlobalInfGraph(const BasicBlockGraph &blockGraph);
     InfGraph        getLocalInfGraph(const BasicBlock &block,
                                      const set<Var *> &globalRegVars);
