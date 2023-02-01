@@ -81,7 +81,7 @@ Token LexicalParser::parseStep(istream &input) {
 
             assert(tokenLexValue.size() > 0);
             Token token({tokenId, tokenLexValue});
-            logger.debug("parsed lexical token id={} lval=\"{}\"", token.id, token.lval);
+            logger.debug("parsed lexical <token {}> ‘{}’", token.id, unescape(token.lval));
             return token;
         }
 

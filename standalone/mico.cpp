@@ -43,6 +43,7 @@ void parse_example(istream &input, ostream &output) {
     mipsGenerator.parse();
     // output mips code
     output << mipsGenerator.gen() << "\n";
+    output.flush();
 }
 
 // mips code generation
@@ -57,6 +58,7 @@ void parse(istream &input, ostream &output, int opt_level, bool ast_only,
 
     if (ast_only) {
         output << getASTstr(root, grammar) << "\n";
+        output.flush();
         exit(0);
     }
 
@@ -67,6 +69,7 @@ void parse(istream &input, ostream &output, int opt_level, bool ast_only,
 
     if (opt_level == 0 && ir_only) {
         output << to_string(ir.code()) << "\n";
+        output.flush();
         exit(0);
     }
 
@@ -79,6 +82,7 @@ void parse(istream &input, ostream &output, int opt_level, bool ast_only,
     }
     if (opt_level == 1 && ir_only) {
         output << to_string(ir.code()) << "\n";
+        output.flush();
         exit(0);
     }
     if (opt_level >= 2) {
@@ -86,6 +90,7 @@ void parse(istream &input, ostream &output, int opt_level, bool ast_only,
     }
     if (opt_level == 2 && ir_only) {
         output << to_string(ir.code()) << "\n";
+        output.flush();
         exit(0);
     }
 
@@ -97,6 +102,7 @@ void parse(istream &input, ostream &output, int opt_level, bool ast_only,
 
     if (compile_only) {
         output << mipsGenerator.gen() << "\n";
+        output.flush();
         exit(0);
     }
 }
@@ -179,6 +185,12 @@ int main(int argc, char **argv) {
             is_legal = false;
         } else {
             output_file = ofstream(output_filename);
+            if (!output_file) {
+                std::cerr << fmt::format("mico: \033[31merror:\033[0m {}: No "
+                                         "such file or directory\n",
+                                         output_filename);
+                is_legal = false;
+            }
             output = &output_file;
             logger.info("Output: {}", output_filename);
         }
