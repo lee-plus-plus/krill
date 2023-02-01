@@ -81,8 +81,9 @@ BasicBlockGraph IrOptimizer::getBasicBlocks(const Code &funcCode) {
 }
 
 // combine attached basic block
-BasicBlockGraph IrOptimizer::simplifyBasicBlocks(const BasicBlockGraph &blockGraph) {
-    const auto &blocks = blockGraph.blocks;
+BasicBlockGraph
+IrOptimizer::simplifyBasicBlocks(const BasicBlockGraph &blockGraph) {
+    const auto &blocks     = blockGraph.blocks;
     const auto &blockEdges = blockGraph.edges;
 
     vector<set<int>> inEdges(blocks.size());
@@ -95,11 +96,13 @@ BasicBlockGraph IrOptimizer::simplifyBasicBlocks(const BasicBlockGraph &blockGra
 
     vector<int> attachedIdx(blocks.size());
     for (int i = 0, aidx = 0; i < blocks.size(); i++) {
-        if (!attachedIdx[i]) { aidx++; }
+        if (!isAttached[i]) { aidx++; }
         if (i == 0) { aidx = 0; }
         attachedIdx[i] = aidx;
         if (i != 0 && attachedIdx[i]) {
-            logger.debug("block {} is attached to block {}", lbl_fullname(blocks[i].lbl), lbl_fullname(blocks[i-1].lbl));
+            logger.debug("block {} is attached to block {}",
+                         lbl_fullname(blocks[i].lbl),
+                         lbl_fullname(blocks[i - 1].lbl));
         }
     }
 
@@ -118,7 +121,14 @@ BasicBlockGraph IrOptimizer::simplifyBasicBlocks(const BasicBlockGraph &blockGra
         }
     }
 
-    return BasicBlockGraph{.blocks = blocks2, .edges = blockEdges2};    
+    // debug
+    logger.debug("Basic Blocks simplification complete");
+    for (int i = 0; i < blocks.size(); i++) {
+        logger.debug("  {} block {}", (attachedIdx[i] % 2) ? "[" : "<",
+                     lbl_name(blocks[i].lbl));
+    }
+
+    return BasicBlockGraph{.blocks = blocks2, .edges = blockEdges2};
 }
 
 void IrOptimizer::livenessAnalysis(const QuadTuple &q, vector<Var *> &defs,
