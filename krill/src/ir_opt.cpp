@@ -557,8 +557,12 @@ IrOptimizer &IrOptimizer::assignRegs() {
 
 
         auto regsSaved = vector<string>{};
-        // if function has call insede, $ra and $fp should be preserved
-        if (has_inside_call) { Appender{regsSaved}.append({"$ra", "$fp"}); }
+        // if function has call insede, $ra should be preserved
+        if (has_inside_call) {
+            Appender{regsSaved}.append({"$ra", "$fp"});
+        } else {
+            Appender{regsSaved}.append({"$fp"});
+        }
         // all the used general-purpose registers should be preserved
         Appender{regsSaved}.append(generalRegsSaved);
         // saved
