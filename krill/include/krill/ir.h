@@ -119,6 +119,7 @@ struct Func {
     };
 
     struct Info {
+        std::optional<bool>           hasInsideCall;
         std::optional<int>            spOffset;  // local space
         std::optional<vector<string>> regsSaved; // callee saved registers
     };

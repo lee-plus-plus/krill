@@ -101,24 +101,15 @@ void MipsGenerator::genFuncBegin(const QuadTuple &q) {
         genCode("ori", "$sp", "$zero", to_hex(stackBeginPosition - 8));
     } 
 
-    // assign stack space for local variables (example given below:
-    // 8($fp) = param<1> (x)
-    // 4($fp) = param<2> (y)
-    // 0($fp) = $ra
-    // -4($fp) = $fp_last
-    // $fp - 8 = $sp => $fp + spOffset (<0) = $sp
-    genCode("sw", "$ra", "$sp", 0);
-    genCode("sw", "$fp", "$sp", -4);
-    genCode("ori", "$fp", "$sp", 0);
-    genCode("addiu", "$sp", "$fp", spOffset);
-
+    // assign stack space for local variables:
     // save caller registers
     int spOffset2 = 0;
     for (string reg : regsSaved) {
         genCode("sw", reg, "$sp", spOffset2);
         spOffset2 -= 4;
     }
-    genCode("addiu", "$sp", "$sp", spOffset2);
+    genCode("ori", "$fp", "$sp", 0);
+    genCode("addiu", "$sp", "$fp", spOffset);
 
     // gen comments for offset meanings
     vector<Var *> localVars;
@@ -141,17 +132,15 @@ void MipsGenerator::genFuncRet(const QuadTuple &q) {
     auto func = q.args_f.func;
     assert(func->info.regsSaved.has_value());
     auto regsSaved = func->info.regsSaved.value();
-    int  spOffset2 = regsSaved.size() * +4;
+
+    // recover registers
+    int  spOffset2 = 0;
     for (string reg : regsSaved) {
-        genCode("lw", reg, "$sp", spOffset2);
+        genCode("lw", reg, "$fp", spOffset2);
         spOffset2 -= 4;
     }
-    genCode("addiu", "$sp", "$sp", regsSaved.size() * +4);
 
-    // pop $sp, $ra, $fp
     genCode("ori", "$sp", "$fp", 0);
-    genCode("lw", "$ra", "$fp", 0); // if no func call inside, can be ignored
-    genCode("lw", "$fp", "$fp", -4);
     genCode("jr", "$ra");
     genCode("nop");
 }

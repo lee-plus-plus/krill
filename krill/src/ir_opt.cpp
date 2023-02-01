@@ -470,6 +470,14 @@ IrOptimizer &IrOptimizer::assignRegs() {
             continue;
         }
         const auto &code = func->code.value();
+
+        // check whether there is inside call
+        bool has_inside_call = false;
+        for (const auto &q : code) {
+            if (q.op == Op::kCall) { has_inside_call = true; }
+        }
+        func->info.hasInsideCall = {has_inside_call};
+
         // build basic block graph
         logger.debug("in {}:", func_fullname(func));
         auto  blockGraph = simplifyBasicBlocks(getBasicBlocks(code));
@@ -528,13 +536,13 @@ IrOptimizer &IrOptimizer::assignRegs() {
         };
         auto varColors = mergeVarColors();
 
-        // assign registers for var
+        // assign general-purpose registers for var
         // notice: $t0 is reserved for compiler
         // DO NOT assgin $t0 to any variable!
         const string regName[19] = {"$t0", "$t1", "$t2", "$t3", "$t4", "$t5",
                                     "$t6", "$t7", "$t8", "$t9", "$s0", "$s1",
                                     "$s2", "$s3", "$s4", "$s5", "$s6", "$s7"};
-        set<string>  regsSaved;
+        set<string>  generalRegsSavedSet;
         for (auto[var, color] : varColors) {
             // 1-7: $t1 - $t7, 8-9: $t8 - $t9, 10- 17: $s0 - $s7
             // remain $t0 for immediate load use
@@ -542,11 +550,56 @@ IrOptimizer &IrOptimizer::assignRegs() {
             // TODO: if color > 17, spilling
             string reg    = regName[color];
             var->info.reg = {reg};
-            regsSaved.insert(reg);
+            generalRegsSavedSet.insert(reg);
         }
-        func->info.regsSaved = {to_vector(regsSaved)};
+        // record those used general-purpose registers
+        auto generalRegsSaved = to_vector(generalRegsSavedSet);
 
+
+        auto regsSaved = vector<string>{};
+        // if function has call insede, $ra and $fp should be preserved
+        if (has_inside_call) { Appender{regsSaved}.append({"$ra", "$fp"}); }
+        // all the used general-purpose registers should be preserved
+        Appender{regsSaved}.append(generalRegsSaved);
+        // saved
+        func->info.regsSaved = {regsSaved};
+
+        // previously assigned stack space for parameters and local variabels
+        // now move there offset to assign stack space for preserving registers
+        //
+        // preserve {"$ra", "$fp", "$t1", "$t2"} 4 registers
+        //
+        // | ...        ...                         | ...        ...
+        // | +12($fp)   param<2>                    | +12($fp)   param<2>
+        // |  +8($fp)   param<1>                    |  +8($fp)   param<1>
+        // |  +4($fp)   param<0>                    |  +4($fp)   param<0>
+        // |  ---------------------  <insert   =>   |  ---------------------
+        // |  -0($fp)   retval<0>                   |  -0($fp)   reg_save<0>
+        // |  -4($fp)   local_var<0>                |  -4($fp)   reg_save<1>
+        // |  -8($fp)   local_var<1>                |  ...       ...
+        // |                                        |  ---------------------
+        // |                                        |  -16($fp)   retval<0>
+        // |                                        |  -20($fp)   local_var<0>
+        // |                                        |  -24($fp)   local_var<1>
+        //
+        // | $sp = $fp - 12                     =>  | $sp = $fp - 12 (- 16)
+
+        int spOffsetForRegSaved = 4 * regsSaved.size();
+        // move stack offset
+        for (auto &var : func->returns) {
+            assert(var->info.fpOffset.has_value());
+            var->info.fpOffset.value() -= spOffsetForRegSaved;
+        }
+        for (auto &var : func->localVars) {
+            assert(var->info.fpOffset.has_value());
+            var->info.fpOffset.value() -= spOffsetForRegSaved;
+        }
+        assert(func->info.spOffset.has_value());
+        func->info.spOffset.value() -= spOffsetForRegSaved;
+
+        // log debug
         logger.debug("in {}", func_fullname(func));
+        logger.debug("  preserved registers: {}", fmt::join(regsSaved, ", "));
         for (const auto &var : globalVars) {
             logger.debug("  {} = {}", var_name(var), var->info.reg.value());
         }
@@ -558,7 +611,6 @@ IrOptimizer &IrOptimizer::assignRegs() {
             }
         }
     }
-
     var_zero->info.reg = {"$zero"};
 
     logger.info("registers assignment complete successfully");
@@ -652,14 +704,12 @@ IrOptimizer &IrOptimizer::annotateInfo() {
          *     12($fp) = param<0> (int32 x)
          *      8($fp) = param<1> (int32* y)
          *      4($fp) = param<2> (int32 z)
-         *      0($fp) = $ra
-         *     -4($fp) = $fp_last
-         *        $sp  = $fp - 8
+         *        $sp  = $fp
          * do:
-         *     -8($fp) <- local_var<0> (int32 retval)
-         *  x -12($fp) <- local_var<3> (int32[10] z) (bug)
-         *    -48($fp) <- local_var<3> (int32[10] z)
-         *    -52($fp) <- local_var<4> (int32 a)
+         *     -0($fp) <- local_var<0> (int32 retval)
+         *  x  -4($fp) <- local_var<3> (int32[10] z) (bug)
+         *    -40($fp) <- local_var<3> (int32[10] z)
+         *    -44($fp) <- local_var<4> (int32 a)
          *        $sp  <- $fp - 48
          **/
 
@@ -673,7 +723,7 @@ IrOptimizer &IrOptimizer::annotateInfo() {
 
         // reverse 0($fp) for $fp, -4($fp) for $sp, -8($fp) for $ra
         // -12($fp) for retval (if there is), -16($fp) ... for local variables
-        int spOffset = -4;
+        int spOffset = +4;
         for (auto &var : func->returns) {
             spOffset -= var->type.size(); // allocate actual spcae for variables
             var->info = Var::Info{.fpOffset = {spOffset}};
