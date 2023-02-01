@@ -463,10 +463,14 @@ void SdtParser::sdt_global_func_decl(APTnode *node) {
                     to_string(fmt::format("re-definition of function ‘{}’",
                                           func->name)));
             }
+            logger.debug("sdt: found previous declaration of function ‘{}’", func->name);
+
             func = prevDecl;
+        } else {
+            // fix bug: previous declared function will be added into ir twice
+            // add its declaration into domains
+            func_domains_.back()->emplace_back(func);
         }
-        // add its declaration into domains
-        func_domains_.back()->emplace_back(func);
         return func;
     };
     Func *func = get_func_decl(node);
