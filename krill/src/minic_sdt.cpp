@@ -819,12 +819,13 @@ pair<Var *, Code> SdtParser::sdt_expr(APTnode *node) {
                  .args_e = {.dest = v_dest, .src1 = v_src, .src2 = var_zero}};
             break;
         case '$': // get memory
+            // expr : '$' expr
             q = {.op = Op::kLoad, .args_m = {.var = v_dest, .mem = v_src}};
             break;
         default:
             assert(false);
         }
-        code_dest.emplace_back(move(q));
+        Appender{code_dest}.append(code_src).append({q});
         return {v_dest, code_dest};
     } else if (child[0].get()->id == '(') { // parenthesis expression
         // expr : '(' expr ')'
