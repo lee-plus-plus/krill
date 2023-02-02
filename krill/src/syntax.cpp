@@ -59,6 +59,7 @@ void AstPrinter::printTree(const AstNode *const node, vector<bool> isLast,
         if (i + 1 == isLast.size()) {
             oss << fmt::format("{}", (isLast[i] ? " └" : " ├"));
             for (int j = 0; j < width_; j++) { oss << "─"; }
+            oss << " ";
         } else {
             oss << fmt::format("{}", (isLast[i] ? "  " : " │"));
             for (int j = 0; j < width_; j++) { oss << " "; }
@@ -266,6 +267,8 @@ shared_ptr<AstNode> Parser::getAstRoot() {
     assert(nodes_.size() == 1);
     return nodes_.top();
 }
+
+bool Parser::isAccepted() const { return isAccepted_; }
 
 // ---------- DIY ----------
 

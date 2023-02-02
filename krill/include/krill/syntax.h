@@ -18,8 +18,8 @@ namespace krill::type {
 
 // Annotated Parsing Tree Node
 struct AstNode {
-    int id;   // syntax id
-    int pidx; // production id, -1 if not from reducution
+    int                        id;   // syntax id
+    int                        pidx; // production id, -1 if not from reducution
     deque<shared_ptr<AstNode>> child;
 
     string symname; // grammar symbol name
@@ -27,6 +27,12 @@ struct AstNode {
     int    row_st, col_st;
     int    row_ed, col_ed;
 };
+
+} // namespace krill::type
+
+namespace krill::runtime {
+
+using krill::type::AstNode;
 
 class AstPrinter {
   private:
@@ -51,11 +57,6 @@ class AstPrinter {
     string print(const vector<shared_ptr<AstNode>> &nodes);
 };
 
-} // namespace krill::type
-
-namespace krill::runtime {
-
-using krill::type::AstNode;
 
 // syntax parser
 class Parser {
@@ -63,9 +64,9 @@ class Parser {
     const Grammar     grammar_;
     const ActionTable actionTable_;
 
-    vector<Token>               inputs_;  // input
-    stack<int>                  states_;  // lr(1) states
-    stack<int>                  symbols_; // lr(1) symbols (for debug)
+    vector<Token>              inputs_;  // input
+    stack<int>                 states_;  // lr(1) states
+    stack<int>                 symbols_; // lr(1) symbols (for debug)
     stack<shared_ptr<AstNode>> nodes_;   // parsed result
 
     int row_curr, col_curr; // help locate those non-child node
@@ -90,6 +91,8 @@ class Parser {
     void clear();
     void parseStep(Token token);
     void parseAll(vector<Token> tokens);
+
+    bool isAccepted() const;
 
     shared_ptr<AstNode> getAstRoot();
 };

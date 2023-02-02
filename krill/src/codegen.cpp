@@ -41,7 +41,7 @@ void genActionTableCode(const ActionTable &actionTable, ostream &oss) {
            "#define GoA Action::Type::kGoto\n"
            "#define AcA Action::Type::kAccept\n"
            "\n";
-    oss << "ActionTable actionTable = " << def_actionTable.str() << "\n";
+    oss << "ActionTable yourActionTable = " << def_actionTable.str() << ";\n";
 }
 
 /** give output as follow:
@@ -164,14 +164,11 @@ void genGrammarCode(const Grammar &grammar, ostream &oss) {
     oss << "\n" << def_prods_comment.str() << "\n";
     oss << fmt::format("const vector<Prod> yourProds = {};\n\n",
                        def_prods.str());
-    oss << "const Grammar yourGrammar({\n"
-           "  .terminalSet=yourTerminalSet,\n"
-           "  .nonterminalSet=yourNonterminalSet,\n"
-           "  .prods=yourProds,\n"
-           "  .symbolNames=yourSymbolNames,\n"
-           "  .prodsPriority=yourProdsPriority,\n"
-           "  .prodsAssociate=yourProdsAssociate,\n"
-           "});\n";
+
+    oss << "const Grammar yourGrammar(\n"
+           "    yourTerminalSet, yourNonterminalSet, yourProds, \n"
+           "    yourSymbolNames, yourProdsPriority, yourProdsAssociate\n"
+           ");\n";
 }
 
 /** give output as follow:
@@ -255,17 +252,20 @@ void genParserCode(const Grammar &grammar, ostream &oss) {
  * };
  *
  * int getSyntaxId(Token token) {
+ *   if (token == END_TOKEN) {
+ *     return END_SYMBOL; // -1
+ *   }
  *   switch (token.id) {
  *     case 0: //  0: [0-9]+
- *       return 0; // DIY
+ *       return -2; // DIY
  *     case 0: //  0: [0-9]+
- *       return 0; // DIY
+ *       return -2; // DIY
  *     case 0: //  0: [0-9]+
- *       return 0; // DIY
+ *       return -2; // DIY
  *     ...
  *     default:
  *       assert(false);
- *       return -1;
+ *       return -2;
  *   }
  * }
  **/
@@ -288,12 +288,16 @@ void genLexerCode(const vector<string> &regexs, ostream &oss) {
            "};\n\n";
 
     stringstream def_func;
-    def_func << "  switch (token.id) {\n";
+
+    def_func << "  if (token == END_TOKEN) {\n"
+                "    return END_SYMBOL; // -1\n"
+                "  }\n"
+                "  switch (token.id) {\n";
     for (int i = 0; i < regexs.size(); i++) {
-        def_func << fmt::format("    case {:d}: // {}\n      return 0;\n", i,
+        def_func << fmt::format("    case {:d}: // {}\n      return -2;\n", i,
                                 regexs[i]);
     }
-    def_func << "    default:\n      assert(false);\n      return -1;\n  }";
+    def_func << "    default:\n      assert(false);\n      return -2;\n  }";
 
     oss << fmt::format("// DIY\nint getSyntaxId(Token token) {{\n{}\n}}\n",
                        def_func.str());
