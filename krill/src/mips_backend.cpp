@@ -515,9 +515,6 @@ void MipsGenerator::genCodes(const QuadTuple &q) {
             genFuncRet(q);
             break;
         case Op::kLabel:
-            if (q.args_j.addr1->name.substr(0, 5) == "init.") {
-                break; // init.x must be empty label, eliminate it
-            }
             genLabel(q.args_j.addr1->name);
             break;
         case Op::kGoto:
