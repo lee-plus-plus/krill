@@ -14,8 +14,7 @@ using namespace krill::type;
 using namespace std;
 using krill::automata::getDFAintegrated;
 using krill::regex::getDFAfromRegex;
-using krill::utils::unescape;
-
+using krill::utils::unescape, krill::utils::apply_map;
 
 namespace krill::type {
 
@@ -42,11 +41,14 @@ LexicalParser::LexicalParser(DFA dfai) : dfa_(dfai), state_(0) {}
 LexicalParser::LexicalParser(vector<DFA> dfas)
     : dfa_(getDFAintegrated(dfas)), state_(0) {}
 
-LexicalParser::LexicalParser(vector<string> regexs) {
-    state_ = 0;
-    vector<DFA> dfas;
-    for (string regex : regexs) { dfas.push_back(getDFAfromRegex(regex)); }
-    dfa_ = getDFAintegrated(dfas);
+LexicalParser::LexicalParser(vector<string> regexs):
+    dfa_(getDFAintegrated(apply_map(regexs, getDFAfromRegex))), 
+    state_(0)
+ {
+    // state_ = 0;
+    // vector<DFA> dfas;
+    // for (string regex : regexs) { dfas.push_back(getDFAfromRegex(regex)); }
+    // dfa_ = getDFAintegrated(dfas);
 }
 
 

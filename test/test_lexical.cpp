@@ -1,6 +1,6 @@
 #include "fmt/core.h"
-#include "krill/defs.h"
 #include "krill/automata.h"
+#include "krill/defs.h"
 #include "krill/grammar.h"
 #include "krill/lexical.h"
 #include "krill/regex.h"
@@ -10,8 +10,8 @@
 #include <sstream>
 #include <vector>
 using namespace std;
-using krill::regex::getDFAfromRegex;
 using krill::automata::getDFAintegrated;
+using krill::regex::getDFAfromRegex;
 using namespace krill::type;
 using namespace krill::utils;
 using namespace krill::runtime;
@@ -30,19 +30,21 @@ class SimpleLexicalParser : public LexicalParser {
 // to align the lexicalId and syntaxId
 // nameToRegex: {terminalName, regex}
 SimpleLexicalParser::SimpleLexicalParser(Grammar             grammar,
-                                         map<string, string> nameToRegex) {
-    state_      = 0;
+                                         map<string, string> nameToRegex)
+    : LexicalParser(
+          apply_map(to_vector(nameToRegex), [](pair<string, string> p) {
+              return getDFAfromRegex(p.second);
+          })) {
+
     tokenNames_ = grammar.symbolNames;
     map<int, string> lexicalNames;
     vector<DFA>      dfas;
 
     int i = 0;
     for (auto[name, regex] : nameToRegex) {
-        dfas.push_back(getDFAfromRegex(regex));
         lexicalNames[i] = name;
         i++;
     }
-    dfa_ = getDFAintegrated(dfas);
 
     // map<string, int> tokenNames_r = reverse(tokenNames_);
     auto tokenNames_r = reverse<int, string>(tokenNames_);

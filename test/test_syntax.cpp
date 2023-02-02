@@ -83,8 +83,8 @@ void test1() {
     syntaxParser.clear();
     syntaxParser.parseAll(syntaxTokens);
 
-    // APTnode *root = syntaxParser.getAPT();
-    cerr << syntaxParser.getAPTstr();
+    auto root = syntaxParser.getAstRoot();
+    cerr << AstPrinter{}.print(root.get()) << "\n";
 }
 
 // regex-like grammar (cannot deal with escape like "\+", "\?" well)
@@ -140,9 +140,6 @@ void test2() {
         }
         syntaxParser.clear();
         syntaxParser.parseAll(syntaxTokens);
-
-        // APTnode *root = syntaxParser.getAPT();
-        // cerr << syntaxParser.getAPTstr();
     }
 }
 
@@ -176,13 +173,14 @@ void test3() {
         getToSyntaxIdMap(grammar.symbolNames, nameToRegex);
 
     // syntax-directed-translation action
-    auto sdt_action = [&](shared_ptr<APTnode> &node, int dot) -> void {
+    auto sdt_action = [&](shared_ptr<AstNode> &node, int dot) -> void {
         // auto &id = node.get()->id; // unused
         auto &pidx  = node.get()->pidx;
 
         AttrDict *next  = &node.get()->attr;
         deque<AttrDict *> child;
         for (auto &c : node.get()->child) {
+            c.get()->attr.Set<string>("lval", c.get()->lval);
             child.push_back(&c.get()->attr);
         }
 
@@ -263,8 +261,8 @@ void test3() {
         }
     };
     // syntax-directed-translation: left-to-right visit on AST
-    std::function<void (shared_ptr<APTnode> &node)> sdt;
-    sdt = [&](shared_ptr<APTnode> &node) -> void {
+    std::function<void (shared_ptr<AstNode> &node)> sdt;
+    sdt = [&](shared_ptr<AstNode> &node) -> void {
         int i;
         for (i = 0; i < node.get()->child.size(); i++) {
             sdt_action(node, i);
@@ -304,11 +302,11 @@ void test3() {
         syntaxParser.parseAll(syntaxTokens);
 
         // syntax-directed translation
-        auto root = syntaxParser.getAPT();
+        auto root = syntaxParser.getAstRoot();
         sdt(root);
 
         // print APT
-        cerr << getAPTstr(root, grammar);
+        cerr << AstPrinter{}.showAttrs().print(root.get()) << "\n";
 
         // print translated result
         auto var_list    = root.get()->attr.Get<vector<pair<string, double>>>("var_list");
@@ -325,7 +323,7 @@ void test3() {
 
 int main() {
     krill::log::sink_cerr->set_level(spdlog::level::debug);
-    vector<void (*)()> testFuncs = {test1, test2, test3};
+    vector<void (*)()> testFuncs = {test1 , test2, test3 };
     for (int i = 0; i < testFuncs.size(); i++) {
         cerr << "#test " << (i + 1) << endl;
         testFuncs[i]();

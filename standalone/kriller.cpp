@@ -195,7 +195,8 @@ void parse_syntax(istream &input, ostream &output, bool is_syntax_yacc,
 
             try {
                 syntaxParser.parseAll(tokens);
-                spdlog::info(syntaxParser.getASTstr());
+                auto root = syntaxParser.getAstRoot();
+                spdlog::info(AstPrinter{}.print(root.get()));
             } catch (exception &e) { spdlog::error(e.what()); }
         }
     } else if (gen_mode) {
