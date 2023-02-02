@@ -336,6 +336,17 @@ struct ToString {
     }
 };
 
+template<template<class...> class Target, class T>
+struct is_template_of
+{
+    static const bool value = false;
+};
+template<template<class...> class Target, class...Args>
+struct is_template_of<Target, Target<Args...>>
+{
+    static const bool value = true;
+};
+
 #define COLOR_RESET   "\033[0m"
 #define COLOR_BLACK   "\033[30m"      /* Black */
 #define COLOR_RED     "\033[31m"      /* Red */

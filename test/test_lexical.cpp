@@ -16,22 +16,22 @@ using namespace krill::type;
 using namespace krill::utils;
 using namespace krill::runtime;
 
-class SimpleLexicalParser : public LexicalParser {
+class SimpleLexer : public Lexer {
   private:
     map<int, int>    toSyntaxId_; // {x, syntaxId}
     map<int, string> tokenNames_; // {syntaxId,  name}
 
   public:
-    SimpleLexicalParser(Grammar grammar, map<string, string> nameToRegex);
+    SimpleLexer(Grammar grammar, map<string, string> nameToRegex);
     Token         parseStep(istream &input);
     vector<Token> parseAll(istream &input);
 };
 
 // to align the lexicalId and syntaxId
 // nameToRegex: {terminalName, regex}
-SimpleLexicalParser::SimpleLexicalParser(Grammar             grammar,
+SimpleLexer::SimpleLexer(Grammar             grammar,
                                          map<string, string> nameToRegex)
-    : LexicalParser(
+    : Lexer(
           apply_map(to_vector(nameToRegex), [](pair<string, string> p) {
               return getDFAfromRegex(p.second);
           })) {
@@ -62,9 +62,9 @@ SimpleLexicalParser::SimpleLexicalParser(Grammar             grammar,
 // read, until one "syntax" token is generated
 // lexical token which cannot map to syntax token will be dropped
 // return tokens with syntax id
-Token SimpleLexicalParser::parseStep(istream &input) {
+Token SimpleLexer::parseStep(istream &input) {
     while (true) {
-        Token token = LexicalParser::parseStep(input);
+        Token token = Lexer::parseStep(input);
         if (toSyntaxId_.count(token.id) != 0) {
             token.id = toSyntaxId_.at(token.id); // lexical id => syntax id
             return token;
@@ -76,7 +76,7 @@ Token SimpleLexicalParser::parseStep(istream &input) {
 
 // read, until the end of input (END_TOKEN is generated)
 // return tokens with syntax id
-vector<Token> SimpleLexicalParser::parseAll(istream &input) {
+vector<Token> SimpleLexer::parseAll(istream &input) {
     vector<Token> tokens;
     do {
         Token token = parseStep(input);
@@ -172,7 +172,7 @@ void test1() {
     cout << "intergrated DFA:" << endl;
     printDFA(dfai, cout, true);
 
-    LexicalParser parser(regexDFAs);
+    Lexer parser(regexDFAs);
 
     vector<string> srcs = {
         "121  abc  a21 a",
@@ -219,7 +219,7 @@ void test2() {
         {"delim", " +"},
     };
 
-    SimpleLexicalParser parser(grammar, nameToRegex);
+    SimpleLexer parser(grammar, nameToRegex);
 
     vector<string> srcs = {"a =1 + 21; b=2*0/1; 1/1-1; "};
 

@@ -10,12 +10,12 @@ using std::map, std::string, std::ostream, std::vector;
 
 namespace krill::codegen {
 
-void genActionTable(const ActionTable &actionTable, ostream &oss);
-void genGrammar(const Grammar& grammar, ostream &oss);
-void genDFA(const DFA &dfa, ostream &oss);
+void genActionTableCode(const ActionTable &actionTable, ostream &oss);
+void genGrammarCode(const Grammar& grammar, ostream &oss);
+void genDfaCode(const DFA &dfa, ostream &oss);
 
-void genSyntaxParser(const Grammar& grammar, ostream &oss);
-void genLexicalParser(const vector<string> &regexs, ostream &oss);
+void genParserCode(const Grammar& grammar, ostream &oss);
+void genLexerCode(const vector<string> &regexs, ostream &oss);
 
 // void genSyntaxParserInCppStyle(const Grammar & grammar, const ActionTable &actionTable, )
 } // namespace krill::codegen

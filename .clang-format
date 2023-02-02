@@ -38,4 +38,5 @@
     },
     "Cpp11BracedListStyle": true,
     "ColumnLimit": 80,
+    "AlwaysBreakTemplateDeclarations": true, 
 }

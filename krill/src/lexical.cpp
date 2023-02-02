@@ -36,12 +36,12 @@ bool Token::operator!=(const Token &t) const {
 
 namespace krill::runtime {
 
-LexicalParser::LexicalParser(DFA dfai) : dfa_(dfai), state_(0) {}
+Lexer::Lexer(DFA dfai) : dfa_(dfai), state_(0) {}
 
-LexicalParser::LexicalParser(vector<DFA> dfas)
+Lexer::Lexer(vector<DFA> dfas)
     : dfa_(getDFAintegrated(dfas)), state_(0) {}
 
-LexicalParser::LexicalParser(vector<string> regexs):
+Lexer::Lexer(vector<string> regexs):
     dfa_(getDFAintegrated(apply_map(regexs, getDFAfromRegex))), 
     state_(0)
  {
@@ -54,7 +54,7 @@ LexicalParser::LexicalParser(vector<string> regexs):
 
 // read, until one token is generated
 // return token with lexical id
-Token LexicalParser::parseStep(istream &input) {
+Token Lexer::parseStep(istream &input) {
     // return end_token when input end
     if (!(input.good() && !input.eof() && !input.fail())) { return END_TOKEN; }
 
@@ -97,7 +97,7 @@ Token LexicalParser::parseStep(istream &input) {
 
 // read, until the end of input (END_TOKEN is generated)
 // return tokens with lexical id
-vector<Token> LexicalParser::parseAll(istream &input) {
+vector<Token> Lexer::parseAll(istream &input) {
     vector<Token> tokens;
     do {
         Token token = parseStep(input);
@@ -106,7 +106,7 @@ vector<Token> LexicalParser::parseAll(istream &input) {
     return tokens;
 }
 
-void LexicalParser::clear() {
+void Lexer::clear() {
     state_ = 0;
     history_ = "";
 }

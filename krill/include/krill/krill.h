@@ -1,7 +1,6 @@
 #ifndef KRILL_H
 #define KRILL_H
 
-#include "krill/attrdict.h"
 #include "krill/lexical.h"
 #include "krill/automata.h"
 #include "krill/lexyacc.h"

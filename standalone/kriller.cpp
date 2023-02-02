@@ -158,7 +158,7 @@ void parse_syntax(istream &input, ostream &output, bool is_syntax_yacc,
 
     if (test_mode) {
         auto         actionTable = getLALR1table(grammar);
-        SyntaxParser syntaxParser(grammar, actionTable);
+        Parser parser(grammar, actionTable);
 
         spdlog::info("terminal set of grammar:\n  {}",
                      fmt::join(apply_map(to_vector(grammar.terminalSet),
@@ -169,7 +169,7 @@ void parse_syntax(istream &input, ostream &output, bool is_syntax_yacc,
 
         spdlog::info("input to be parsed:");
         while (true) {
-            syntaxParser.clear();
+            parser.clear();
             cerr << "> ";
             string line;
 
@@ -194,13 +194,13 @@ void parse_syntax(istream &input, ostream &output, bool is_syntax_yacc,
             tokens.push_back(END_TOKEN);
 
             try {
-                syntaxParser.parseAll(tokens);
-                auto root = syntaxParser.getAstRoot();
+                parser.parseAll(tokens);
+                auto root = parser.getAstRoot();
                 spdlog::info(AstPrinter{}.print(root.get()));
             } catch (exception &e) { spdlog::error(e.what()); }
         }
     } else if (gen_mode) {
-        genSyntaxParser(grammar, output);
+        genParserCode(grammar, output);
     }
 }
 
@@ -227,10 +227,10 @@ void parse_lexical(istream &input, ostream &output, bool is_lexical,
         }
         spdlog::info("given regexs:\n{}", ss.str());
 
-        LexicalParser lexicalParser(regexs);
+        Lexer lexer(regexs);
         spdlog::info("input strings to be parsed:");
         while (true) {
-            lexicalParser.clear();
+            lexer.clear();
             cerr << "> ";
             string line;
 
@@ -241,7 +241,7 @@ void parse_lexical(istream &input, ostream &output, bool is_lexical,
             stringstream ss;
             ss << line;
             try {
-                vector<Token> tokens = lexicalParser.parseAll(ss);
+                vector<Token> tokens = lexer.parseAll(ss);
                 for (auto token : tokens) {
                     spdlog::info("<token {:d}> \"{}\"", token.id, token.lval);
                 }
@@ -249,7 +249,7 @@ void parse_lexical(istream &input, ostream &output, bool is_lexical,
         }
 
     } else if (gen_mode) {
-        genLexicalParser(regexs, output);
+        genLexerCode(regexs, output);
     }
 }
 

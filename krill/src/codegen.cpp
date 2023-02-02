@@ -14,33 +14,68 @@ using namespace std;
 
 namespace krill::codegen {
 
-void genActionTable(const ActionTable &actionTable, ostream &oss) {
+/** give output as follow:
+ *
+ * #define AkA Action::Type::kAction
+ * #define ReA Action::Type::kReduce
+ * #define GoA Action::Type::kGoto
+ * #define AcA Action::Type::kAccept
+ *
+ * const ActionTable yourActionTable = {
+ *   {{1,2},{AT0,3}}, {{1,2},{AT0,3}}, {{1,2},{AT0,3}}
+ * };
+ **/
+void genActionTableCode(const ActionTable &actionTable, ostream &oss) {
     stringstream def_actionTable;
-    def_actionTable << "{\n";
-    const string typeName[] = {"AT0", "AT1", "AT2", "AT3"};
+    def_actionTable << "{\n  ";
+    const string typeName[] = {"AkA", "ReA", "GoA", "AcA"};
     for (auto[key, action] : actionTable) {
         def_actionTable << fmt::format(
-            "{{{{{}, {}}}, {{{}, {}}}}}, ", key.first, key.second,
+            "{{{{{},{}}},{{{},{}}}}}, ", key.first, key.second,
             typeName[static_cast<int>(action.type)], action.tgt);
     }
     def_actionTable << "}";
 
-    oss << "struct Action {\n"
-           "  enum Type { kAction = 0, kReduce = 1, kGoto = 2, kAccept = 3 };\n"
-           "  TYPE type; int tgt;\n"
-           "};\n";
-    oss << "using ActionTable = map<pair<int, int>, Action>;\n\n";
-    oss << "#define AT0 Action::Type::kAction\n"
-           "#define AT1 Action::Type::kReduce\n"
-           "#define AT2 Action::Type::kGoto\n"
-           "#define AT3 Action::Type::kAccept\n"
+    oss << "#define AkA Action::Type::kAction\n"
+           "#define ReA Action::Type::kReduce\n"
+           "#define GoA Action::Type::kGoto\n"
+           "#define AcA Action::Type::kAccept\n"
            "\n";
-    oss << fmt::format("ActionTable actionTable = {};\n",
-                       def_actionTable.str());
+    oss << "ActionTable actionTable = " << def_actionTable.str() << "\n";
 }
 
-void genGrammar(const Grammar &grammar, ostream &oss) {
-    const auto & symbolNames = grammar.symbolNames;
+/** give output as follow:
+ *
+ * constexpr int VOID = 1;
+ * constexpr int INT  = 2;
+ *
+ * #define NoA Associate::kNone
+ * #define LeA Associate::kLeft
+ * #define RiA Associate::kRight
+ *
+ * map<int, string> yourSymbolNames = { ... };
+ * set<int> yourTerminalSet = { ... };
+ * set<int> yourNonterminalSet = { ... };
+ * vector<int> yourProdsPriority = { ... };
+ * vector<Associate> yourProdsAssociate = { ... };
+ *
+ * vector<Prod> yourProds = {
+ *     {program, {decl_list}},
+ *     {decl_list, {decl_list, decl}},
+ *     ...
+ * };
+ *
+ * const Grammar yourGrammar(
+ *   .terminalSet = yourSymbolNames,
+ *   .nonterminalSet = yourTerminalSet,
+ *   .prods = yourProds,
+ *   .symbolNames = yourNonterminalSet,
+ *   .prodsPriority = yourProdsPriority,
+ *   .prodsAssociate = yourProdsAssociate,
+ * );
+ **/
+void genGrammarCode(const Grammar &grammar, ostream &oss) {
+    const auto &symbolNames = grammar.symbolNames;
 
     // define of symbols
     stringstream def_symbols;
@@ -67,77 +102,86 @@ void genGrammar(const Grammar &grammar, ostream &oss) {
 
     // prods comment
     stringstream def_prods_comment;
+    def_prods_comment << "/** productions:\n";
     for (int i = 0; i < grammar.prods.size(); i++) {
         const auto &prod = grammar.prods[i];
-        def_prods_comment << fmt::format("// {:2d}: ", i);
+        def_prods_comment << fmt::format(" * {:2d}: ", i);
         def_prods_comment << symbolNames.at(prod.symbol) << " -> ";
         for (int r : prod.right) {
             def_prods_comment << symbolNames.at(r) << " ";
         }
         def_prods_comment << "\n";
     }
+    def_prods_comment << " **/\n";
 
     // prods
     stringstream def_prods;
     def_prods << "{\n";
     for (int i = 0; i < grammar.prods.size(); i++) {
-        def_prods << fmt::format("  /* {:2d} */", i);
         const auto &prod = grammar.prods[i];
         // def_prods << symbolNames.at(prod.symbol) << " -> ";
         // for (int r : prod.right) { def_prods << symbolNames.at(r) << " "; }
         // def_prods << "*/\n";
-        def_prods << " { " << symbolNames.at(prod.symbol) << ", {";
+        def_prods << "  {" << symbolNames.at(prod.symbol) << ", {";
         for (int j = 0; j < prod.right.size(); j++) {
             def_prods << symbolNames.at(prod.right[j])
                       << ((j + 1 < prod.right.size()) ? ", " : "");
         }
         def_prods << "}}, \n";
-    }
+    } // namespace krill::codegen
     def_prods << "}";
 
     // prodsPriority
     stringstream def_prodsPriority;
-    def_prodsPriority << fmt::format("{{\n  {}\n}}", fmt::join(grammar.prodsPriority, ", "));
+    def_prodsPriority << fmt::format("{{\n  {}\n}}",
+                                     fmt::join(grammar.prodsPriority, ", "));
 
     // prodsAssociate
     // enum class Associate {kNone = 0, kLeft = 1, kRight = 2};
-    stringstream def_prodsAssociate;
-    map<Associate, string> assoName = {{Associate::kNone, "AS0"},
-                                       {Associate::kLeft, "AS1"},
-                                       {Associate::kRight, "AS2"}};
+    stringstream           def_prodsAssociate;
+    map<Associate, string> assoName = {{Associate::kNone, "NoA"},
+                                       {Associate::kLeft, "LeA"},
+                                       {Associate::kRight, "RiA"}};
     def_prodsAssociate << fmt::format(
-        "{{\n  {}\n}}", fmt::join(apply_map(grammar.prodsAssociate, assoName), ", "));
+        "{{\n  {}\n}}",
+        fmt::join(apply_map(grammar.prodsAssociate, assoName), ", "));
 
     oss << fmt::format("{}\n", def_symbols.str());
-    oss << "struct Prod { int symbol; vector<int> right; };\n";
-    oss << "enum class Associate {kNone = 0, kLeft = 1, kRight = 2};\n"
-           "struct Grammar {\n  set<int> terminalSet;\n  set<int> nonterminalSet;\n"
-           "  vector<Prod> prods;\n  map<int, string> symbolNames;\n  vector<int> "
-           "prodsPriority;\n  vector<Associate> prodsAssociate;\n};\n\n"
-           "#define AS0 Associate::kNone\n"
-           "#define AS1 Associate::kLeft\n"
-           "#define AS2 Associate::kRight\n\n"; 
+    oss << "#define NoA Associate::kNone\n"
+           "#define LeA Associate::kLeft\n"
+           "#define RiA Associate::kRight\n\n";
 
-    oss << fmt::format("map<int, string> symbolNames = {};\n\n",
+    oss << fmt::format("const map<int, string> yourSymbolNames = {};\n\n",
                        def_symbolnames.str());
-    oss << fmt::format("set<int> terminalSet = {};\n", def_terminals.str());
-    oss << fmt::format("set<int> nonterminalSet = {};\n",
+    oss << fmt::format("const set<int> yourTerminalSet = {};\n",
+                       def_terminals.str());
+    oss << fmt::format("const set<int> yourNonterminalSet = {};\n",
                        def_nonterminals.str());
-    oss << fmt::format("vector<int> prodsPriority = {};\n", def_prodsPriority.str());
-    oss << fmt::format("vector<Associate> prodsAssociate = {};\n", def_prodsAssociate.str());
+    oss << fmt::format("const vector<int> yourProdsPriority = {};\n",
+                       def_prodsPriority.str());
+    oss << fmt::format("const vector<Associate> yourProdsAssociate = {};\n",
+                       def_prodsAssociate.str());
     oss << "\n" << def_prods_comment.str() << "\n";
-    oss << fmt::format("vector<Prod> prods = {};\n\n", def_prods.str());
-    oss << "Grammar grammar({\n"
-           "  .terminalSet=terminalSet,\n"
-           "  .nonterminalSet=nonterminalSet,\n"
-           "  .prods=prods,\n"
-           "  .symbolNames=symbolNames,\n"
-           "  .prodsPriority=prodsPriority,\n"
-           "  .prodsAssociate=prodsAssociate,\n"
+    oss << fmt::format("const vector<Prod> yourProds = {};\n\n",
+                       def_prods.str());
+    oss << "const Grammar yourGrammar({\n"
+           "  .terminalSet=yourTerminalSet,\n"
+           "  .nonterminalSet=yourNonterminalSet,\n"
+           "  .prods=yourProds,\n"
+           "  .symbolNames=yourSymbolNames,\n"
+           "  .prodsPriority=yourProdsPriority,\n"
+           "  .prodsAssociate=yourProdsAssociate,\n"
            "});\n";
 }
 
-void genDFA(const DFA &dfa, ostream &oss) {
+/** give output as follow:
+ *
+ * const DFAgraph yourDFAgraph = { ... };
+ * const map<int, int> yourFinality = { ... };
+ * const DFA yourDfa({{.graph = yourDFAgraph, .finality = yourFinality}});
+ * };
+ **/
+void genDfaCode(const DFA &dfa, ostream &oss) {
     stringstream def_dfa_graph;
     def_dfa_graph << "{\n";
     int i;
@@ -163,53 +207,95 @@ void genDFA(const DFA &dfa, ostream &oss) {
     }
     def_finality << "\n}";
 
-    oss << "constexpr int EMPTY_SYMBOL = 0;\n"
-        << "using DFAgraph = map<int, map<int, int>>;\n"
-        << "struct DFA { DFAgraph graph; map<int, int> finality; };\n"
-        << fmt::format("const DFAgraph graph = {};\n\n", def_dfa_graph.str());
-    oss << fmt::format("const map<int, int> finality = {};\n\n",
+    oss << fmt::format("const DFAgraph yourDFAgraph = {};\n\n",
+                       def_dfa_graph.str());
+    oss << fmt::format("const map<int, int> yourFinality = {};\n\n",
                        def_finality.str());
-    oss << fmt::format(
-        "const DFA dfa({{.graph = graph, .finality = finality}});\n",
-        def_finality.str());
+    oss << fmt::format("const DFA yourDfa({{.graph = yourDFAgraph, .finality = "
+                       "yourFinality}});\n",
+                       def_finality.str());
 }
 
-void genSyntaxParser(const Grammar &grammar, ostream &oss) {
+/** give output as follow:
+ *
+ * // ActionTable
+ * ...
+ * // Grammar
+ * ...
+ * class YourParser : public Parser {
+ *   public:
+ *     YourParser(): Parser(yourGrammar, yourActionTable) {}
+ * };
+ **/
+void genParserCode(const Grammar &grammar, ostream &oss) {
     auto actionTable = getLALR1table(grammar);
 
     oss << "// Action Table\n";
-    genActionTable(actionTable, oss);
+    genActionTableCode(actionTable, oss);
     oss << "\n";
 
     oss << "// Grammar\n";
-    genGrammar(grammar, oss);
+    genGrammarCode(grammar, oss);
 
-    oss << "SyntaxParser syntaxParser(grammar, actionTable);\n";
+    oss << "class YourParser : public Parser {\n"
+           "  public:\n"
+           "    YourParser(): Parser(yourGrammar, yourActionTable) {}\n"
+           "};\n";
 }
 
-void genLexicalParser(const vector<string> &regexs, ostream &oss) {
+/** give output as follow:
+ *
+ * // ActionTable
+ * ...
+ * // Grammar
+ * ...
+ * class YourLexer : public Lexer {
+ *   public:
+ *     YourLexer(): Lexer(yourDfa) {}
+ * };
+ *
+ * int getSyntaxId(Token token) {
+ *   switch (token.id) {
+ *     case 0: //  0: [0-9]+
+ *       return 0; // DIY
+ *     case 0: //  0: [0-9]+
+ *       return 0; // DIY
+ *     case 0: //  0: [0-9]+
+ *       return 0; // DIY
+ *     ...
+ *     default:
+ *       assert(false);
+ *       return -1;
+ *   }
+ * }
+ **/
+void genLexerCode(const vector<string> &regexs, ostream &oss) {
     vector<DFA> dfas;
     for (string regex : regexs) { dfas.push_back(getDFAfromRegex(regex)); }
     DFA dfai = getDFAintegrated(dfas);
 
+    oss << "/**\n";
     for (int i = 0; i < regexs.size(); i++) {
-        oss << fmt::format("// {:2d}: {}\n", i, regexs[i]);
+        oss << fmt::format(" * {:2d}: {}\n", i, regexs[i]);
     }
-    oss << "\n";
+    oss << " **/\n";
 
-    genDFA(dfai, oss);
+    genDfaCode(dfai, oss);
     oss << "\n";
-    oss << "LexicalParser lexicalParser(dfa);\n\n";
+    oss << "class YourLexer : public Lexer {\n"
+           "  public:\n"
+           "    YourLexer(): Lexer(yourDfa) {}\n"
+           "};\n\n";
 
     stringstream def_func;
     def_func << "  switch (token.id) {\n";
     for (int i = 0; i < regexs.size(); i++) {
-        def_func << fmt::format(
-            "    case {:d}: // {:2d}: {}\n      return 0; // DIY\n", i, i, regexs[i]);
+        def_func << fmt::format("    case {:d}: // {}\n      return 0;\n", i,
+                                regexs[i]);
     }
-    def_func << "    default:\n      assert(false);\n"; def_func << "}\n";
+    def_func << "    default:\n      assert(false);\n      return -1;\n  }";
 
-    oss << fmt::format("int getSyntaxId(Token token) {{\n{}\n}}\n",
+    oss << fmt::format("// DIY\nint getSyntaxId(Token token) {{\n{}\n}}\n",
                        def_func.str());
 }
 
