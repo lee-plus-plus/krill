@@ -559,7 +559,7 @@ IrOptimizer &IrOptimizer::assignRegs() {
         auto regsSaved = vector<string>{};
         // if function has call insede, $ra should be preserved
         if (has_inside_call) {
-            Appender{regsSaved}.append({"$ra", "$fp"});
+            Appender{regsSaved}.append({"$fp", "$ra"});
         } else {
             Appender{regsSaved}.append({"$fp"});
         }

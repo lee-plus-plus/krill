@@ -98,8 +98,8 @@ void MipsGenerator::genFuncBegin(const QuadTuple &q) {
 
     if (funcname == "main") {
         genCode("ori", "$fp", "$zero", to_hex(stackBeginPosition));
-        genCode("ori", "$sp", "$zero", to_hex(stackBeginPosition - 8));
-    } 
+        genCode("ori", "$sp", "$zero", to_hex(stackBeginPosition - 4));
+    }
 
     // assign stack space for local variables:
     // save caller registers
@@ -134,13 +134,44 @@ void MipsGenerator::genFuncRet(const QuadTuple &q) {
     auto regsSaved = func->info.regsSaved.value();
 
     // recover registers
-    int  spOffset2 = 0;
+    int spOffset2 = 0;
+    // bug: cannot recover $fp like other registers
+    // ---------------- wrong ----------------
+    // return.0:
+    //      lw      $t1, -16($fp)
+    //      ori     $v0, $t1, 0
+    //      lw      $ra, 0($fp)
+    //      lw      $fp, -4($fp)  # no
+    //      lw      $t1, -8($fp)
+    //      lw      $t2, -12($fp)
+    //      ori     $sp, $fp, 0
+    //      jr      $ra
+    //      nop
+    // --------------- correct ---------------
+    // return.0:
+    //      lw      $t1, -16($fp)
+    //      ori     $v0, $t1, 0
+    //      lw      $ra, 0($fp)
+    //      lw      $t1, -8($fp)
+    //      lw      $t2, -12($fp)
+    //      ori     $sp, $fp, 0
+    //      lw      $fp, -4($fp) # yes
+    //      jr      $ra
+    //      nop
+    bool needRecoverFp = false;
+    int  spOffsetForFp = 0;
     for (string reg : regsSaved) {
-        genCode("lw", reg, "$fp", spOffset2);
+        if (reg == "$fp") {
+            needRecoverFp = true;
+            spOffsetForFp = spOffset2;
+        } else {
+            genCode("lw", reg, "$fp", spOffset2);
+        }
         spOffset2 -= 4;
     }
 
     genCode("ori", "$sp", "$fp", 0);
+    if (needRecoverFp) { genCode("lw", "$fp", "$fp", spOffsetForFp); }
     genCode("jr", "$ra");
     genCode("nop");
 }
