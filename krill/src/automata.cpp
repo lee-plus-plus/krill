@@ -1,4 +1,5 @@
 #include "krill/automata.h"
+#include <exception>
 #include <algorithm>
 #include <queue>
 #include <tuple>
@@ -32,6 +33,28 @@ string to_string(const EdgeTable &tbl, const map<int, string> &symbolNames) {
 
 
 namespace krill::automata {
+
+int match(DFA dfa, string input) {
+    try {
+        int state = 0;
+        for (char c : input) { state = dfa.graph.at(state).at(c); }
+        return dfa.finality.at(state);
+    } catch (std::exception &err) { return false; }
+}
+
+bool unmatch(DFA dfa, string input) {
+    try {
+        int state = 0;
+        for (char c : input) {
+            if (dfa.graph.count(state) == 0) { return true; }
+            if (dfa.graph.at(state).count(c) == 0) { return true; }
+            state = dfa.graph.at(state).at(c);
+        }
+        return dfa.finality.at(state) == 0;
+    } catch (std::exception &err) { return true; }
+    return false;
+}
+
 
 // 最小化DFA
 // 包括了消除不可达状态、合并等价状态

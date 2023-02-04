@@ -43,6 +43,10 @@ namespace krill::automata {
     
 using namespace krill::type;
 
+// for test
+int match(DFA dfa, std::string input);
+bool unmatch(DFA dfa, std::string input);
+
 DFA getMinimizedDfa(DFA dfa);
 DFA getDFAfromNFA(NFA nfa);
 DFA getDFAintegrated(vector<DFA> dfas);

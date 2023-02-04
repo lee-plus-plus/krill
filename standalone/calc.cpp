@@ -1,222 +1,270 @@
 // mini calculator
+#include "krill/deps.h"
 #include <cassert>
 #include <iostream>
-#include <map>
-#include <stack>
+#include <sstream>
 #include <string>
-#include <vector>
-using std::pair, std::vector, std::map, std::stack;
 using namespace std;
+using namespace krill;
 
-struct GrammarNode {
-    double value;
-}; // DIY
+// -------------------- parser --------------------
 
-GrammarNode syntaxParser(vector<int> tokens, vector<char> lexValues) {
-    // declaration of struct
-    struct Prod {
-        int         symbol;
-        vector<int> right;
-    };
-    enum TYPE { ACTION, REDUCE, GOTO, ACCEPT };
-    struct Action {
-        TYPE type;
-        int  tgt;
-    };
-    typedef map<pair<int, int>, Action> ActionTable;
+// Action Table
+#define AkA Action::Type::kAction
+#define ReA Action::Type::kReduce
+#define GoA Action::Type::kGoto
+#define AcA Action::Type::kAccept
 
-    // prods
-    static const vector<Prod> prods = {
-        /* FILL-0 */
-        /* 0: Q -> P */ {0, {1}},
-        /* 1: P -> T */ {1, {2}},
-        /* 2: T -> ( P ) */ {2, {3, 1, 4}},
-        /* 3: T -> T * T */ {2, {2, 5, 2}},
-        /* 4: T -> T / T */ {2, {2, 6, 2}},
-        /* 5: P -> T + T */ {1, {2, 7, 2}},
-        /* 6: P -> T - T */ {1, {2, 8, 2}},
-        /* 7: T -> - T */ {2, {8, 2}},
-        /* 8: T -> d */ {2, {9}},
-    };
+ActionTable yourActionTable = {
+    {{0, 40}, {AkA, 1}},    {{0, 45}, {AkA, 2}},    {{0, 260}, {GoA, 3}},
+    {{0, 261}, {GoA, 4}},   {{0, 262}, {AkA, 5}},   {{1, 40}, {AkA, 1}},
+    {{1, 45}, {AkA, 2}},    {{1, 260}, {GoA, 6}},   {{1, 261}, {GoA, 4}},
+    {{1, 262}, {AkA, 5}},   {{2, 40}, {AkA, 1}},    {{2, 45}, {AkA, 2}},
+    {{2, 261}, {GoA, 7}},   {{2, 262}, {AkA, 5}},   {{3, -1}, {AcA, 0}},
+    {{3, 43}, {AkA, 8}},    {{3, 45}, {AkA, 9}},    {{4, -1}, {ReA, 1}},
+    {{4, 41}, {ReA, 1}},    {{4, 42}, {AkA, 10}},   {{4, 43}, {ReA, 1}},
+    {{4, 45}, {ReA, 1}},    {{4, 47}, {AkA, 11}},   {{5, -1}, {ReA, 8}},
+    {{5, 41}, {ReA, 8}},    {{5, 42}, {ReA, 8}},    {{5, 43}, {ReA, 8}},
+    {{5, 45}, {ReA, 8}},    {{5, 47}, {ReA, 8}},    {{6, 41}, {AkA, 12}},
+    {{6, 43}, {AkA, 8}},    {{6, 45}, {AkA, 9}},    {{7, -1}, {ReA, 7}},
+    {{7, 41}, {ReA, 7}},    {{7, 42}, {AkA, 10}},   {{7, 43}, {ReA, 7}},
+    {{7, 45}, {ReA, 7}},    {{7, 47}, {AkA, 11}},   {{8, 40}, {AkA, 1}},
+    {{8, 45}, {AkA, 2}},    {{8, 261}, {GoA, 13}},  {{8, 262}, {AkA, 5}},
+    {{9, 40}, {AkA, 1}},    {{9, 45}, {AkA, 2}},    {{9, 261}, {GoA, 14}},
+    {{9, 262}, {AkA, 5}},   {{10, 40}, {AkA, 1}},   {{10, 45}, {AkA, 2}},
+    {{10, 261}, {GoA, 15}}, {{10, 262}, {AkA, 5}},  {{11, 40}, {AkA, 1}},
+    {{11, 45}, {AkA, 2}},   {{11, 261}, {GoA, 16}}, {{11, 262}, {AkA, 5}},
+    {{12, -1}, {ReA, 2}},   {{12, 41}, {ReA, 2}},   {{12, 42}, {ReA, 2}},
+    {{12, 43}, {ReA, 2}},   {{12, 45}, {ReA, 2}},   {{12, 47}, {ReA, 2}},
+    {{13, -1}, {ReA, 5}},   {{13, 41}, {ReA, 5}},   {{13, 42}, {AkA, 10}},
+    {{13, 43}, {ReA, 5}},   {{13, 45}, {ReA, 5}},   {{13, 47}, {AkA, 11}},
+    {{14, -1}, {ReA, 6}},   {{14, 41}, {ReA, 6}},   {{14, 42}, {AkA, 10}},
+    {{14, 43}, {ReA, 6}},   {{14, 45}, {ReA, 6}},   {{14, 47}, {AkA, 11}},
+    {{15, -1}, {ReA, 3}},   {{15, 41}, {ReA, 3}},   {{15, 42}, {ReA, 3}},
+    {{15, 43}, {ReA, 3}},   {{15, 45}, {ReA, 3}},   {{15, 47}, {ReA, 3}},
+    {{16, -1}, {ReA, 4}},   {{16, 41}, {ReA, 4}},   {{16, 42}, {AkA, 10}},
+    {{16, 43}, {ReA, 4}},   {{16, 45}, {ReA, 4}},   {{16, 47}, {ReA, 4}},
+};
 
-    // Action Table
-    static const ActionTable actionTable = {
-        /* FILL-1 */
-        {{0, 1}, {GOTO, 1}},     {{0, 2}, {GOTO, 2}},
-        {{0, 3}, {ACTION, 3}},   {{0, 8}, {ACTION, 4}},
-        {{0, 9}, {ACTION, 5}},   {{1, -1}, {ACCEPT, 0}},
-        {{2, -1}, {REDUCE, 1}},  {{2, 4}, {REDUCE, 1}},
-        {{2, 5}, {ACTION, 6}},   {{2, 6}, {ACTION, 7}},
-        {{2, 7}, {ACTION, 8}},   {{2, 8}, {ACTION, 9}},
-        {{3, 1}, {GOTO, 10}},    {{3, 2}, {GOTO, 2}},
-        {{3, 3}, {ACTION, 3}},   {{3, 8}, {ACTION, 4}},
-        {{3, 9}, {ACTION, 5}},   {{4, 2}, {GOTO, 11}},
-        {{4, 3}, {ACTION, 3}},   {{4, 8}, {ACTION, 4}},
-        {{4, 9}, {ACTION, 5}},   {{5, -1}, {REDUCE, 8}},
-        {{5, 4}, {REDUCE, 8}},   {{5, 5}, {REDUCE, 8}},
-        {{5, 6}, {REDUCE, 8}},   {{5, 7}, {REDUCE, 8}},
-        {{5, 8}, {REDUCE, 8}},   {{6, 2}, {GOTO, 12}},
-        {{6, 3}, {ACTION, 3}},   {{6, 8}, {ACTION, 4}},
-        {{6, 9}, {ACTION, 5}},   {{7, 2}, {GOTO, 13}},
-        {{7, 3}, {ACTION, 3}},   {{7, 8}, {ACTION, 4}},
-        {{7, 9}, {ACTION, 5}},   {{8, 2}, {GOTO, 14}},
-        {{8, 3}, {ACTION, 3}},   {{8, 8}, {ACTION, 4}},
-        {{8, 9}, {ACTION, 5}},   {{9, 2}, {GOTO, 15}},
-        {{9, 3}, {ACTION, 3}},   {{9, 8}, {ACTION, 4}},
-        {{9, 9}, {ACTION, 5}},   {{10, 4}, {ACTION, 16}},
-        {{11, -1}, {REDUCE, 7}}, {{11, 4}, {REDUCE, 7}},
-        {{11, 5}, {REDUCE, 7}},  {{11, 6}, {REDUCE, 7}},
-        {{11, 7}, {REDUCE, 7}},  {{11, 8}, {REDUCE, 7}},
-        {{12, -1}, {REDUCE, 3}}, {{12, 4}, {REDUCE, 3}},
-        {{12, 5}, {REDUCE, 3}},  {{12, 6}, {REDUCE, 3}},
-        {{12, 7}, {REDUCE, 3}},  {{12, 8}, {REDUCE, 3}},
-        {{13, -1}, {REDUCE, 4}}, {{13, 4}, {REDUCE, 4}},
-        {{13, 5}, {REDUCE, 4}},  {{13, 6}, {REDUCE, 4}},
-        {{13, 7}, {REDUCE, 4}},  {{13, 8}, {REDUCE, 4}},
-        {{14, -1}, {REDUCE, 5}}, {{14, 4}, {REDUCE, 5}},
-        {{14, 5}, {ACTION, 6}},  {{14, 6}, {ACTION, 7}},
-        {{15, -1}, {REDUCE, 6}}, {{15, 4}, {REDUCE, 6}},
-        {{15, 5}, {ACTION, 6}},  {{15, 6}, {ACTION, 7}},
-        {{16, -1}, {REDUCE, 2}}, {{16, 4}, {REDUCE, 2}},
-        {{16, 5}, {REDUCE, 2}},  {{16, 6}, {REDUCE, 2}},
-        {{16, 7}, {REDUCE, 2}},  {{16, 8}, {REDUCE, 2}},
-    };
+// Grammar
+constexpr int Q = 259;
+constexpr int P = 260;
+constexpr int T = 261;
+constexpr int d = 262;
 
-    if (tokens[tokens.size() - 1] != -1) { tokens.push_back(-1); }
+#define NoA Associate::kNone
+#define LeA Associate::kLeft
+#define RiA Associate::kRight
 
-    stack<int>         states;
-    stack<GrammarNode> stateNodes; // DIY
-    states.push(0);
+const map<int, string> yourSymbolNames = {
+    {-1, "ζ"},   {0, "ε"},    {40, "'('"}, {41, "')'"},
+    {42, "'*'"}, {43, "'+'"}, {45, "'-'"}, {47, "'/'"},
+    {259, "Q"},  {260, "P"},  {261, "T"},  {262, "d"},
+};
 
-    for (int i = 0, accpeted = false; !accpeted;) {
-        // look tokens[i], state => next_state, action
-        assert(actionTable.count({states.top(), tokens[i]}) != 0);
+const set<int>          yourTerminalSet    = {40, 41, 42, 43, 45, 47, 262};
+const set<int>          yourNonterminalSet = {259, 260, 261};
+const vector<int>       yourProdsPriority  = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+const vector<Associate> yourProdsAssociate = {NoA, NoA, NoA, NoA, NoA,
+                                              NoA, NoA, NoA, NoA};
 
-        Action action = actionTable.at({states.top(), tokens[i]});
-        switch (action.type) {
-            case ACTION: {
-                states.push(action.tgt);
-                stateNodes.push(GrammarNode({(double)(lexValues[i] - '0')})); // DIY
-                i++;
-                break;
-            }
-            case REDUCE: {
-                Prod                r = prods[action.tgt];
-                vector<GrammarNode> childNodes;
-                for (int j = 0; j < (int) r.right.size(); j++) {
-                    states.pop();
-                    childNodes.insert(childNodes.begin(), stateNodes.top());
-                    stateNodes.pop();
-                }
+/** productions:
+ *  0: Q -> P
+ *  1: P -> T
+ *  2: T -> '(' P ')'
+ *  3: T -> T '*' T
+ *  4: T -> T '/' T
+ *  5: P -> P '+' T
+ *  6: P -> P '-' T
+ *  7: T -> '-' T
+ *  8: T -> d
+ **/
 
-                assert(actionTable.count({states.top(), r.symbol}) != 0);
-                Action action2 = actionTable.at({states.top(), r.symbol});
-                assert(action2.type == GOTO);
-                states.push(action2.tgt);
+const vector<Prod> yourProds = {
+    {Q, {P}},         {P, {T}},         {T, {'(', P, ')'}},
+    {T, {T, '*', T}}, {T, {T, '/', T}}, {P, {P, '+', T}},
+    {P, {P, '-', T}}, {T, {'-', T}},    {T, {d}},
+};
 
-                GrammarNode nextNode;
-                switch (action.tgt) {
-                    /* FILL-2 */
-                    case 0: // Q -> P
-                        // for example, $0.value  = $1.value + $2.value
-                        nextNode = GrammarNode(
-                            {childNodes[0].value}); // DIY
-                        break;
-                    case 1: // P -> T
-                        nextNode = GrammarNode(
-                            {childNodes[0].value}); // DIY
-                        break;
-                    case 2: // T -> ( P )
-                        nextNode = GrammarNode(
-                            {childNodes[1].value}); // DIY
-                        break;
-                    case 3: // T -> T * T
-                        nextNode = GrammarNode(
-                            {childNodes[0].value * childNodes[2].value}); // DIY
-                        break;
-                    case 4: // T -> T / T
-                        nextNode = GrammarNode(
-                            {childNodes[0].value / childNodes[2].value}); // DIY
-                        break;
-                    case 5: // P -> T + T
-                        nextNode = GrammarNode(
-                            {childNodes[0].value + childNodes[2].value}); // DIY
-                        break;
-                    case 6: // P -> T - T
-                        nextNode = GrammarNode(
-                            {childNodes[0].value - childNodes[2].value}); // DIY
-                        break;
-                    case 7: // T -> - T
-                        nextNode = GrammarNode(
-                            {-childNodes[1].value}); // DIY
-                        break;
-                    case 8: // T -> d
-                        nextNode = GrammarNode(
-                            {childNodes[0].value}); // DIY
-                        break;
+const Grammar yourGrammar(yourTerminalSet, yourNonterminalSet, yourProds,
+                          yourSymbolNames, yourProdsPriority,
+                          yourProdsAssociate);
 
-                    default: {
-                        assert(false);
-                        break;
-                    }
-                }
-                stateNodes.push(nextNode);
-                break;
-            }
-            case ACCEPT: {
-                accpeted = true;
-                break;
-            }
-            default: {
-                assert(false);
-                break;
-            }
-        }
-    }
-    assert(stateNodes.size() == 1);
-    return stateNodes.top(); // DIY
+// -------------------- lexer --------------------
+
+/** regex:
+ *  0: [\-\+]0|[1-9][0-9]*
+ *  1: \+
+ *  2: \-
+ *  3: \*
+ *  4: \/
+ *  5: \(
+ *  6: \)
+ *  7: [ ]+
+ **/
+const DFAgraph yourDFAgraph = {
+    {0,
+     {{32, 1},
+      {40, 2},
+      {41, 3},
+      {42, 4},
+      {43, 5},
+      {45, 6},
+      {47, 7},
+      {49, 8},
+      {50, 8},
+      {51, 8},
+      {52, 8},
+      {53, 8},
+      {54, 8},
+      {55, 8},
+      {56, 8},
+      {57, 8}}},
+    {1, {{32, 1}}},
+    {5, {{48, 9}}},
+    {6, {{48, 9}}},
+    {8,
+     {{48, 8},
+      {49, 8},
+      {50, 8},
+      {51, 8},
+      {52, 8},
+      {53, 8},
+      {54, 8},
+      {55, 8},
+      {56, 8},
+      {57, 8}}},
+};
+
+const map<int, int> yourFinality = {{0, 0}, {1, 8}, {2, 6}, {3, 7}, {4, 4},
+                                    {5, 2}, {6, 3}, {7, 5}, {8, 1}, {9, 1}};
+
+const DFA yourDfa({.graph = yourDFAgraph, .finality = yourFinality});
+
+class YourLexer : public Lexer {
+  public:
+    YourLexer() : Lexer(yourDfa) {}
+};
+
+// -------------------- main --------------------
+
+
+class YourParser : public Parser {
+  public:
+    YourParser() : Parser(yourGrammar, yourActionTable) {}
+
+    void onAction(AstNode *node);
+    void onReduce(AstNode *node);
+    void onAccept();
+    void onError();
+};
+
+void YourParser::onAction(AstNode *node) {
+    if (node->id == d) { node->attr.RefN<double>("value") = stoi(node->lval); }
 }
 
-pair<vector<int>, vector<char>> lexicalParser(string src) {
-    // {{0, "Q"}, {1, "P"}, {2, "T"}, {3, "("},
-    //  {4, ")"}, {5, "*"}, {6, "/"}, {7, "+"},
-    //  {8, "-"}, {9, "d"}}
-    vector<int>  tokens;
-    vector<char> lexValues;
+void YourParser::onReduce(AstNode *node) {
+    AttrDict *         attr = &node->attr;
+    vector<AttrDict *> child;
+    for (auto &node : node->child) { child.push_back(&node.get()->attr); }
 
-    for (char c : src) {
-        int token;
-        if (c == '(') {
-            token = 3;
-        } else if (c == ')') {
-            token = 4;
-        } else if (c == '*') {
-            token = 5;
-        } else if (c == '/') {
-            token = 6;
-        } else if (c == '+') {
-            token = 7;
-        } else if (c == '-') {
-            token = 8;
-        } else if (c >= '0' && c <= '9') {
-            token = 9;
-        }
-        tokens.push_back(token);
-        lexValues.push_back(c);
+    switch (node->pidx) {
+    case 0: // Q -> P
+    case 1: // P -> T
+    case 8: // T -> d
+        attr->RefN<double>("value") = child[0]->Ref<double>("value");
+        break;
+    case 2: // T -> ( P )
+        attr->RefN<double>("value") = child[1]->Ref<double>("value");
+        break;
+    case 3: // T -> T * T
+        attr->RefN<double>("value") =
+            child[0]->Ref<double>("value") * child[2]->Ref<double>("value");
+        break;
+    case 4: // T -> T / T
+        attr->RefN<double>("value") =
+            child[0]->Ref<double>("value") / child[2]->Ref<double>("value");
+        break;
+    case 5: // P -> T + T
+        attr->RefN<double>("value") =
+            child[0]->Ref<double>("value") + child[2]->Ref<double>("value");
+        break;
+    case 6: // P -> T - T
+        attr->RefN<double>("value") =
+            child[0]->Ref<double>("value") - child[2]->Ref<double>("value");
+        break;
+    case 7: // T -> - T
+        attr->RefN<double>("value") = -child[1]->Ref<double>("value");
+        break;
+    default:
+        assert(false);
     }
-    return make_pair(tokens, lexValues);
 }
 
+void YourParser::onAccept() {
+    auto node = nodes_.top();
+    spdlog::info("result: {}", node.get()->attr.Ref<double>("value"));
+}
+
+void YourParser::onError() {}
+
+// DIY
+int getSyntaxId(Token token) {
+    switch (token.id) {
+    case -1: // end of input
+        return -1;
+    case 0: // [\-\+]0|[1-9][0-9]*
+        return d;
+    case 1: // \+
+        return '+';
+    case 2: // \-
+        return '-';
+    case 3: // \*
+        return '*';
+    case 4: // \/
+        return '/';
+    case 5: // \(
+        return '(';
+    case 6: // \)
+        return ')';
+    case 7: // [ ]+
+        return -2;
+    default:
+        assert(false);
+        return -2;
+    }
+}
 
 int main() {
-    string src;
-    while (true) {
-        cout << ">> ";
-        getline(cin, src);
-        auto[tokens, lexValues] = lexicalParser(src);
-        auto node               = syntaxParser(tokens, lexValues);
-        cout << node.value << endl;
-    }
+    YourLexer  lexer;
+    YourParser parser;
 
-    return 0;
+    while (true) {
+        lexer.clear();
+        parser.clear();
+
+        cerr << "> ";
+        string line;
+
+        getline(cin, line);
+        if (cin.eof()) { break; }
+        if (line.size() == 0) { continue; }
+
+        stringstream ss;
+        ss << line;
+
+        while (!parser.isAccepted()) {
+            Token token = lexer.parseStep(ss);
+            spdlog::info("<token {:d}> \"{}\"", token.id, token.lval);
+
+            int syntaxId = getSyntaxId(token);
+            if (syntaxId == -2) { continue; }
+            token.id = syntaxId;
+
+            parser.parseStep(token);
+        }
+
+        auto root = parser.getAstRoot();
+        cout << AstPrinter{}.showAttr().print(root.get());
+    }
 }

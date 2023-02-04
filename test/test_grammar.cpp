@@ -2,6 +2,7 @@
 #include "krill/grammar.h"
 #include "spdlog/spdlog.h"
 #include <cassert>
+#include <doctest/doctest.h>
 #include <fmt/format.h>
 #include <iostream>
 #include <vector>
@@ -62,55 +63,51 @@ GrammarNode *simpleSyntaxParser(Grammar grammar, ActionTable actionTable,
 
         Action action = actionTable[{states.back(), src[i]}];
         switch (action.type) {
-            case Action::Type::kAction: {
-                if (showStates) {
-                    cout << fmt::format("ACTION push s{}", action.tgt);
-                }
-                states.push_back(action.tgt);
-                stateNodes.push_back(new GrammarNode({{}, src[i]}));
-                i++;
-                break;
+        case Action::Type::kAction: {
+            if (showStates) {
+                cout << fmt::format("ACTION push s{}", action.tgt);
             }
-            case Action::Type::kReduce: {
-                Prod                  r = prods[action.tgt];
-                vector<GrammarNode *> temp;
+            states.push_back(action.tgt);
+            stateNodes.push_back(new GrammarNode({{}, src[i]}));
+            i++;
+            break;
+        }
+        case Action::Type::kReduce: {
+            Prod                  r = prods[action.tgt];
+            vector<GrammarNode *> temp;
 
-                if (showStates) {
-                    cout << fmt::format("REDUCE r{} pop ", action.tgt + 1);
-                }
-                for (int j = 0; j < r.right.size(); j++) {
-                    if (showStates) {
-                        cout << fmt::format("s{} ", states.back());
-                    }
-                    temp.push_back(stateNodes.back());
-                    states.pop_back();
-                    stateNodes.pop_back();
-                }
+            if (showStates) {
+                cout << fmt::format("REDUCE r{} pop ", action.tgt + 1);
+            }
+            for (int j = 0; j < r.right.size(); j++) {
+                if (showStates) { cout << fmt::format("s{} ", states.back()); }
+                temp.push_back(stateNodes.back());
+                states.pop_back();
+                stateNodes.pop_back();
+            }
 
-                assert(actionTable.count({states.back(), r.symbol}) != 0);
-                Action action2 = actionTable[{states.back(), r.symbol}];
-                states.push_back(action2.tgt);
-                if (showStates) {
-                    cout << fmt::format("GOTO s{}", action2.tgt);
-                }
+            assert(actionTable.count({states.back(), r.symbol}) != 0);
+            Action action2 = actionTable[{states.back(), r.symbol}];
+            states.push_back(action2.tgt);
+            if (showStates) { cout << fmt::format("GOTO s{}", action2.tgt); }
 
-                GrammarNode *nextNode = new GrammarNode({{}, r.symbol});
-                while (temp.size()) {
-                    nextNode->children.push_back(temp.back());
-                    temp.pop_back();
-                }
-                stateNodes.push_back(nextNode);
-                break;
+            GrammarNode *nextNode = new GrammarNode({{}, r.symbol});
+            while (temp.size()) {
+                nextNode->children.push_back(temp.back());
+                temp.pop_back();
             }
-            case Action::Type::kAccept: {
-                if (showStates) { cout << "ACCEPT\t\t"; }
-                flag = false;
-                break;
-            }
-            default: {
-                assert(false);
-                break;
-            }
+            stateNodes.push_back(nextNode);
+            break;
+        }
+        case Action::Type::kAccept: {
+            if (showStates) { cout << "ACCEPT\t\t"; }
+            flag = false;
+            break;
+        }
+        default: {
+            assert(false);
+            break;
+        }
         }
         if (showStates) {
             cout << fmt::format("\nstates: [{}], done\n",
@@ -153,188 +150,193 @@ void printGrammarTreeNode(GrammarNode *           node,
 }
 
 // test first set and follow set
-void test1() {
-    fmt::print("test first-set and follow-set \n");
-    fmt::print("----------------------------- \n");
-    // initialize symbolset and grammar
-    Grammar grammar({
-        "Q -> S",
-        "S -> V '=' R",
-        "S -> R",
-        "R -> L",
-        "L -> '*' R",
-        "L -> i",
-        "V -> a",
-    });
+TEST_CASE("grammar_01") {
+    try {
+        // fmt::print("test first-set and follow-set \n");
+        // fmt::print("----------------------------- \n");
+        // initialize symbolset and grammar
+        Grammar grammar({
+            "Q -> S",
+            "S -> V '=' R",
+            "S -> R",
+            "R -> L",
+            "L -> '*' R",
+            "L -> i",
+            "V -> a",
+        });
 
-    auto firstSets  = getFirstSets(grammar);
-    auto followSets = getFollowSets(grammar, firstSets);
-    fmt::print("\n");
+        map<int, set<int>> firstSets  = getFirstSets(grammar);
+        map<int, set<int>> followSets = getFollowSets(grammar, firstSets);
+        // fmt::print("\n");
+
+    } catch (exception &err) { CHECK(false); }
 }
 
 // test syntax parsing
-void test2() {
-    fmt::print("test LR(1) analysis procedure \n");
-    fmt::print("----------------------------- \n");
-    // initialize symbolset and grammar
-    Grammar grammar({
-        "Q -> A",
-        "A -> A + M",
-        "A -> M",
-        "M -> M * M",
-        "M -> ( A )",
-        "M -> d",
-    });
-    string src = "(d+d)*d+(d)";
+TEST_CASE("grammar_02") {
+    try {
+        // fmt::print("test LR(1) analysis procedure \n");
+        // fmt::print("----------------------------- \n");
+        // initialize symbolset and grammar
+        Grammar grammar({
+            "Q -> A",
+            "A -> A + M",
+            "A -> M",
+            "M -> M * M",
+            "M -> ( A )",
+            "M -> d",
+        });
+        string  src = "(d+d)*d+(d)";
 
-    fmt::print("> symbol names:\n");
-    for (auto[id, str] : grammar.symbolNames) {
-        cout << fmt::format("{:d}: {:s}\n", id, str);
-    }
+        // fmt::print("> symbol names:\n");
+        // for (auto[id, str] : grammar.symbolNames) {
+        //     cout << fmt::format("{:d}: {:s}\n", id, str);
+        // }
 
-    auto firstSets  = getFirstSets(grammar);
-    auto followSets = getFollowSets(grammar, firstSets);
-    auto lr1Automata = getLR1automata(grammar);
-    auto actionTable = getLR1table(grammar, lr1Automata);
+        auto firstSets   = getFirstSets(grammar);
+        auto followSets  = getFollowSets(grammar, firstSets);
+        auto lr1Automata = getLR1automata(grammar);
+        auto actionTable = getLR1table(grammar, lr1Automata);
 
-    fmt::print("> use LR(1) Action Table to parse: \n");
-    fmt::print("> input string: {}\n", src);
-    vector<int> tokens = simpleLexicalParser(grammar.symbolNames, src);
-    fmt::print("{}\n\n", fmt::join(tokens, ", "));
+        // fmt::print("> use LR(1) Action Table to parse: \n");
+        // fmt::print("> input string: {}\n", src);
+        vector<int> tokens = simpleLexicalParser(grammar.symbolNames, src);
+        // fmt::print("{}\n\n", fmt::join(tokens, ", "));
 
-    GrammarNode *root = simpleSyntaxParser(grammar, actionTable, tokens, true);
-    fmt::print("> grammar tree: \n");
-    printGrammarTreeNode(root, grammar.symbolNames, cout);
+        // GrammarNode *root =
+            simpleSyntaxParser(grammar, actionTable, tokens, false);
+        // fmt::print("> grammar tree: \n");
+        // printGrammarTreeNode(root, grammar.symbolNames, cout);
 
-    fmt::print("\n");
+        // fmt::print("\n");
+    } catch (exception &err) { CHECK(false); }
 }
 
 // test ambiguous grammar: "Dangling-Else"
-void test3() {
-    fmt::print("test ambiguous grammar: \"Dangling-Else\" \n");
-    fmt::print("--------------------------------------- \n");
-    // initialize symbolset and grammar
-    Grammar grammar({
-        "P -> S",
-        "S -> i S t S e S",
-        "S -> i S t S",
-        "S -> D",
-    });
+TEST_CASE("grammar_03") {
+    try {
+        // fmt::print("test ambiguous grammar: \"Dangling-Else\" \n");
+        // fmt::print("--------------------------------------- \n");
+        // initialize symbolset and grammar
+        Grammar grammar({
+            "P -> S",
+            "S -> i S t S e S",
+            "S -> i S t S",
+            "S -> D",
+        });
 
-    grammar.prodsPriority[1] = -1;
-    string src = "iDtiDtDeD";
+        grammar.prodsPriority[1] = -1;
+        string src               = "iDtiDtDeD";
 
-    cout << grammar.str();
-    fmt::print("> symbol names:\n");
-    for (auto[id, str] : grammar.symbolNames) {
-        cout << fmt::format("{:d}: {:s}\n", id, str);
-    }
+        // cout << grammar.str();
+        // fmt::print("> symbol names:\n");
+        // for (auto[id, str] : grammar.symbolNames) {
+        //     cout << fmt::format("{:d}: {:s}\n", id, str);
+        // }
 
-    auto firstSets  = getFirstSets(grammar);
-    auto followSets = getFollowSets(grammar, firstSets);
-    auto lr1Automata = getLR1automata(grammar);    
-    auto actionTable = getLR1table(grammar, lr1Automata);
+        auto firstSets   = getFirstSets(grammar);
+        auto followSets  = getFollowSets(grammar, firstSets);
+        auto lr1Automata = getLR1automata(grammar);
+        auto actionTable = getLR1table(grammar, lr1Automata);
 
-    fmt::print("> use LR(1) Action Table to parse: \n");
-    fmt::print("> input string: {}\n", src);
+        // fmt::print("> use LR(1) Action Table to parse: \n");
+        // fmt::print("> input string: {}\n", src);
 
-    vector<int> tokens = simpleLexicalParser(grammar.symbolNames, src);
-    fmt::print("{}\n\n", fmt::join(tokens, ", "));
+        vector<int> tokens = simpleLexicalParser(grammar.symbolNames, src);
+        // fmt::print("{}\n\n", fmt::join(tokens, ", "));
 
-    GrammarNode *root = simpleSyntaxParser(grammar, actionTable, tokens, true);
-    fmt::print("> grammar tree: \n");
-    printGrammarTreeNode(root, grammar.symbolNames, cout);
+        // GrammarNode *root =
+            simpleSyntaxParser(grammar, actionTable, tokens, false);
+        // fmt::print("> grammar tree: \n");
+        // printGrammarTreeNode(root, grammar.symbolNames, cout);
+
+    } catch (exception &err) { CHECK(false); }
 }
 
 // test ambiguous grammar: priority and associacity
-void test4() {
-    fmt::print("test ambiguous grammar: priority and associacity \n");
-    fmt::print("------------------------------------------------ \n");
-    Grammar grammar({
-        "P -> S",
-        "S -> S + S",
-        "S -> S - S",
-        "S -> S * S",
-        "S -> S / S",
-        "S -> S < S",
-        "S -> S > S",
-        "S -> D",
-    });
+TEST_CASE("grammar_04") {
+    try {
+        // fmt::print("test ambiguous grammar: priority and associacity \n");
+        // fmt::print("------------------------------------------------ \n");
+        Grammar grammar({
+            "P -> S",
+            "S -> S + S",
+            "S -> S - S",
+            "S -> S * S",
+            "S -> S / S",
+            "S -> S < S",
+            "S -> S > S",
+            "S -> D",
+        });
 
-    grammar.prodsPriority[1] = -1;
-    grammar.prodsPriority[2] = -1;
-    grammar.prodsPriority[3] = -2;
-    grammar.prodsPriority[4] = -2;
-    grammar.prodsPriority[5] = -3;
-    grammar.prodsPriority[6] = -3;
-    grammar.prodsAssociate[1] = Associate::kLeft;
-    grammar.prodsAssociate[2] = Associate::kLeft;
-    grammar.prodsAssociate[3] = Associate::kLeft;
-    grammar.prodsAssociate[4] = Associate::kLeft;
-    grammar.prodsAssociate[5] = Associate::kRight;
-    grammar.prodsAssociate[6] = Associate::kRight;
+        grammar.prodsPriority[1]  = -1;
+        grammar.prodsPriority[2]  = -1;
+        grammar.prodsPriority[3]  = -2;
+        grammar.prodsPriority[4]  = -2;
+        grammar.prodsPriority[5]  = -3;
+        grammar.prodsPriority[6]  = -3;
+        grammar.prodsAssociate[1] = Associate::kLeft;
+        grammar.prodsAssociate[2] = Associate::kLeft;
+        grammar.prodsAssociate[3] = Associate::kLeft;
+        grammar.prodsAssociate[4] = Associate::kLeft;
+        grammar.prodsAssociate[5] = Associate::kRight;
+        grammar.prodsAssociate[6] = Associate::kRight;
 
-    string src = "D+D*D<D+D<D+D*D*D*D+D<D";
+        string src = "D+D*D<D+D<D+D*D*D*D+D<D";
 
-    cout << grammar.str();
-    fmt::print("> symbol names:\n");
-    for (auto[id, str] : grammar.symbolNames) {
-        cout << fmt::format("{:d}: {:s}\n", id, str);
-    }
+        // cout << grammar.str();
+        // fmt::print("> symbol names:\n");
+        // for (auto[id, str] : grammar.symbolNames) {
+        //     cout << fmt::format("{:d}: {:s}\n", id, str);
+        // }
 
-    auto firstSets  = getFirstSets(grammar);
-    auto followSets = getFollowSets(grammar, firstSets);
-    auto lr1Automata = getLR1automata(grammar);
-    auto actionTable = getLR1table(grammar, lr1Automata);
-    
-    fmt::print("> use LR(1) Action Table to parse: \n");
-    fmt::print("> input string: {}\n", src);
-    vector<int> tokens = simpleLexicalParser(grammar.symbolNames, src);
-    fmt::print("{}\n\n", fmt::join(tokens, ", "));
+        auto firstSets   = getFirstSets(grammar);
+        auto followSets  = getFollowSets(grammar, firstSets);
+        auto lr1Automata = getLR1automata(grammar);
+        auto actionTable = getLR1table(grammar, lr1Automata);
 
-    GrammarNode *root = simpleSyntaxParser(grammar, actionTable, tokens, true);
-    fmt::print("> grammar tree: \n");
-    printGrammarTreeNode(root, grammar.symbolNames, cout);
+        // fmt::print("> use LR(1) Action Table to parse: \n");
+        // fmt::print("> input string: {}\n", src);
+        vector<int> tokens = simpleLexicalParser(grammar.symbolNames, src);
+        // fmt::print("{}\n\n", fmt::join(tokens, ", "));
+
+        // GrammarNode *root =
+            simpleSyntaxParser(grammar, actionTable, tokens, false);
+        // fmt::print("> grammar tree: \n");
+        // printGrammarTreeNode(root, grammar.symbolNames, cout);
+
+    } catch (exception &err) { CHECK(false); }
 }
 
 // LALR test
-void test5() {
-    fmt::print("test empty production in LR(1) grammar \n");
-    fmt::print("-------------------------------------- \n");
-    // initialize symbolset and grammar
-    Grammar grammar({
-        "S -> P",
-        "P -> ( As Bs )",
-        "As -> As A", // 左递归
-        "As ->",
-        "Bs -> Bs B", // 左递归
-        "Bs ->",
-    });
+TEST_CASE("grammar_05") {
+    try {
+        // fmt::print("test empty production in LR(1) grammar \n");
+        // fmt::print("-------------------------------------- \n");
+        // initialize symbolset and grammar
+        Grammar grammar({
+            "S -> P",
+            "P -> ( As Bs )",
+            "As -> As A", // 左递归
+            "As ->",
+            "Bs -> Bs B", // 左递归
+            "Bs ->",
+        });
 
-    auto lr1Automata = getLR1automata(grammar);
-    auto lalr1Automata = getLALR1fromLR1(grammar, lr1Automata);
-    auto actionTable = getLR1table(grammar, lalr1Automata);
+        auto lr1Automata   = getLR1automata(grammar);
+        auto lalr1Automata = getLALR1fromLR1(grammar, lr1Automata);
+        auto actionTable   = getLR1table(grammar, lalr1Automata);
 
-    fmt::print("> use LR(1) Action Table to analyze: \n");
-    string src = "()";
-    fmt::print("> input string: {}\n", src);
+        // fmt::print("> use LR(1) Action Table to analyze: \n");
+        string src = "()";
+        // fmt::print("> input string: {}\n", src);
 
-    vector<int> tokens = simpleLexicalParser(grammar.symbolNames, src);
-    cout << src << "\n";
+        vector<int> tokens = simpleLexicalParser(grammar.symbolNames, src);
 
-    GrammarNode *root = simpleSyntaxParser(grammar, actionTable, tokens, true);
-    fmt::print("> grammar tree: \n");
-    printGrammarTreeNode(root, grammar.symbolNames, cout);
-}
+        // GrammarNode *root =
+            simpleSyntaxParser(grammar, actionTable, tokens, false);
+        // fmt::print("> grammar tree: \n");
+        // printGrammarTreeNode(root, grammar.symbolNames, cout);
 
-int main() {
-    krill::log::sink_cerr->set_level(spdlog::level::debug);
-    vector<void (*)()> testFuncs = {test1, test2, test3, test4, test5};
-    // vector<void (*)()> testFuncs = { test5};
-    for (int i = 0; i < testFuncs.size(); i++) {
-        cout << "#test " << (i + 1) << "\n";
-        testFuncs[i]();
-        cout << "\n" << "\n";
-    }
-    return 0;
+    } catch (exception &err) { CHECK(false); }
 }

@@ -1,4 +1,4 @@
-target('test_automata')
+target('test')
   add_files('test_automata.cpp')
   add_deps('krill')
 target('test_grammar')

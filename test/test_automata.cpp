@@ -1,6 +1,7 @@
-#include "krill/defs.h"
-#include "krill/automata.h"
 #include "fmt/format.h"
+#include "krill/automata.h"
+#include "krill/defs.h"
+#include <doctest/doctest.h>
 #include <iostream>
 using namespace std;
 using namespace krill::type;
@@ -23,7 +24,9 @@ void printDFA(DFA dfa, ostream &oss, bool isAscii = false) {
 
     oss << "DFA: \n";
     oss << "\t";
-    for (int symbol : symbolset) { oss << fmt::format(isAscii ? "'{:c}'\t":"_{:d}\t", symbol); }
+    for (int symbol : symbolset) {
+        oss << fmt::format(isAscii ? "'{:c}'\t" : "_{:d}\t", symbol);
+    }
     oss << "\n";
     for (const auto &elem : dfa.finality) {
         const int &state = elem.first;
@@ -51,7 +54,9 @@ void printNFA(NFA nfa, ostream &oss, bool isAscii = false) {
 
     oss << "NFA: \n";
     oss << "\t";
-    for (int symbol : symbolset) { oss << fmt::format(isAscii ? "'{:c}'\t":"_{:d}\t", symbol); }
+    for (int symbol : symbolset) {
+        oss << fmt::format(isAscii ? "'{:c}'\t" : "_{:d}\t", symbol);
+    }
     oss << "\n";
     for (const auto &elem : nfa.finality) {
         const int &state = elem.first;
@@ -78,103 +83,128 @@ void printNFA(NFA nfa, ostream &oss, bool isAscii = false) {
 }
 
 // test the transformation from EdgeTable to NFA to DFA
-void test1() {
-    printf("test EdgeTable -> NFA -> DFA \n");
-    printf("---------------------------- \n");
-    EdgeTable edgeTable = {
-        // regex: a(b|c+)c
-        {'a', 0, 1}, {'b', 1, 2},  {'\0', 1, 3}, // '\0' empty edge
-        {'c', 3, 3}, {'\0', 3, 2}, {'b', 2, 4},
-    };
-    printf("> Edge Table \n");
-    printEdgeTable(edgeTable, cout);
+TEST_CASE("automata_NFA_to_DFA") {
+    try {
+        // test EdgeTable -> NFA -> DFA
+        EdgeTable edgeTable = {
+            // regex: a(b|c+)c
+            {'a', 0, 1},  {'b', 1, 2}, {'c', 2, 3}, // '\0' empty edge
+            {'\0', 1, 4}, {'c', 4, 4}, {'c', 4, 2},
+        };
 
-    NFAgraph      nfaGraph = toNFAgraph(edgeTable);
-    map<int, int> finality = {
-        {0, 0}, {1, 0}, {2, 0}, {3, 0}, {4, 1}}; // must contains all states
-    NFA nfa({nfaGraph, finality});
-    printf("> NFA \n");
-    printNFA(nfa, cout);
+        NFAgraph      nfaGraph = toNFAgraph(edgeTable);
+        map<int, int> finality = {
+            {0, 0}, {1, 0}, {2, 0}, {3, 1}, {4, 0}}; // must contains all states
+        NFA nfa({nfaGraph, finality});
 
-    DFA dfa = getDFAfromNFA(nfa);
-    printf("> DFA \n");
-    printDFA(dfa, cout);
+        DFA dfa = getDFAfromNFA(nfa);
+
+        CHECK(match(dfa, "abc"));
+        CHECK(match(dfa, "acc"));
+        CHECK(match(dfa, "acccccc"));
+        CHECK(unmatch(dfa, "abbc"));
+        CHECK(unmatch(dfa, "ac"));
+        CHECK(unmatch(dfa, "abcc"));
+        CHECK(unmatch(dfa, "acbc"));
+        CHECK(unmatch(dfa, "a"));
+        CHECK(unmatch(dfa, "bc"));
+        CHECK(unmatch(dfa, ""));
+        CHECK(unmatch(dfa, "adc"));
+
+    } catch (exception &err) { CHECK(false); }
 }
 
 // test the minimization of DFA
-void test2() {
-    printf("test minimization of DFA \n");
-    printf("------------------------ \n");
-    DFA dfa = {{
-                   {0, {{'a', 11}}},
-                   {11, {{'b', 2}}},
-                   {22, {{'a', 33}}},
-                   {33, {{'b', 0}}},
-                   {44, {{'a', 55}}},
-               },
-               {{0, 0}, {11, 1}, {22, 0}, {33, 1}, {44, 0}, {55, 0}}};
-    printf("> raw DFA \n");
-    printDFA(dfa, cout);
+TEST_CASE("automata_minimize_DFA") {
+    try {
+        // test minimization of DFA
+        DFA dfa = {{
+                       // (a)
+                       {0, {{'a', 11}}},
+                       {11, {{'b', 2}}},
+                       {22, {{'a', 33}}},
+                       {33, {{'b', 0}}},
+                       {44, {{'a', 55}}},
+                   },
+                   {{0, 0}, {11, 1}, {22, 0}, {33, 1}, {44, 0}, {55, 0}}};
+        DFA dfa2 = getMinimizedDfa(dfa);
 
-    DFA dfa2 = getMinimizedDfa(dfa);
-    printf("> minimized DFA \n");
-    printDFA(dfa2, cout);
+        CHECK(match(dfa, "a"));
+        CHECK(unmatch(dfa, "ab"));
+        CHECK(unmatch(dfa, "aba"));
+        CHECK(unmatch(dfa, ""));
+
+        CHECK(match(dfa2, "a"));
+        CHECK(unmatch(dfa2, "ab"));
+        CHECK(unmatch(dfa2, "aba"));
+        CHECK(unmatch(dfa2, ""));
+
+    } catch (std::runtime_error &err) { CHECK(false); }
 }
 
 // test the intergration of multiple DFAs
-void test3() {
-    printf("test intergration of multiple DFAs \n");
-    printf("---------------------------------- \n");
+TEST_CASE("automata_intergrate_DFAs") {
+    try {
+        // test intergration of multiple DFAs
+        DFA dfa1 = {// abcc
+                    {
+                        {0, {{'a', 10}}},
+                        {10, {{'b', 20}}},
+                        {20, {{'c', 30}}},
+                        {30, {{'c', 40}}},
+                    },
+                    {
+                        {0, 0},
+                        {10, 0},
+                        {20, 0},
+                        {30, 0},
+                        {40, 1},
+                    }};
 
-    DFA dfa1 = {// abcc
-                {
-                    {0, {{'a', 10}}},
-                    {10, {{'b', 20}}},
-                    {20, {{'c', 30}}},
-                    {30, {{'c', 0}}},
-                },
-                {
-                    {0, 0},
-                    {10, 1},
-                    {20, 0},
-                    {30, 1},
-                }};
-    printf("> DFA(1) \n");
-    printDFA(dfa1, cout);
+        CHECK(match(dfa1, "abcc"));
+        CHECK(unmatch(dfa1, "abc"));
+        CHECK(unmatch(dfa1, "ac"));
+        CHECK(unmatch(dfa1, "abbc"));
 
-    DFA dfa2 = {// a(ba)*
-                {
-                    {0, {{'a', 1}}},
-                    {1, {{'b', 0}}},
-                },
-                {{0, 0}, {1, 1}}};
-    printf("> DFA(2) \n");
-    printDFA(dfa2, cout);
+        DFA dfa2 = {// a(ba)*
+                    {
+                        {0, {{'a', 1}}},
+                        {1, {{'b', 0}}},
+                    },
+                    {{0, 0}, {1, 1}}};
 
-    DFA dfa3 = {// ac(b+c|c)
-                {
-                    {0, {{'a', 2}}},
-                    {2, {{'c', 4}}},
-                    {4, {{'b', 5}}},
-                    {5, {{'b', 5}}},
-                    {5, {{'c', 6}}},
-                    {4, {{'c', 6}}},
-                },
-                {{0, 0}, {2, 0}, {4, 0}, {5, 1}, {6, 1}}};
-    printf("> DFA(3) \n");
-    printDFA(dfa3, cout);
+        CHECK(match(dfa2, "a"));
+        CHECK(match(dfa2, "aba"));
+        CHECK(match(dfa2, "abababa"));
+        CHECK(unmatch(dfa2, "ab"));
+        CHECK(unmatch(dfa2, "abab"));
+        CHECK(unmatch(dfa2, "abb"));
 
-    DFA dfai = getDFAintegrated({dfa1, dfa2, dfa3});
-    printf("> DFA intergrated \n");
-    printDFA(dfai, cout);
-}
+        DFA dfa3 = {// ac(b+c|c)
+                    {
+                        {0, {{'a', 2}}},
+                        {2, {{'c', 4}}},
+                        {4, {{'b', 5}, {'c', 6}}},
+                        {5, {{'b', 5}, {'c', 6}}},
+                    },
+                    {{0, 0}, {2, 0}, {4, 0}, {5, 0}, {6, 1}}};
+        
+        CHECK(match(dfa3, "acc"));
+        CHECK(match(dfa3, "acbc"));
+        CHECK(match(dfa3, "acbbbbc"));
+        CHECK(unmatch(dfa3, "acb"));
+        CHECK(unmatch(dfa3, "acbcb"));
+        CHECK(unmatch(dfa3, "abc"));
 
-int main() {
-    vector<void (*)()> testFuncs = {test1, test2, test3};
-    for (int i = 0; i < testFuncs.size(); i++) {
-        cout << "#test " << (i + 1) << endl;
-        testFuncs[i]();
-        cout << endl << endl;
-    }
-    return 0;
+        DFA dfai = getDFAintegrated({dfa1, dfa2, dfa3});
+        
+        CHECK(match(dfai, "abcc") == 1);
+        CHECK(match(dfai, "a") == 2);
+        CHECK(match(dfai, "aba") == 2);
+        CHECK(match(dfai, "abababa") == 2);
+        CHECK(match(dfai, "acc") == 3);
+        CHECK(match(dfai, "acbc") == 3);
+        CHECK(match(dfai, "acbbbbc") == 3);
+
+    } catch (std::runtime_error &err) { CHECK(false); }
 }

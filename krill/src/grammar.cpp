@@ -155,7 +155,7 @@ Grammar::Grammar(vector<vector<string>> prodSymbolStrs,
     auto[prodsPriors, prodsAssos] = getPriorityAndAsscociate(
         prodSymbolStrs, symbolPriority, symbolAssociate);
     new (this) Grammar(ts, nts, prods, symbolNames, prodsPriors, prodsAssos);
-    logger.info("grammar generated:\n{}", this->str());
+    logger.debug("grammar generated:\n{}", this->str());
 }
 
 Grammar::Grammar(vector<string> prodStrs) {
@@ -555,7 +555,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                 // conflict
                 Action theirAction = actionTable.at({i, item.search});
                 Action ourAction   = {Action::Type::kReduce, r};
-                logger.info(
+                logger.debug(
                     "lr1 conflit at state s{}, search {}: ours: {}, theirs: {}",
                     i, symbolNames.at(item.search), ourAction.str(),
                     theirAction.str());
@@ -583,7 +583,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
 
                 // REDUCE / ACTION conflict
                 assert(theirAction.type == Action::Type::kAction);
-                logger.info("  item p{}: {}", r + 1, to_string(item, grammar));
+                logger.debug("  item p{}: {}", r + 1, to_string(item, grammar));
 
                 int a;
                 for (a = 0; a < prods.size(); a++) {
@@ -600,14 +600,14 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                     bool useOurs = (rPrior < aPrior);
                     actionTable[{i, item.search}] =
                         useOurs ? ourAction : theirAction;
-                    logger.info("  conflict resolved: {} (priority r={}, a={})",
+                    logger.debug("  conflict resolved: {} (priority r={}, a={})",
                                 (useOurs ? "REDUCE" : "ACTION"), rPrior,
                                 aPrior);
                     if (min(rPrior, aPrior) >= 0) {
                         // resolved by default priority, dangerous!
                         logger.warn("  conflit resolved by default "
                                         "priority, may not be what you want");
-                        logger.info("  summary of state s{}: \n{}", i,
+                        logger.debug("  summary of state s{}: \n{}", i,
                                     to_string(states[i], grammar));
                     }
                 } else if (asso != Associate::kNone) {
@@ -615,7 +615,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                     bool useOurs = (asso == Associate::kLeft);
                     actionTable[{i, item.search}] =
                         useOurs ? ourAction : theirAction;
-                    logger.info("lr1 conflict resolved: {} ({} associate)",
+                    logger.debug("lr1 conflict resolved: {} ({} associate)",
                                 (useOurs ? "REDUCE" : "ACTION"),
                                 (useOurs ? "Left" : "Right"));
                 } else {
@@ -626,7 +626,7 @@ ActionTable getLR1table(Grammar grammar, LR1Automata lr1Automata) {
                         "failed to resolve by priority or associacity");
                     logger.warn("conflit resolved by FORCING reduce, may "
                                     "not be what you want");
-                    logger.info("summary of state s{}: \n{}", i,
+                    logger.debug("summary of state s{}: \n{}", i,
                                 to_string(states[i], grammar));
                 }
             }
@@ -697,7 +697,7 @@ LR1Automata getLALR1fromLR1(Grammar grammar, LR1Automata lr1Automata) {
     for (auto edge : resEdgeTable0) { resEdgeTable.push_back(edge); }
 
     LR1Automata lalr1Automata({resStates, resEdgeTable});
-    logger.info("complete transferring LR1 Automata to LALR1 Automata "
+    logger.info("complete LR1 to LALR1 Automata "
                 "(num_states={} -> {}, num_edges={} -> {})",
                 states.size(), resStates.size(), edgeTable.size(),
                 resEdgeTable.size());
