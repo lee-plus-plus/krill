@@ -177,8 +177,8 @@ void test3() {
 
     ActionTable actionTable = getLALR1table(grammar);
 
-    using MyAstNode = BaseAstNode<AttrDict>;
-    using MyParser = BaseParser<MyAstNode>;
+    using MyAstNode = AstNode;
+    using MyParser = Parser;
 
     Lexer    lexer(toRegexs(nameToRegex));
     MyParser parser(grammar, actionTable);

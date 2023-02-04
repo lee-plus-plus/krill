@@ -148,55 +148,53 @@ class YourLexer : public Lexer {
 
 // -------------------- main --------------------
 
-struct YourAttr { double value; };
-using YourAstNode = BaseAstNode<YourAttr>;
 
-class YourParser : public BaseParser<YourAstNode> {
+class YourParser : public Parser {
   public:
-    YourParser() : BaseParser<YourAstNode>(yourGrammar, yourActionTable) {}
+    YourParser() : Parser(yourGrammar, yourActionTable) {}
 
-    void onAction(YourAstNode *node);
-    void onReduce(YourAstNode *node);
+    void onAction(AstNode *node);
+    void onReduce(AstNode *node);
     void onAccept();
     void onError();
 };
 
-void YourParser::onAction(YourAstNode *node) {
-    if (node->id == d) { node->attr.value = stoi(node->lval); }
+void YourParser::onAction(AstNode *node) {
+    if (node->id == d) { node->attr.RefN<double>("value") = stoi(node->lval); }
 }
 
-void YourParser::onReduce(YourAstNode *node) {
-    YourAttr *         attr = &node->attr;
-    vector<YourAttr *> child;
+void YourParser::onReduce(AstNode *node) {
+    AttrDict *         attr = &node->attr;
+    vector<AttrDict *> child;
     for (auto &node : node->child) { child.push_back(&node.get()->attr); }
 
     switch (node->pidx) {
     case 0: // Q -> P
     case 1: // P -> T
     case 8: // T -> d
-        attr->value = child[0]->value;
+        attr->RefN<double>("value") = child[0]->Ref<double>("value");
         break;
     case 2: // T -> ( P )
-        attr->value = child[1]->value;
+        attr->RefN<double>("value") = child[1]->Ref<double>("value");
         break;
     case 3: // T -> T * T
-        attr->value =
-            child[0]->value * child[2]->value;
+        attr->RefN<double>("value") =
+            child[0]->Ref<double>("value") * child[2]->Ref<double>("value");
         break;
     case 4: // T -> T / T
-        attr->value =
-            child[0]->value / child[2]->value;
+        attr->RefN<double>("value") =
+            child[0]->Ref<double>("value") / child[2]->Ref<double>("value");
         break;
     case 5: // P -> T + T
-        attr->value =
-            child[0]->value + child[2]->value;
+        attr->RefN<double>("value") =
+            child[0]->Ref<double>("value") + child[2]->Ref<double>("value");
         break;
     case 6: // P -> T - T
-        attr->value =
-            child[0]->value - child[2]->value;
+        attr->RefN<double>("value") =
+            child[0]->Ref<double>("value") - child[2]->Ref<double>("value");
         break;
     case 7: // T -> - T
-        attr->value = -child[1]->value;
+        attr->RefN<double>("value") = -child[1]->Ref<double>("value");
         break;
     default:
         assert(false);
@@ -205,7 +203,7 @@ void YourParser::onReduce(YourAstNode *node) {
 
 void YourParser::onAccept() {
     auto node = nodes_.top();
-    spdlog::info("result: {}", node.get()->attr.value);
+    spdlog::info("result: {}", node.get()->attr.Ref<double>("value"));
 }
 
 void YourParser::onError() {}
@@ -267,6 +265,6 @@ int main() {
         }
 
         auto root = parser.getAstRoot();
-        cout << AstPrinter{}.print(root.get());
+        cout << AstPrinter{}.showAttr().print(root.get());
     }
 }
