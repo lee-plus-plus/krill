@@ -37,7 +37,7 @@ namespace krill {
         extern const Token END_TOKEN;
 
         // syntax
-        struct AstNode;
+        // struct AstNode;
 
     } // namespace type
 

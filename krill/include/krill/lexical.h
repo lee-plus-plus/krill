@@ -35,6 +35,10 @@ class Lexer {
     int    state_;   // dfa state
     string history_; // input history
 
+    int row_curr_, col_curr_;
+
+    void count(const string &word);
+
   public:
     Lexer(DFA dfai);
     Lexer(vector<DFA> dfas);

@@ -1,5 +1,5 @@
-#include "fmt/format.h"
 #include "krill/lexical.h"
+#include "fmt/format.h"
 #include "krill/automata.h"
 #include "krill/regex.h"
 #include "krill/utils.h"
@@ -8,8 +8,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
-using krill::log::logger;
 using krill::error::parse_error;
+using krill::log::logger;
 using namespace krill::type;
 using namespace std;
 using krill::automata::getDFAintegrated;
@@ -36,19 +36,30 @@ bool Token::operator!=(const Token &t) const {
 
 namespace krill::runtime {
 
-Lexer::Lexer(DFA dfai) : dfa_(dfai), state_(0) {}
+Lexer::Lexer(DFA dfai)
+    : dfa_(dfai), state_(0), history_(""), row_curr_(1), col_curr_(1) {}
 
 Lexer::Lexer(vector<DFA> dfas)
-    : dfa_(getDFAintegrated(dfas)), state_(0) {}
+    : dfa_(getDFAintegrated(dfas)), state_(0), history_(""), row_curr_(1), col_curr_(1) {}
 
-Lexer::Lexer(vector<string> regexs):
-    dfa_(getDFAintegrated(apply_map(regexs, getDFAfromRegex))), 
-    state_(0)
- {
-    // state_ = 0;
-    // vector<DFA> dfas;
-    // for (string regex : regexs) { dfas.push_back(getDFAfromRegex(regex)); }
-    // dfa_ = getDFAintegrated(dfas);
+Lexer::Lexer(vector<string> regexs)
+    : dfa_(getDFAintegrated(apply_map(regexs, getDFAfromRegex))), state_(0), history_(""),
+      row_curr_(1), col_curr_(1) {
+}
+
+void Lexer::count(const string &word) {
+    for (char c : word) {
+        if (c == '\n') {
+            row_curr_ += 1;
+            col_curr_ = 1;
+        } else if (c == '\t') {
+            // col_ = ((col_ + 3) / 4) * 4 + 1; // bad
+            col_curr_ += 1;
+            while (col_curr_ % 8 != 1) { col_curr_ += 1; } // good
+        } else {
+            col_curr_ += 1;
+        }
+    }
 }
 
 
@@ -69,21 +80,36 @@ Token Lexer::parseStep(istream &input) {
 
             // assert(dfa_.finality.at(state_) != 0); // failed
             if (dfa_.finality.at(state_) == 0) {
-                logger.debug("lexical error: unmatched ‘{}’ in ‘{}’",
-                                buffer.str() + c, unescape(history_ + c));
-                throw runtime_error(
-                    fmt::format("lexical error: unmatched ‘{}’ in ‘{}’",
-                                buffer.str() + c, unescape(history_ + c)));
+                logger.debug("lexer: unmatched ‘{}’ in ‘{}’", buffer.str() + c,
+                             unescape(history_ + c));
+                throw runtime_error(fmt::format("lexer: unmatched ‘{}’ in ‘{}’",
+                                                buffer.str() + c,
+                                                unescape(history_ + c)));
             }
             int    tokenId       = dfa_.finality.at(state_) - 1;
             string tokenLexValue = buffer.str();
+            int    tokenRowSt    = row_curr_;
+            int    tokenColSt    = col_curr_;
+
+            count(tokenLexValue); // update row_curr_, col_curr_
+            int tokenRowEd = row_curr_;
+            int tokenColEd = col_curr_;
+
+            assert(tokenLexValue.size() > 0); // otherwise, dead loop
 
             state_ = 0;
             buffer.clear();
 
-            assert(tokenLexValue.size() > 0);
-            Token token({tokenId, tokenLexValue});
-            logger.debug("parsed lexical <token {}> ‘{}’", token.id, unescape(token.lval));
+            Token token{.id     = tokenId,
+                        .lval   = tokenLexValue,
+                        .row_st = tokenRowSt,
+                        .col_st = tokenColSt,
+                        .row_ed = tokenRowEd,
+                        .col_ed = tokenColEd};
+
+            logger.debug("lexer: <token {}> ‘{}’ ({}:{}-{}:{})", token.id,
+                         unescape(token.lval), tokenRowSt, tokenColSt,
+                         tokenRowEd, tokenColEd);
             return token;
         }
 
@@ -107,8 +133,10 @@ vector<Token> Lexer::parseAll(istream &input) {
 }
 
 void Lexer::clear() {
-    state_ = 0;
-    history_ = "";
+    state_    = 0;
+    history_  = "";
+    row_curr_ = 1;
+    col_curr_ = 1;
 }
 
 } // namespace krill::runtime

@@ -3,6 +3,7 @@
 #include <cassert>
 #include <iostream>
 #include <sstream>
+#include <string>
 using namespace std;
 using namespace krill;
 
@@ -22,12 +23,12 @@ ActionTable yourActionTable = {
     {{2, 261}, {GoA, 7}},   {{2, 262}, {AkA, 5}},   {{3, -1}, {AcA, 0}},
     {{3, 43}, {AkA, 8}},    {{3, 45}, {AkA, 9}},    {{4, -1}, {ReA, 1}},
     {{4, 41}, {ReA, 1}},    {{4, 42}, {AkA, 10}},   {{4, 43}, {ReA, 1}},
-    {{4, 45}, {ReA, 1}},    {{4, 47}, {AkA, 11}},   {{5, -1}, {ReA, 9}},
-    {{5, 41}, {ReA, 9}},    {{5, 42}, {ReA, 9}},    {{5, 43}, {ReA, 9}},
-    {{5, 45}, {ReA, 9}},    {{5, 47}, {ReA, 9}},    {{6, 41}, {AkA, 12}},
-    {{6, 43}, {AkA, 8}},    {{6, 45}, {AkA, 9}},    {{7, -1}, {ReA, 8}},
-    {{7, 41}, {ReA, 8}},    {{7, 42}, {AkA, 10}},   {{7, 43}, {ReA, 8}},
-    {{7, 45}, {ReA, 8}},    {{7, 47}, {AkA, 11}},   {{8, 40}, {AkA, 1}},
+    {{4, 45}, {ReA, 1}},    {{4, 47}, {AkA, 11}},   {{5, -1}, {ReA, 8}},
+    {{5, 41}, {ReA, 8}},    {{5, 42}, {ReA, 8}},    {{5, 43}, {ReA, 8}},
+    {{5, 45}, {ReA, 8}},    {{5, 47}, {ReA, 8}},    {{6, 41}, {AkA, 12}},
+    {{6, 43}, {AkA, 8}},    {{6, 45}, {AkA, 9}},    {{7, -1}, {ReA, 7}},
+    {{7, 41}, {ReA, 7}},    {{7, 42}, {AkA, 10}},   {{7, 43}, {ReA, 7}},
+    {{7, 45}, {ReA, 7}},    {{7, 47}, {AkA, 11}},   {{8, 40}, {AkA, 1}},
     {{8, 45}, {AkA, 2}},    {{8, 261}, {GoA, 13}},  {{8, 262}, {AkA, 5}},
     {{9, 40}, {AkA, 1}},    {{9, 45}, {AkA, 2}},    {{9, 261}, {GoA, 14}},
     {{9, 262}, {AkA, 5}},   {{10, 40}, {AkA, 1}},   {{10, 45}, {AkA, 2}},
@@ -63,9 +64,9 @@ const map<int, string> yourSymbolNames = {
 
 const set<int>          yourTerminalSet    = {40, 41, 42, 43, 45, 47, 262};
 const set<int>          yourNonterminalSet = {259, 260, 261};
-const vector<int>       yourProdsPriority  = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+const vector<int>       yourProdsPriority  = {1, 2, 3, 4, 5, 6, 7, 8, 9};
 const vector<Associate> yourProdsAssociate = {NoA, NoA, NoA, NoA, NoA,
-                                              NoA, NoA, NoA, NoA, NoA};
+                                              NoA, NoA, NoA, NoA};
 
 /** productions:
  *  0: Q -> P
@@ -75,24 +76,19 @@ const vector<Associate> yourProdsAssociate = {NoA, NoA, NoA, NoA, NoA,
  *  4: T -> T '/' T
  *  5: P -> P '+' T
  *  6: P -> P '-' T
- *  7: P -> T
- *  8: T -> '-' T
- *  9: T -> d
+ *  7: T -> '-' T
+ *  8: T -> d
  **/
 
 const vector<Prod> yourProds = {
-    {Q, {P}},         {P, {T}},         {T, {'(', P, ')'}}, {T, {T, '*', T}},
-    {T, {T, '/', T}}, {P, {P, '+', T}}, {P, {P, '-', T}},   {P, {T}},
-    {T, {'-', T}},    {T, {d}},
+    {Q, {P}},         {P, {T}},         {T, {'(', P, ')'}},
+    {T, {T, '*', T}}, {T, {T, '/', T}}, {P, {P, '+', T}},
+    {P, {P, '-', T}}, {T, {'-', T}},    {T, {d}},
 };
 
 const Grammar yourGrammar(yourTerminalSet, yourNonterminalSet, yourProds,
                           yourSymbolNames, yourProdsPriority,
                           yourProdsAssociate);
-class YourParser : public Parser {
-  public:
-    YourParser() : Parser(yourGrammar, yourActionTable) {}
-};
 
 // -------------------- lexer --------------------
 
@@ -152,6 +148,68 @@ class YourLexer : public Lexer {
 
 // -------------------- main --------------------
 
+struct YourAttr { double value; };
+using YourAstNode = BaseAstNode<YourAttr>;
+
+class YourParser : public BaseParser<YourAstNode> {
+  public:
+    YourParser() : BaseParser<YourAstNode>(yourGrammar, yourActionTable) {}
+
+    void onAction(YourAstNode *node);
+    void onReduce(YourAstNode *node);
+    void onAccept();
+    void onError();
+};
+
+void YourParser::onAction(YourAstNode *node) {
+    if (node->id == d) { node->attr.value = stoi(node->lval); }
+}
+
+void YourParser::onReduce(YourAstNode *node) {
+    YourAttr *         attr = &node->attr;
+    vector<YourAttr *> child;
+    for (auto &node : node->child) { child.push_back(&node.get()->attr); }
+
+    switch (node->pidx) {
+    case 0: // Q -> P
+    case 1: // P -> T
+    case 8: // T -> d
+        attr->value = child[0]->value;
+        break;
+    case 2: // T -> ( P )
+        attr->value = child[1]->value;
+        break;
+    case 3: // T -> T * T
+        attr->value =
+            child[0]->value * child[2]->value;
+        break;
+    case 4: // T -> T / T
+        attr->value =
+            child[0]->value / child[2]->value;
+        break;
+    case 5: // P -> T + T
+        attr->value =
+            child[0]->value + child[2]->value;
+        break;
+    case 6: // P -> T - T
+        attr->value =
+            child[0]->value - child[2]->value;
+        break;
+    case 7: // T -> - T
+        attr->value = -child[1]->value;
+        break;
+    default:
+        assert(false);
+    }
+}
+
+void YourParser::onAccept() {
+    auto node = nodes_.top();
+    spdlog::info("result: {}", node.get()->attr.value);
+}
+
+void YourParser::onError() {}
+
 // DIY
 int getSyntaxId(Token token) {
     switch (token.id) {
@@ -180,7 +238,7 @@ int getSyntaxId(Token token) {
 }
 
 int main() {
-    YourLexer lexer;
+    YourLexer  lexer;
     YourParser parser;
 
     while (true) {
@@ -201,7 +259,7 @@ int main() {
             Token token = lexer.parseStep(ss);
             spdlog::info("<token {:d}> \"{}\"", token.id, token.lval);
 
-            int   syntaxId = getSyntaxId(token);
+            int syntaxId = getSyntaxId(token);
             if (syntaxId == -2) { continue; }
             token.id = syntaxId;
 

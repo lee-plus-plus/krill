@@ -172,7 +172,7 @@ void test1() {
     cout << "intergrated DFA:" << endl;
     printDFA(dfai, cout, true);
 
-    Lexer parser(regexDFAs);
+    Lexer lexer(regexDFAs);
 
     vector<string> srcs = {
         "121  abc  a21 a",
@@ -182,12 +182,13 @@ void test1() {
     };
 
     for (string src : srcs) {
+        lexer.clear();
         cout << fmt::format("\n> input=\"{}\"\n", src);
 
         stringstream srcStream;
         srcStream << src;
         while (true) {
-            Token token = parser.parseStep(srcStream);
+            Token token = lexer.parseStep(srcStream);
             cout << fmt::format("[{} \"{}\"]", symbolNames[token.id],
                                 token.lval);
             if (token == END_TOKEN) { break; }
@@ -219,17 +220,18 @@ void test2() {
         {"delim", " +"},
     };
 
-    SimpleLexer parser(grammar, nameToRegex);
+    SimpleLexer lexer(grammar, nameToRegex);
 
     vector<string> srcs = {"a =1 + 21; b=2*0/1; 1/1-1; "};
 
     for (string src : srcs) {
+        lexer.clear();
         cout << fmt::format("\n> input=\"{}\"\n", src);
 
         stringstream srcStream;
         srcStream << src;
         while (true) {
-            Token token = parser.parseStep(srcStream);
+            Token token = lexer.parseStep(srcStream);
             cout << fmt::format("[{} \"{}\"]", grammar.symbolNames[token.id],
                                 token.lval);
             if (token == END_TOKEN) { break; }
